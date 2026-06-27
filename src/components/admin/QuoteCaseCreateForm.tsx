@@ -178,6 +178,7 @@ export function QuoteCaseCreateForm({
   const [itemRows, setItemRows] = useState<QuoteItemRow[]>([DEFAULT_ITEM_ROW]);
   const [itineraryRows, setItineraryRows] = useState<ItineraryRow[]>([DEFAULT_ITINERARY_ROW]);
   const [searches, setSearches] = useState<Record<string, SearchState>>({});
+  const itemDayGroups = buildItemDayGroups(itemRows, itineraryRows);
 
   async function createQuoteCase(formData: FormData) {
     setIsBusy(true);
@@ -343,7 +344,7 @@ export function QuoteCaseCreateForm({
             <h2>Quote Items</h2>
             <p>Search supplier items by keyword, then apply an Excel-style calculation preset.</p>
           </div>
-          <button className="button-secondary" onClick={addItemRow} type="button">
+          <button className="button-secondary" onClick={() => addItemRow()} type="button">
             Add Row
           </button>
         </div>
@@ -378,199 +379,214 @@ export function QuoteCaseCreateForm({
               </tr>
             </thead>
             <tbody>
-              {itemRows.map((row) => {
-                const totals = calculateRowTotals(row);
-                const preset = getCalculationPreset(row.calculationPreset);
-                const searchState = searches[row.id] ?? { isLoading: false, error: "", results: [] };
-                return (
-                  <tr key={row.id}>
-                    <td>
-                      <select
-                        aria-label="Itinerary day"
-                        value={row.itineraryDayNo}
-                        onChange={(event) => updateItemRow(row.id, { itineraryDayNo: event.target.value })}
-                      >
-                        {itineraryRows.map((day) => (
-                          <option key={day.id} value={day.dayNo}>
-                            Day {day.dayNo}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <div className="item-lookup-cell">
-                        <div className="lookup-row">
-                          <input
-                            aria-label="Search item keyword"
-                            placeholder="hotel, bibimbap, bus..."
-                            value={row.searchKeyword}
-                            onChange={(event) => updateItemRow(row.id, { searchKeyword: event.target.value })}
-                          />
-                          <button className="button-secondary" onClick={() => searchCostItems(row)} type="button">
-                            {searchState.isLoading ? "..." : "Search"}
-                          </button>
-                        </div>
-                        <input
-                          aria-label="Item name"
-                          placeholder="Item name"
-                          required
-                          value={row.snapshotItemName}
-                          onChange={(event) => updateItemRow(row.id, { snapshotItemName: event.target.value })}
-                        />
-                        {searchState.error ? <span className="danger-text">{searchState.error}</span> : null}
-                        {searchState.results.length > 0 ? (
-                          <div className="lookup-results">
-                            {searchState.results.slice(0, 3).map((result) => (
-                              <button
-                                key={result.id}
-                                onClick={() => applyCostItem(row.id, result)}
-                                type="button"
-                              >
-                                <strong>{result.name_en ?? result.name_ko}</strong>
-                                <span>{result.domestic_suppliers.name_en ?? result.domestic_suppliers.name_ko}</span>
-                              </button>
-                            ))}
-                          </div>
+              {itemDayGroups.map((group) =>
+                group.rows.length > 0 ? (
+                  group.rows.map((row, rowIndex) => {
+                    const totals = calculateRowTotals(row);
+                    const preset = getCalculationPreset(row.calculationPreset);
+                    const searchState = searches[row.id] ?? { isLoading: false, error: "", results: [] };
+                    return (
+                      <tr className={rowIndex === 0 ? "day-group-start" : undefined} key={row.id}>
+                        {rowIndex === 0 ? (
+                          <td className="day-group-cell" rowSpan={group.rows.length}>
+                            <strong>Day {group.dayNo}</strong>
+                            {group.serviceDate ? <span>{group.serviceDate}</span> : null}
+                            {group.title ? <span>{group.title}</span> : null}
+                            <button className="button-secondary" onClick={() => addItemRow(group.dayNo)} type="button">
+                              Add Item
+                            </button>
+                          </td>
                         ) : null}
-                      </div>
-                    </td>
-                    <td>
-                      <select
-                        aria-label="Item category"
-                        value={row.itemCategory}
-                        onChange={(event) => updateItemRow(row.id, { itemCategory: event.target.value })}
-                      >
-                        {ITEM_CATEGORIES.map((category) => (
-                          <option key={category} value={category}>
-                            {category}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <input
-                        aria-label="Supplier name"
-                        placeholder="Supplier"
-                        value={row.snapshotSupplierName}
-                        onChange={(event) => updateItemRow(row.id, { snapshotSupplierName: event.target.value })}
-                      />
-                    </td>
-                    <td>
-                      <div className="money-cell">
-                        <input
-                          aria-label="Currency"
-                          placeholder="KRW"
-                          value={row.snapshotCostCurrency}
-                          onChange={(event) => updateItemRow(row.id, { snapshotCostCurrency: event.target.value })}
-                        />
-                        <input
-                          aria-label="Unit cost"
-                          min="0"
-                          placeholder="Cost"
-                          step="0.01"
-                          type="number"
-                          value={row.snapshotUnitCostAmount}
-                          onChange={(event) => updateItemRow(row.id, { snapshotUnitCostAmount: event.target.value })}
-                        />
-                        <input
-                          aria-label="Exchange rate to KRW"
-                          min="0"
-                          placeholder="FX"
-                          step="0.000001"
-                          type="number"
-                          value={row.exchangeRateToKrw}
-                          onChange={(event) => updateItemRow(row.id, { exchangeRateToKrw: event.target.value })}
-                        />
-                      </div>
-                    </td>
-                    <td>
-                      <select
-                        aria-label="Calculation preset"
-                        value={row.calculationPreset}
-                        onChange={(event) =>
-                          applyCalculationPreset(row.id, event.target.value as CalculationPreset)
-                        }
-                      >
-                        {CALCULATION_PRESETS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                      <span className="subtext">{preset.formulaLabel}</span>
-                    </td>
-                    <td>
-                      <input
-                        aria-label={preset.quantityLabel}
-                        min="1"
-                        step="0.01"
-                        type="number"
-                        value={row.quantity}
-                        onChange={(event) => updateItemRow(row.id, { quantity: event.target.value })}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        aria-label="Pax count"
-                        min="1"
-                        step="1"
-                        type="number"
-                        value={row.paxCount}
-                        onChange={(event) => updateItemRow(row.id, { paxCount: event.target.value })}
-                      />
-                    </td>
-                    <td>
-                      <div className="margin-cell">
-                        <select
-                          aria-label="Margin mode"
-                          value={row.marginMode}
-                          onChange={(event) =>
-                            updateItemRow(row.id, { marginMode: event.target.value as QuoteItemRow["marginMode"] })
-                          }
-                        >
-                          <option value="auto_rate">Auto %</option>
-                          <option value="manual_total">Manual Total</option>
-                        </select>
-                        {row.marginMode === "manual_total" ? (
+                        <td>
+                          <div className="item-lookup-cell">
+                            <div className="lookup-row">
+                              <input
+                                aria-label="Search item keyword"
+                                placeholder="hotel, bibimbap, bus..."
+                                value={row.searchKeyword}
+                                onChange={(event) => updateItemRow(row.id, { searchKeyword: event.target.value })}
+                              />
+                              <button className="button-secondary" onClick={() => searchCostItems(row)} type="button">
+                                {searchState.isLoading ? "..." : "Search"}
+                              </button>
+                            </div>
+                            <input
+                              aria-label="Item name"
+                              placeholder="Item name"
+                              required
+                              value={row.snapshotItemName}
+                              onChange={(event) => updateItemRow(row.id, { snapshotItemName: event.target.value })}
+                            />
+                            {searchState.error ? <span className="danger-text">{searchState.error}</span> : null}
+                            {searchState.results.length > 0 ? (
+                              <div className="lookup-results">
+                                {searchState.results.slice(0, 3).map((result) => (
+                                  <button
+                                    key={result.id}
+                                    onClick={() => applyCostItem(row.id, result)}
+                                    type="button"
+                                  >
+                                    <strong>{result.name_en ?? result.name_ko}</strong>
+                                    <span>{result.domestic_suppliers.name_en ?? result.domestic_suppliers.name_ko}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        </td>
+                        <td>
+                          <select
+                            aria-label="Item category"
+                            value={row.itemCategory}
+                            onChange={(event) => updateItemRow(row.id, { itemCategory: event.target.value })}
+                          >
+                            {ITEM_CATEGORIES.map((category) => (
+                              <option key={category} value={category}>
+                                {category}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
                           <input
-                            aria-label="Manual sell total"
-                            min="0"
-                            placeholder="Total"
+                            aria-label="Supplier name"
+                            placeholder="Supplier"
+                            value={row.snapshotSupplierName}
+                            onChange={(event) => updateItemRow(row.id, { snapshotSupplierName: event.target.value })}
+                          />
+                        </td>
+                        <td>
+                          <div className="money-cell">
+                            <input
+                              aria-label="Currency"
+                              placeholder="KRW"
+                              value={row.snapshotCostCurrency}
+                              onChange={(event) => updateItemRow(row.id, { snapshotCostCurrency: event.target.value })}
+                            />
+                            <input
+                              aria-label="Unit cost"
+                              min="0"
+                              placeholder="Cost"
+                              step="0.01"
+                              type="number"
+                              value={row.snapshotUnitCostAmount}
+                              onChange={(event) => updateItemRow(row.id, { snapshotUnitCostAmount: event.target.value })}
+                            />
+                            <input
+                              aria-label="Exchange rate to KRW"
+                              min="0"
+                              placeholder="FX"
+                              step="0.000001"
+                              type="number"
+                              value={row.exchangeRateToKrw}
+                              onChange={(event) => updateItemRow(row.id, { exchangeRateToKrw: event.target.value })}
+                            />
+                          </div>
+                        </td>
+                        <td>
+                          <select
+                            aria-label="Calculation preset"
+                            value={row.calculationPreset}
+                            onChange={(event) =>
+                              applyCalculationPreset(row.id, event.target.value as CalculationPreset)
+                            }
+                          >
+                            {CALCULATION_PRESETS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="subtext">{preset.formulaLabel}</span>
+                        </td>
+                        <td>
+                          <input
+                            aria-label={preset.quantityLabel}
+                            min="1"
                             step="0.01"
                             type="number"
-                            value={row.manualTotal}
-                            onChange={(event) => updateItemRow(row.id, { manualTotal: event.target.value })}
+                            value={row.quantity}
+                            onChange={(event) => updateItemRow(row.id, { quantity: event.target.value })}
                           />
-                        ) : (
+                        </td>
+                        <td>
                           <input
-                            aria-label="Margin rate"
-                            min="-1"
-                            placeholder="Rate"
-                            step="0.01"
+                            aria-label="Pax count"
+                            min="1"
+                            step="1"
                             type="number"
-                            value={row.marginRate}
-                            onChange={(event) => updateItemRow(row.id, { marginRate: event.target.value })}
+                            value={row.paxCount}
+                            onChange={(event) => updateItemRow(row.id, { paxCount: event.target.value })}
                           />
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <strong>{formatMoney(totals.sell)}</strong>
-                      <span className="subtext">Cost {formatMoney(totals.cost)}</span>
-                    </td>
-                    <td>
-                      <button
-                        className="button-secondary"
-                        disabled={itemRows.length === 1}
-                        onClick={() => removeItemRow(row.id)}
-                        type="button"
-                      >
-                        Remove
+                        </td>
+                        <td>
+                          <div className="margin-cell">
+                            <select
+                              aria-label="Margin mode"
+                              value={row.marginMode}
+                              onChange={(event) =>
+                                updateItemRow(row.id, { marginMode: event.target.value as QuoteItemRow["marginMode"] })
+                              }
+                            >
+                              <option value="auto_rate">Auto %</option>
+                              <option value="manual_total">Manual Total</option>
+                            </select>
+                            {row.marginMode === "manual_total" ? (
+                              <input
+                                aria-label="Manual sell total"
+                                min="0"
+                                placeholder="Total"
+                                step="0.01"
+                                type="number"
+                                value={row.manualTotal}
+                                onChange={(event) => updateItemRow(row.id, { manualTotal: event.target.value })}
+                              />
+                            ) : (
+                              <input
+                                aria-label="Margin rate"
+                                min="-1"
+                                placeholder="Rate"
+                                step="0.01"
+                                type="number"
+                                value={row.marginRate}
+                                onChange={(event) => updateItemRow(row.id, { marginRate: event.target.value })}
+                              />
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <strong>{formatMoney(totals.sell)}</strong>
+                          <span className="subtext">Cost {formatMoney(totals.cost)}</span>
+                        </td>
+                        <td>
+                          <button
+                            className="button-secondary"
+                            disabled={itemRows.length === 1}
+                            onClick={() => removeItemRow(row.id)}
+                            type="button"
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr className="day-group-start" key={`empty-${group.dayNo}`}>
+                    <td className="day-group-cell">
+                      <strong>Day {group.dayNo}</strong>
+                      {group.serviceDate ? <span>{group.serviceDate}</span> : null}
+                      {group.title ? <span>{group.title}</span> : null}
+                      <button className="button-secondary" onClick={() => addItemRow(group.dayNo)} type="button">
+                        Add Item
                       </button>
                     </td>
+                    <td className="empty-day-items" colSpan={10}>
+                      No quote items assigned to this day yet.
+                    </td>
                   </tr>
-                );
-              })}
+                )
+              )}
             </tbody>
             <tfoot>
               <tr>
@@ -744,7 +760,7 @@ export function QuoteCaseCreateForm({
     setSearches((current) => ({ ...current, [rowId]: { isLoading: false, error: "", results: [] } }));
   }
 
-  function addItemRow() {
+  function addItemRow(dayNo?: string) {
     setItemRows((current) => [
       ...current,
       {
@@ -752,7 +768,7 @@ export function QuoteCaseCreateForm({
         id: `row-${Date.now()}-${current.length}`,
         sourceSupplierProductId: null,
         sourceSupplierPriceId: null,
-        itineraryDayNo: current[0]?.itineraryDayNo ?? "1",
+        itineraryDayNo: dayNo ?? itineraryRows[0]?.dayNo ?? current[0]?.itineraryDayNo ?? "1",
         searchKeyword: "",
         snapshotItemName: "",
         snapshotSupplierName: "",
@@ -798,8 +814,40 @@ export function QuoteCaseCreateForm({
   }
 
   function updateItineraryRow(id: string, patch: Partial<ItineraryRow>) {
+    const previousDayNo = itineraryRows.find((row) => row.id === id)?.dayNo;
     setItineraryRows((current) => current.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+    if (patch.dayNo && previousDayNo && patch.dayNo !== previousDayNo) {
+      setItemRows((current) =>
+        current.map((row) => (row.itineraryDayNo === previousDayNo ? { ...row, itineraryDayNo: patch.dayNo ?? previousDayNo } : row))
+      );
+    }
   }
+}
+
+function buildItemDayGroups(itemRows: QuoteItemRow[], itineraryRows: ItineraryRow[]) {
+  const assigned = new Set<string>();
+  const groups = itineraryRows.map((day) => {
+    const rows = itemRows.filter((row) => row.itineraryDayNo === day.dayNo);
+    rows.forEach((row) => assigned.add(row.id));
+    return {
+      dayNo: day.dayNo,
+      serviceDate: day.serviceDate,
+      title: day.title,
+      rows
+    };
+  });
+
+  const orphanRows = itemRows.filter((row) => !assigned.has(row.id));
+  if (orphanRows.length > 0) {
+    groups.push({
+      dayNo: "Unassigned",
+      serviceDate: "",
+      title: "Items not linked to an itinerary day",
+      rows: orphanRows
+    });
+  }
+
+  return groups;
 }
 
 function choosePrice(prices: CostSearchPrice[]) {

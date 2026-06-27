@@ -400,6 +400,44 @@ table {
   vertical-align: top;
 }
 
+.quote-item-table .day-group-start td {
+  border-top: 2px solid #cbd5e1;
+}
+
+.day-group-cell {
+  background: #f8fafc;
+  border-right: 1px solid #d9dee7;
+  color: #243b53;
+}
+
+.day-group-cell strong,
+.day-group-cell span {
+  display: block;
+}
+
+.day-group-cell strong {
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.day-group-cell span {
+  color: #627d98;
+  font-size: 12px;
+  line-height: 1.35;
+  margin-bottom: 6px;
+  overflow-wrap: anywhere;
+}
+
+.day-group-cell .button-secondary {
+  margin-top: 6px;
+  width: 100%;
+}
+
+.empty-day-items {
+  color: #627d98;
+  font-style: italic;
+}
+
 .quote-item-table input,
 .quote-item-table select {
   width: 100%;
