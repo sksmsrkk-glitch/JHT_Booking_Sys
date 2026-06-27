@@ -47,6 +47,14 @@ export async function requireFinanceUser(supabase: any) {
   return internalUser;
 }
 
+export async function requireAdminUser(supabase: any) {
+  const internalUser = await requireInternalUser(supabase);
+  if (!internalUser.roles.includes("admin")) {
+    throw new HttpError(403, "Admin role is required");
+  }
+  return internalUser;
+}
+
 export async function requireAgencyUser(supabase: any) {
   const user = await requireCurrentUser(supabase);
   const { data, error } = await supabase

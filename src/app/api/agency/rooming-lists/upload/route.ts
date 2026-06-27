@@ -19,10 +19,12 @@ export async function POST(request: Request) {
     const supabase = createRequestSupabaseClient(request);
     const agencyUser = await requireAgencyUser(supabase);
     const reservationId = requireUuid(body.reservationId, "reservationId");
-    const revisionNo = optionalPositiveInteger(body.revisionNo, "revisionNo") ?? 1;
+    await assertAgencyReservation(supabase, reservationId, agencyUser.agencyAccountId);
+    const revisionNo = optionalPositiveInteger(body.revisionNo, "revisionNo") ?? (await nextRevisionNo(supabase, reservationId));
     const originalFilename = requireString(body.originalFilename, "originalFilename");
-    const storagePath = requireString(body.storagePath, "storagePath");
+    const storagePath = optionalString(body.storagePath) ?? `agency-rooming/${reservationId}/rev-${revisionNo}/${originalFilename}`;
     const idempotencyKey = String(body.idempotencyKey ?? `${reservationId}:${revisionNo}:${originalFilename}`);
+    const passengers = body.passengers ? requireArray<PassengerInput>(body.passengers, "passengers") : [];
 
     const { data: roomingList, error: roomingError } = await supabase
       .from("rooming_lists")
@@ -33,6 +35,7 @@ export async function POST(request: Request) {
           original_filename: originalFilename,
           storage_path: storagePath,
           revision_no: revisionNo,
+          parsed_status: passengers.length > 0 ? "parsed" : "uploaded",
           idempotency_key: idempotencyKey
         },
         { onConflict: "idempotency_key" }
@@ -42,7 +45,6 @@ export async function POST(request: Request) {
 
     if (roomingError) throw new HttpError(500, roomingError.message);
 
-    const passengers = body.passengers ? requireArray<PassengerInput>(body.passengers, "passengers") : [];
     if (passengers.length > 0) {
       const rows = passengers.map((passenger, index) => ({
         reservation_id: reservationId,
@@ -68,4 +70,36 @@ export async function POST(request: Request) {
   } catch (error) {
     return fail(error);
   }
+}
+
+async function assertAgencyReservation(supabase: any, reservationId: string, agencyAccountId: string) {
+  const { data, error } = await supabase
+    .from("reservations")
+    .select("id, agency_account_id, status")
+    .eq("id", reservationId)
+    .eq("agency_account_id", agencyAccountId)
+    .maybeSingle();
+
+  if (error) throw new HttpError(500, error.message);
+  if (!data) throw new HttpError(404, "Reservation not found");
+  if (data.status === "cancelled") throw new HttpError(409, "Cancelled reservation cannot receive rooming lists");
+}
+
+async function nextRevisionNo(supabase: any, reservationId: string) {
+  const { data, error } = await supabase
+    .from("rooming_lists")
+    .select("revision_no")
+    .eq("reservation_id", reservationId)
+    .order("revision_no", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new HttpError(500, error.message);
+  return Number(data?.revision_no ?? 0) + 1;
+}
+
+function optionalString(value: unknown) {
+  if (typeof value !== "string") return value === undefined || value === null ? null : String(value);
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }

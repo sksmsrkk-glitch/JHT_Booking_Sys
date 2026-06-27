@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+const noStoreHeaders = { "Cache-Control": "no-store" };
+
 export async function readJson<T = Record<string, unknown>>(request: Request): Promise<T> {
   try {
     return (await request.json()) as T;
@@ -18,7 +20,7 @@ export class HttpError extends Error {
 }
 
 export function ok(data: unknown, init?: ResponseInit) {
-  return NextResponse.json({ data }, init);
+  return jsonResponse({ data }, init);
 }
 
 export function created(data: unknown) {
@@ -27,14 +29,33 @@ export function created(data: unknown) {
 
 export function fail(error: unknown) {
   if (error instanceof HttpError) {
-    return NextResponse.json({ error: error.message }, { status: error.status });
+    return jsonResponse({ error: publicErrorMessage(error) }, { status: error.status });
   }
 
   if (error instanceof Error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return jsonResponse({ error: "Internal server error" }, { status: 500 });
   }
 
-  return NextResponse.json({ error: "Unknown error" }, { status: 500 });
+  return jsonResponse({ error: "Unknown error" }, { status: 500 });
+}
+
+function publicErrorMessage(error: HttpError) {
+  if (error.status >= 500) {
+    return "Internal server error";
+  }
+  return error.message;
+}
+
+function jsonResponse(body: unknown, init?: ResponseInit) {
+  const callerHeaders = Object.fromEntries(new Headers(init?.headers));
+
+  return NextResponse.json(body, {
+    ...init,
+    headers: {
+      ...callerHeaders,
+      ...noStoreHeaders
+    }
+  });
 }
 
 export function requireString(value: unknown, field: string) {

@@ -1,6 +1,7 @@
+import { writeAuditLog } from "@/lib/api/audit";
 import { requireInternalUser } from "@/lib/api/auth";
 import { created, fail, HttpError, readJson } from "@/lib/api/http";
-import { buildReminderIdempotencyKey } from "@/lib/domain/operations.mjs";
+import { assertOperationTaskReminderAllowed, buildReminderIdempotencyKey } from "@/lib/domain/operations.mjs";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -10,7 +11,7 @@ export async function POST(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const body = await readJson<Record<string, unknown>>(request);
     const supabase = createRequestSupabaseClient(request);
-    await requireInternalUser(supabase);
+    const internalUser = await requireInternalUser(supabase);
 
     const ruleCode = String(body.ruleCode ?? "manual");
     const { data: task, error: taskError } = await supabase
@@ -20,6 +21,11 @@ export async function POST(request: Request, context: RouteContext) {
       .single();
 
     if (taskError) throw new HttpError(500, taskError.message);
+    try {
+      assertOperationTaskReminderAllowed({ taskStatus: task.status });
+    } catch (error) {
+      throw new HttpError(409, error instanceof Error ? error.message : "Operation task reminders are locked");
+    }
 
     const { data: rule } = await supabase
       .from("operation_reminder_rules")
@@ -64,6 +70,20 @@ export async function POST(request: Request, context: RouteContext) {
       .single();
 
     if (error) throw new HttpError(500, error.message);
+    await writeAuditLog(supabase, {
+      actorProfileId: internalUser.profileId,
+      action: "operation_task.manual_reminder_queued",
+      entityTable: "operation_tasks",
+      entityId: task.id,
+      beforeData: { status: task.status, assignedTo: task.assigned_to ?? null },
+      afterData: {
+        reminderLogId: data.id,
+        ruleCode,
+        idempotencyKey,
+        notificationStatus: "queued",
+        sentTo: task.assigned_to ? [task.assigned_to] : []
+      }
+    });
     return created(data);
   } catch (error) {
     return fail(error);

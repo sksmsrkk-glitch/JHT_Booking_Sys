@@ -1,5 +1,6 @@
+import { writeAuditLog } from "@/lib/api/audit";
 import { requireAgencyUser } from "@/lib/api/auth";
-import { created, fail, HttpError, optionalPositiveInteger, optionalString, readJson, requireString } from "@/lib/api/http";
+import { created, fail, HttpError, ok, optionalPositiveInteger, optionalString, readJson, requireString } from "@/lib/api/http";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
 const ALLOWED_INQUIRY_TYPES = [
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
       .limit(100);
 
     if (error) throw new HttpError(500, error.message);
-    return Response.json({ data });
+    return ok(data);
   } catch (error) {
     return fail(error);
   }
@@ -59,6 +60,17 @@ export async function POST(request: Request) {
       .single();
 
     if (error) throw new HttpError(500, error.message);
+    await writeAuditLog(supabase, {
+      actorProfileId: null,
+      action: "agency_inquiry.submitted",
+      entityTable: "agency_inquiries",
+      entityId: data.id,
+      afterData: {
+        agencyAccountId: agencyUser.agencyAccountId,
+        agencyUserId: agencyUser.agencyUserId,
+        inquiry: data
+      }
+    });
     return created(data);
   } catch (error) {
     return fail(error);

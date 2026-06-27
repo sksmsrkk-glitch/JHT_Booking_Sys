@@ -1,7 +1,7 @@
 import { requireInternalUser } from "@/lib/api/auth";
 import { writeAuditLog } from "@/lib/api/audit";
 import { created, fail, HttpError } from "@/lib/api/http";
-import { createDefaultOperationTasks } from "@/lib/domain/operations.mjs";
+import { assertReservationOperationsOpen, createDefaultOperationTasks } from "@/lib/domain/operations.mjs";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -14,11 +14,16 @@ export async function POST(request: Request, context: RouteContext) {
 
     const { data: reservation, error: reservationError } = await supabase
       .from("reservations")
-      .select("id, tour_start_date")
+      .select("id, status, tour_start_date")
       .eq("id", id)
       .single();
 
     if (reservationError) throw new HttpError(500, reservationError.message);
+    try {
+      assertReservationOperationsOpen({ reservationStatus: reservation.status });
+    } catch (error) {
+      throw new HttpError(409, error instanceof Error ? error.message : "Reservation operations are locked");
+    }
     if (!reservation.tour_start_date) throw new HttpError(400, "Reservation tour_start_date is required");
 
     const { data: existingTasks, error: existingError } = await supabase

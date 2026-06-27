@@ -8,6 +8,8 @@ export const OPERATION_TEAMS = [
   "finance"
 ];
 
+export const OPERATION_TASK_STATUSES = ["todo", "blocked", "in_progress", "done", "cancelled"];
+
 export const DEFAULT_TASK_TEMPLATES = [
   { team: "sales", taskType: "agency_final_request_check", title: "Confirm final agency request", daysBefore: 30 },
   { team: "operations", taskType: "itinerary_finalization", title: "Finalize itinerary", daysBefore: 21 },
@@ -46,10 +48,63 @@ export function createDefaultOperationTasks({ reservationId, tourStartDate, crea
   });
 }
 
+export function buildOperationTaskUpdate(input, now = new Date()) {
+  const update = {};
+
+  if ("status" in input) {
+    if (!OPERATION_TASK_STATUSES.includes(input.status)) {
+      throw new Error(`Unsupported operation task status: ${input.status}`);
+    }
+    update.status = input.status;
+    if (input.status === "done") {
+      update.completed_at = now.toISOString();
+      update.blocked_reason = null;
+    } else {
+      update.completed_at = null;
+    }
+  }
+
+  if ("blockedReason" in input && update.status !== "done") {
+    update.blocked_reason = normalizeOptionalText(input.blockedReason);
+  }
+
+  if (update.status === "blocked" && !update.blocked_reason) {
+    throw new Error("Blocked tasks require a blocked reason");
+  }
+
+  if (update.status && update.status !== "blocked" && !("blockedReason" in input)) {
+    update.blocked_reason = null;
+  }
+
+  if ("dueAt" in input) {
+    update.due_at = normalizeOptionalDateTime(input.dueAt);
+  }
+
+  if ("domesticSupplierId" in input) {
+    update.domestic_supplier_id = normalizeOptionalText(input.domesticSupplierId);
+  }
+
+  return update;
+}
+
+export function assertReservationOperationsOpen({ reservationStatus }) {
+  if (["cancelled", "completed"].includes(reservationStatus)) {
+    throw new Error(`Reservation operations are locked when status is ${reservationStatus}`);
+  }
+  return true;
+}
+
+export function assertOperationTaskReminderAllowed({ taskStatus }) {
+  if (["done", "cancelled"].includes(taskStatus)) {
+    throw new Error(`Operation task reminders are locked when task status is ${taskStatus}`);
+  }
+  return true;
+}
+
 export function buildReminderCandidates({ tasks, now = new Date(), rules = DEFAULT_REMINDER_RULES }) {
   const nowDate = new Date(now);
   return tasks
-    .filter((task) => !["done", "cancelled"].includes(task.status))
+    .filter((task) => isOperationTaskReminderAllowed(task.status))
     .flatMap((task) => {
       const dueAt = new Date(task.due_at);
       const hoursUntilDue = (dueAt.getTime() - nowDate.getTime()) / 36e5;
@@ -66,6 +121,10 @@ export function buildReminderCandidates({ tasks, now = new Date(), rules = DEFAU
     });
 }
 
+export function isOperationTaskReminderAllowed(taskStatus) {
+  return !["done", "cancelled"].includes(taskStatus);
+}
+
 export function shouldTriggerRule(hoursUntilDue, rule) {
   if (rule.code === "overdue") {
     return hoursUntilDue < 0;
@@ -77,4 +136,20 @@ export function shouldTriggerRule(hoursUntilDue, rule) {
 export function buildReminderIdempotencyKey(task, rule, now) {
   const date = now.toISOString().slice(0, 10);
   return `${task.reservation_id}:${task.id}:${rule.code}:${date}`;
+}
+
+function normalizeOptionalText(value) {
+  if (value === undefined || value === null) return null;
+  const normalized = String(value).trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeOptionalDateTime(value) {
+  const normalized = normalizeOptionalText(value);
+  if (!normalized) return null;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("dueAt must be a valid date/time");
+  }
+  return date.toISOString();
 }

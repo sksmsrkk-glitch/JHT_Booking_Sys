@@ -1,11 +1,28 @@
 import { requireInternalUser } from "@/lib/api/auth";
 import { writeAuditLog } from "@/lib/api/audit";
-import { created, fail, HttpError, readJson, requireArray, requireString, requireUuid } from "@/lib/api/http";
+import { created, fail, HttpError, ok, readJson, requireArray, requireString, requireUuid } from "@/lib/api/http";
 import { makeCaseCode, makeShareId } from "@/lib/domain/ids";
-import { calculateQuoteItem } from "@/lib/domain/quotation.mjs";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
+import { listQuoteCases } from "@/features/quotation/queries";
+import { calculateQuoteItemInput, roundMoney, toQuoteItemRow, type QuoteItemInput } from "@/features/quotation/input";
 
-type QuoteItemInput = Record<string, unknown>;
+export async function GET(request: Request) {
+  try {
+    const supabase = createRequestSupabaseClient(request);
+    await requireInternalUser(supabase);
+
+    const url = new URL(request.url);
+    const quoteCases = await listQuoteCases(supabase, {
+      q: url.searchParams.get("q") ?? undefined,
+      status: url.searchParams.get("status") ?? undefined,
+      agencyAccountId: url.searchParams.get("agencyAccountId") ?? undefined
+    });
+
+    return ok(quoteCases);
+  } catch (error) {
+    return fail(error);
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -14,7 +31,7 @@ export async function POST(request: Request) {
     const internalUser = await requireInternalUser(supabase);
     const rawItems = body.items ? requireArray<QuoteItemInput>(body.items, "items") : [];
 
-    const calculatedItems = rawItems.map((item, index) => calculateInputItem(item, index));
+    const calculatedItems = rawItems.map((item, index) => calculateQuoteItemInput(item, `items[${index}]`));
     const totals = calculatedItems.reduce(
       (current, item) => ({
         cost: current.cost + Number(item.totalCostKrw),
@@ -29,16 +46,16 @@ export async function POST(request: Request) {
       .insert({
         company_id: requireUuid(body.companyId, "companyId"),
         agency_account_id: requireUuid(body.agencyAccountId, "agencyAccountId"),
-        agency_inquiry_id: body.agencyInquiryId ?? null,
+        agency_inquiry_id: optionalUuid(body.agencyInquiryId),
         case_code: String(body.caseCode ?? makeCaseCode()),
         share_id: String(body.shareId ?? makeShareId()),
         tour_name: requireString(body.tourName, "tourName"),
-        tour_type: body.tourType ?? null,
+        tour_type: optionalString(body.tourType),
         status: "quoting",
-        currency: body.currency ?? "KRW",
-        estimated_pax: body.estimatedPax ?? null,
-        start_date: body.startDate ?? null,
-        end_date: body.endDate ?? null,
+        currency: optionalString(body.currency) ?? "KRW",
+        estimated_pax: optionalNumber(body.estimatedPax),
+        start_date: optionalString(body.startDate),
+        end_date: optionalString(body.endDate),
         internal_owner_id: internalUser.profileId
       })
       .select("id, case_code, share_id, tour_name, status")
@@ -52,15 +69,17 @@ export async function POST(request: Request) {
         quote_case_id: quoteCase.id,
         version_no: 1,
         status: "draft",
-        margin_mode: body.marginMode ?? "auto_rate",
-        default_margin_rate: body.defaultMarginRate ?? 0,
-        currency: body.currency ?? "KRW",
-        exchange_rate_to_krw: body.exchangeRateToKrw ?? 1,
+        margin_mode: optionalString(body.marginMode) ?? "auto_rate",
+        default_margin_rate: optionalNumber(body.defaultMarginRate) ?? 0,
+        currency: optionalString(body.currency) ?? "KRW",
+        exchange_rate_to_krw: optionalNumber(body.exchangeRateToKrw) ?? 1,
         agency_visible_summary: body.agencyVisibleSummary ?? {},
+        public_fare_options: Array.isArray(body.publicFareOptions) ? body.publicFareOptions : [],
+        excel_source_summary: normalizeObject(body.excelSourceSummary),
         public_total_amount: roundMoney(totals.sell),
         internal_total_cost_krw: roundMoney(totals.cost),
         internal_total_margin_krw: roundMoney(totals.margin),
-        terms_and_conditions: body.termsAndConditions ?? null,
+        terms_and_conditions: optionalString(body.termsAndConditions),
         created_by: internalUser.profileId
       })
       .select("id, version_no, status")
@@ -86,27 +105,7 @@ export async function POST(request: Request) {
     }
 
     if (calculatedItems.length > 0) {
-      const quoteItemRows = calculatedItems.map((item) => ({
-        quote_version_id: version.id,
-        item_category: item.itemCategory,
-        source_supplier_product_id: item.sourceSupplierProductId,
-        source_supplier_price_id: item.sourceSupplierPriceId,
-        snapshot_item_name: item.snapshotItemName,
-        snapshot_supplier_name: item.snapshotSupplierName,
-        snapshot_cost_currency: item.snapshotCostCurrency,
-        snapshot_unit_cost_amount: item.snapshotCostAmount,
-        exchange_rate_to_krw: item.exchangeRateToKrw,
-        pricing_unit: item.pricingUnit,
-        quantity: item.quantity,
-        pax_count: item.paxCount,
-        margin_mode: item.marginMode,
-        margin_rate: item.marginRate,
-        manual_margin_amount: item.manualMarginAmount,
-        total_cost_krw: item.totalCostKrw,
-        total_sell_amount: item.totalSellAmount,
-        partner_visible_notes: item.partnerVisibleNotes,
-        internal_notes: item.internalNotes
-      }));
+      const quoteItemRows = calculatedItems.map((item) => toQuoteItemRow(version.id, item));
 
       const { error: itemError } = await supabase.from("quote_items").insert(quoteItemRows);
       if (itemError) throw new HttpError(500, itemError.message);
@@ -126,29 +125,24 @@ export async function POST(request: Request) {
   }
 }
 
-function calculateInputItem(item: QuoteItemInput, index: number) {
-  const calculated = calculateQuoteItem({
-    sourceSupplierProductId: item.sourceSupplierProductId ?? null,
-    sourceSupplierPriceId: item.sourceSupplierPriceId ?? null,
-    snapshotItemName: requireString(item.snapshotItemName, `items[${index}].snapshotItemName`),
-    snapshotSupplierName: item.snapshotSupplierName ?? null,
-    snapshotCostCurrency: item.snapshotCostCurrency ?? "KRW",
-    unitCostAmount: item.snapshotUnitCostAmount ?? item.unitCostAmount ?? 0,
-    exchangeRateToKrw: item.exchangeRateToKrw ?? 1,
-    quantity: item.quantity ?? 1,
-    paxCount: item.paxCount ?? 1,
-    pricingUnit: item.pricingUnit ?? "per_group",
-    margin: item.margin ?? { mode: "auto_rate", rate: 0 }
-  });
-
-  return {
-    ...calculated,
-    itemCategory: requireString(item.itemCategory, `items[${index}].itemCategory`),
-    partnerVisibleNotes: item.partnerVisibleNotes ?? null,
-    internalNotes: item.internalNotes ?? null
-  };
+function optionalString(value: unknown) {
+  if (typeof value !== "string") return value === undefined || value === null ? null : String(value);
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
-function roundMoney(value: number) {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
+function optionalNumber(value: unknown) {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function optionalUuid(value: unknown) {
+  if (value === undefined || value === null || value === "") return null;
+  return requireUuid(value, "agencyInquiryId");
+}
+
+function normalizeObject(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value;
 }

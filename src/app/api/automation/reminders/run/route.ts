@@ -1,4 +1,5 @@
 import { requireAutomationSecret } from "@/lib/api/guards";
+import { writeApiLog } from "@/lib/api/api-log";
 import { fail, HttpError, ok } from "@/lib/api/http";
 import { buildReminderCandidates } from "@/lib/domain/operations.mjs";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
@@ -80,7 +81,16 @@ export async function POST(request: Request) {
       queuedCount += 1;
     }
 
-    return ok({ checkedTaskCount: tasks?.length ?? 0, candidateCount: candidates.length, queuedCount });
+    const responsePayload = { checkedTaskCount: tasks?.length ?? 0, candidateCount: candidates.length, queuedCount };
+    await writeApiLog(supabase, {
+      source: "automation_reminders",
+      endpoint: "/api/automation/reminders/run",
+      method: "POST",
+      statusCode: 200,
+      responsePayload
+    });
+
+    return ok(responsePayload);
   } catch (error) {
     return fail(error);
   }

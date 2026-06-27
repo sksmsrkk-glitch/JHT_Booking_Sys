@@ -9,7 +9,21 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.mjs",
-    "verify": "npm run test && npm run typecheck"
+    "verify:env": "node scripts/verify-env.mjs",
+    "verify:schema": "node scripts/verify-schema.mjs",
+    "verify:seed": "node scripts/verify-seed.mjs",
+    "verify:api-guards": "node scripts/verify-api-guards.mjs",
+    "verify:api-body-order": "node scripts/verify-api-body-order.mjs",
+    "verify:api-responses": "node scripts/verify-api-responses.mjs",
+    "verify:api-contract": "node scripts/verify-api-contract.mjs",
+    "verify:repo-safety": "node scripts/verify-repo-safety.mjs",
+    "verify:security-config": "node scripts/verify-security-config.mjs",
+    "verify:launch-runbook": "node scripts/verify-launch-runbook.mjs",
+    "verify:page-smoke": "node scripts/verify-page-smoke.mjs",
+    "verify:app-route-smoke": "node scripts/verify-app-route-smoke.mjs",
+    "smoke:runtime": "node scripts/runtime-smoke.mjs",
+    "verify": "npm run test && npm run typecheck",
+    "verify:v1": "npm run verify:env && npm run verify:schema && npm run verify:seed && npm run verify:api-guards && npm run verify:api-body-order && npm run verify:api-responses && npm run verify:api-contract && npm run verify:repo-safety && npm run verify:security-config && npm run verify:launch-runbook && npm run verify:page-smoke && npm run verify:app-route-smoke && npm run test && npm run typecheck && npm run build && npm run smoke:runtime"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",

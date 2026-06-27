@@ -1,6 +1,7 @@
 import { requireInternalUser } from "@/lib/api/auth";
 import { writeAuditLog } from "@/lib/api/audit";
-import { created, fail, HttpError } from "@/lib/api/http";
+import { created, fail, HttpError, ok } from "@/lib/api/http";
+import { buildQuoteExportRequest, QUOTE_EXPORT_ACTIVE_STATUSES } from "@/lib/domain/quote-export.mjs";
 import { makeExportPath } from "@/lib/domain/ids";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
@@ -11,18 +12,44 @@ export async function POST(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const supabase = createRequestSupabaseClient(request);
     const internalUser = await requireInternalUser(supabase);
+
+    const { data: version, error: versionError } = await supabase
+      .from("quote_versions")
+      .select("id, status, public_total_amount")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (versionError) throw new HttpError(500, versionError.message);
+    if (!version) throw new HttpError(404, "Quote version not found");
+
+    const { data: existing, error: existingError } = await supabase
+      .from("quote_exports")
+      .select("id, quote_version_id, export_type, storage_path, status, error_message, created_at")
+      .eq("quote_version_id", id)
+      .eq("export_type", "xlsx")
+      .in("status", QUOTE_EXPORT_ACTIVE_STATUSES)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) throw new HttpError(500, existingError.message);
+    if (existing) return ok(existing);
+
     const storagePath = makeExportPath(id);
+    const exportRow = buildQuoteExportRequest({
+      quoteVersionId: id,
+      versionStatus: version.status,
+      publicTotalAmount: Number(version.public_total_amount ?? 0),
+      storagePath
+    });
 
     const { data, error } = await supabase
       .from("quote_exports")
       .insert({
-        quote_version_id: id,
-        export_type: "xlsx",
-        storage_path: storagePath,
-        status: "queued",
+        ...exportRow,
         created_by: internalUser.profileId
       })
-      .select("id, quote_version_id, export_type, storage_path, status, created_at")
+      .select("id, quote_version_id, export_type, storage_path, status, error_message, created_at")
       .single();
 
     if (error) throw new HttpError(500, error.message);

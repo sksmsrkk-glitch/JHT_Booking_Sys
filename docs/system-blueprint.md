@@ -1,5 +1,9 @@
 # JHT Operations Platform System Blueprint
 
+## Local V1 Demo Seed
+
+`supabase/seed.sql` provides local-only v1 demo data across master data, quote, reservation, operations, supplier messages, finance, Gmail, migration, audit, API logs, and failed automation recovery. Demo credentials and rows must be removed or replaced before connecting a real Supabase project.
+
 ## 1. 전체 시스템 정의
 
 ### 1.1 시스템 목적
@@ -384,6 +388,7 @@ Quote Version 상태:
 - worker가 XLSX 생성
 - Supabase Storage에 저장
 - export status 업데이트
+- `POST /api/automation/quote-exports/run`이 queued export를 처리하고 `EXPORT_STORAGE_BUCKET` Storage bucket에 업로드한다.
 
 Export 원칙:
 
@@ -1109,6 +1114,9 @@ Domestic Supplier RLS 기준:
 | `POST` | `/api/supplier-messages/:id/approve` | 공급사 메시지 승인 | Internal |
 | `POST` | `/api/supplier-messages/:id/send` | 발송 queue 등록 | Internal |
 | `POST` | `/api/migrations/notion-csv` | Notion CSV staging | Internal |
+| `GET` | `/api/migrations/notion-csv/batches` | Migration batch list | Internal |
+| `PATCH` | `/api/migrations/notion-csv/batches/:id/status` | Migration validate/approve/fail gate | Internal |
+| `PATCH` | `/api/automation/gmail-review/:id` | Gmail manual link/unlink review | Internal |
 
 ### 7.3 Automation API
 
@@ -1227,6 +1235,7 @@ flowchart TD
 /admin/finance/invoices
 /admin/finance/settlements
 /admin/automation/gmail-review
+/admin/automation/failed-jobs
 /admin/migrations/notion-csv
 /admin/audit
 ```
@@ -1459,7 +1468,7 @@ PII 대상:
 | Gmail 오매칭 | 잘못된 case 변경 | confidence score, manual review | email_thread 재연결 audit |
 | 원가 변경이 과거 견적 반영 | 손익 오류 | quote snapshot | 새 quote version 발행 |
 | 룸링리스트 중복 업로드 | 고객/객실 오류 | revision/idempotency/passenger unique | duplicate review UI |
-| Kakao 장애 | 공급사 알림 누락 | fallback email, retry queue | failed outbox 재처리 |
+| Kakao 장애 | 공급사 알림 누락 | fallback email, retry queue | failed outbox 재처리 및 감사로그 |
 | Excel export 실패 | 견적 발송 지연 | queue status/error 저장 | 재시도 버튼 |
 | reminder 중복 | 업무 피로/혼선 | reminder idempotency | log 기준 중복 제거 |
 | settlement 오입력 | 손익 왜곡 | approval/audit | settlement reopen 권한 |

@@ -1,28 +1,30 @@
-const adminWorkflows = [
-  "Search domestic supplier costs",
-  "Create quote cases and quote versions",
-  "Generate reservations after agency acceptance",
-  "Create operation tasks and reminders",
-  "Draft and approve supplier email/Kakao messages",
-  "Record invoices, payments, expenses, shopping commissions, and settlement"
-];
+import { RouteCardGrid } from "@/components/v1/RouteCardGrid";
+import { adminRoutes } from "@/features/v1/site-map";
 
 export default function AdminPage() {
   return (
     <>
-      <h1>Internal Admin</h1>
-      <p>
-        Internal workspace for sales, operations, hotel booking, vehicle booking, guide
-        assignment, content booking, and finance teams.
-      </p>
-      <section className="grid">
-        {adminWorkflows.map((workflow) => (
-          <article className="panel" key={workflow}>
-            <h2>{workflow}</h2>
-            <p>Status: scaffolded API and database contracts are ready for UI implementation.</p>
-          </article>
-        ))}
+      <div className="page-header">
+        <div>
+          <p className="eyebrow">JHT Internal</p>
+          <h1>Internal Admin</h1>
+          <p>
+            Workbench for sales, operations, booking teams, finance, automation review,
+            migration, and audit. Domestic Supplier and Overseas Agency data stay separated.
+          </p>
+        </div>
+      </div>
+      <section className="action-band">
+        <div>
+          <h2>Version 1 Build Map</h2>
+          <p>
+            Start with supplier master data, then connect agency inquiries, quote snapshots,
+            reservations, task reminders, supplier messages, and finance.
+          </p>
+        </div>
+        <span className="status-dot status-live">In Progress</span>
       </section>
+      <RouteCardGrid routes={adminRoutes} />
     </>
   );
 }

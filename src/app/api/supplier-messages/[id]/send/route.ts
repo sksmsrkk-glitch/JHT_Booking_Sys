@@ -1,7 +1,7 @@
 import { requireInternalUser } from "@/lib/api/auth";
 import { writeAuditLog } from "@/lib/api/audit";
 import { fail, HttpError, ok } from "@/lib/api/http";
-import { assertSupplierMessageCanSend } from "@/lib/domain/supplier-messages.mjs";
+import { assertSupplierMessageCanSend, buildSupplierMessageRequeueUpdate } from "@/lib/domain/supplier-messages.mjs";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -23,15 +23,21 @@ export async function POST(request: Request, context: RouteContext) {
       return ok({ id, status: before.status, idempotencyKey: before.idempotency_key });
     }
 
-    try {
-      assertSupplierMessageCanSend(before);
-    } catch (error) {
-      throw new HttpError(400, error instanceof Error ? error.message : "Supplier message is not sendable");
-    }
+    const update =
+      before.status === "failed"
+        ? buildRequeueUpdate(before)
+        : (() => {
+            try {
+              assertSupplierMessageCanSend(before);
+            } catch (error) {
+              throw new HttpError(400, error instanceof Error ? error.message : "Supplier message is not sendable");
+            }
+            return { status: "queued" };
+          })();
 
     const { data, error } = await supabase
       .from("supplier_message_outbox")
-      .update({ status: "queued" })
+      .update(update)
       .eq("id", id)
       .select("id, status, channel, message_type, idempotency_key, risk_level")
       .single();
@@ -60,5 +66,13 @@ export async function POST(request: Request, context: RouteContext) {
     return ok(data);
   } catch (error) {
     return fail(error);
+  }
+}
+
+function buildRequeueUpdate(message: Record<string, unknown>) {
+  try {
+    return buildSupplierMessageRequeueUpdate(message);
+  } catch (error) {
+    throw new HttpError(400, error instanceof Error ? error.message : "Supplier message cannot be requeued");
   }
 }

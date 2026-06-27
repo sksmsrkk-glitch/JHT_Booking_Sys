@@ -1,0 +1,264 @@
+import type {
+  AgencyInvoiceDetail,
+  AgencyInvoiceListItem,
+  AgencyPaymentSummary,
+  AgencyPassengerItem,
+  AgencyQuoteListItem,
+  AgencyReservationDetail,
+  AgencyReservationListItem,
+  AgencyReservationStatusHistoryItem,
+  AgencyRoomingListItem
+} from "./types";
+
+type SupabaseClientLike = {
+  from: (table: string) => any;
+};
+
+export async function listAgencyQuoteCases(
+  supabase: SupabaseClientLike,
+  agencyAccountId: string
+): Promise<AgencyQuoteListItem[]> {
+  const { data, error } = await supabase
+    .from("quote_cases")
+    .select(
+      "id, case_code, share_id, tour_name, tour_type, status, currency, estimated_pax, start_date, end_date, created_at, quote_versions(id, version_no, status, public_total_amount, sent_at, accepted_at)"
+    )
+    .eq("agency_account_id", agencyAccountId)
+    .in("status", ["sent", "revision_requested", "accepted", "expired"])
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapAgencyQuoteListItem);
+}
+
+export async function listAgencyReservations(
+  supabase: SupabaseClientLike,
+  agencyAccountId: string
+): Promise<AgencyReservationListItem[]> {
+  const { data, error } = await supabase
+    .from("reservations")
+    .select(
+      "id, reservation_code, status, tour_start_date, tour_end_date, quote_case_id, created_at, quote_cases(case_code, tour_name), reservation_status_history(id), rooming_lists(id)"
+    )
+    .eq("agency_account_id", agencyAccountId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapAgencyReservationListItem);
+}
+
+export async function getAgencyReservationDetail(
+  supabase: SupabaseClientLike,
+  agencyAccountId: string,
+  reservationId: string
+): Promise<AgencyReservationDetail | null> {
+  const { data: reservation, error: reservationError } = await supabase
+    .from("reservations")
+    .select(
+      "id, reservation_code, status, tour_start_date, tour_end_date, quote_case_id, created_at, quote_cases(case_code, tour_name), reservation_status_history(id), rooming_lists(id)"
+    )
+    .eq("id", reservationId)
+    .eq("agency_account_id", agencyAccountId)
+    .maybeSingle();
+
+  if (reservationError) throw new Error(reservationError.message);
+  if (!reservation) return null;
+
+  const [
+    { data: history, error: historyError },
+    { data: roomingLists, error: roomingError },
+    { data: passengers, error: passengerError }
+  ] = await Promise.all([
+    supabase
+      .from("reservation_status_history")
+      .select("id, from_status, to_status, reason, created_at")
+      .eq("reservation_id", reservationId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("rooming_lists")
+      .select("id, original_filename, storage_path, revision_no, parsed_status, created_at")
+      .eq("reservation_id", reservationId)
+      .order("revision_no", { ascending: false }),
+    supabase
+      .from("passengers")
+      .select("id, passenger_no, full_name, gender, date_of_birth, dietary_requirements, coach_label, rooming_list_id, created_at")
+      .eq("reservation_id", reservationId)
+      .order("passenger_no", { ascending: true })
+  ]);
+
+  if (historyError) throw new Error(historyError.message);
+  if (roomingError) throw new Error(roomingError.message);
+  if (passengerError) throw new Error(passengerError.message);
+
+  return {
+    ...mapAgencyReservationListItem({
+      ...reservation,
+      reservation_status_history: history ?? [],
+      rooming_lists: roomingLists ?? []
+    }),
+    statusHistory: (history ?? []).map(mapAgencyReservationStatusHistoryItem),
+    roomingLists: (roomingLists ?? []).map(mapAgencyRoomingListItem),
+    passengers: (passengers ?? []).map(mapAgencyPassengerItem)
+  };
+}
+
+export async function listAgencyInvoices(
+  supabase: SupabaseClientLike,
+  agencyAccountId: string
+): Promise<AgencyInvoiceListItem[]> {
+  const { data, error } = await supabase
+    .from("invoices")
+    .select(
+      "id, invoice_no, reservation_id, status, currency, total_amount, issued_at, due_date, storage_path, created_at, reservations!inner(id, reservation_code, agency_account_id, quote_cases(tour_name), agency_accounts(name)), payments(id, status, amount)"
+    )
+    .eq("reservations.agency_account_id", agencyAccountId)
+    .in("status", ["issued", "partially_paid", "paid", "overdue"])
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapAgencyInvoiceListItem);
+}
+
+export async function getAgencyInvoiceDetail(
+  supabase: SupabaseClientLike,
+  agencyAccountId: string,
+  invoiceId: string
+): Promise<AgencyInvoiceDetail | null> {
+  const { data, error } = await supabase
+    .from("invoices")
+    .select(
+      "id, invoice_no, reservation_id, status, currency, total_amount, issued_at, due_date, storage_path, created_at, reservations!inner(id, reservation_code, agency_account_id, quote_cases(tour_name), agency_accounts(name)), payments(id, status, currency, amount, received_at, method, created_at)"
+    )
+    .eq("id", invoiceId)
+    .eq("reservations.agency_account_id", agencyAccountId)
+    .in("status", ["issued", "partially_paid", "paid", "overdue"])
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+
+  return {
+    ...mapAgencyInvoiceListItem(data),
+    payments: (data.payments ?? []).map(mapAgencyPaymentSummary)
+  };
+}
+
+function mapAgencyQuoteListItem(row: any): AgencyQuoteListItem {
+  const visibleVersions = (Array.isArray(row.quote_versions) ? row.quote_versions : [])
+    .filter((version: any) => ["sent", "accepted", "superseded"].includes(version.status))
+    .sort((left: any, right: any) => Number(right.version_no) - Number(left.version_no));
+  const latestVersion = visibleVersions[0];
+
+  return {
+    id: row.id,
+    caseCode: row.case_code,
+    shareId: row.share_id,
+    tourName: row.tour_name,
+    tourType: row.tour_type ?? null,
+    status: row.status,
+    currency: row.currency,
+    estimatedPax: row.estimated_pax ?? null,
+    startDate: row.start_date ?? null,
+    endDate: row.end_date ?? null,
+    latestVersionNo: latestVersion?.version_no ?? null,
+    latestVersionStatus: latestVersion?.status ?? null,
+    publicTotalAmount:
+      latestVersion?.public_total_amount === null || latestVersion?.public_total_amount === undefined
+        ? null
+        : Number(latestVersion.public_total_amount),
+    sentAt: latestVersion?.sent_at ?? null,
+    acceptedAt: latestVersion?.accepted_at ?? null,
+    createdAt: row.created_at
+  };
+}
+
+function mapAgencyReservationListItem(row: any): AgencyReservationListItem {
+  return {
+    id: row.id,
+    reservationCode: row.reservation_code,
+    status: row.status,
+    tourStartDate: row.tour_start_date ?? null,
+    tourEndDate: row.tour_end_date ?? null,
+    quoteCaseId: row.quote_case_id,
+    caseCode: row.quote_cases?.case_code ?? null,
+    tourName: row.quote_cases?.tour_name ?? null,
+    statusHistoryCount: Array.isArray(row.reservation_status_history) ? row.reservation_status_history.length : 0,
+    roomingListCount: Array.isArray(row.rooming_lists) ? row.rooming_lists.length : 0,
+    createdAt: row.created_at
+  };
+}
+
+function mapAgencyReservationStatusHistoryItem(row: any): AgencyReservationStatusHistoryItem {
+  return {
+    id: row.id,
+    fromStatus: row.from_status ?? null,
+    toStatus: row.to_status,
+    reason: row.reason ?? null,
+    createdAt: row.created_at
+  };
+}
+
+function mapAgencyRoomingListItem(row: any): AgencyRoomingListItem {
+  return {
+    id: row.id,
+    originalFilename: row.original_filename ?? null,
+    storagePath: row.storage_path ?? null,
+    revisionNo: row.revision_no,
+    parsedStatus: row.parsed_status,
+    createdAt: row.created_at
+  };
+}
+
+function mapAgencyPassengerItem(row: any): AgencyPassengerItem {
+  return {
+    id: row.id,
+    passengerNo: row.passenger_no ?? null,
+    fullName: row.full_name,
+    gender: row.gender ?? null,
+    dateOfBirth: row.date_of_birth ?? null,
+    dietaryRequirements: row.dietary_requirements ?? null,
+    coachLabel: row.coach_label ?? null,
+    roomingListId: row.rooming_list_id ?? null,
+    createdAt: row.created_at
+  };
+}
+
+function mapAgencyPaymentSummary(row: any): AgencyPaymentSummary {
+  return {
+    id: row.id,
+    status: row.status,
+    currency: row.currency,
+    amount: Number(row.amount ?? 0),
+    receivedAt: row.received_at ?? null,
+    method: row.method ?? null,
+    createdAt: row.created_at
+  };
+}
+
+function mapAgencyInvoiceListItem(row: any): AgencyInvoiceListItem {
+  const payments = Array.isArray(row.payments) ? row.payments : [];
+  const confirmedPaymentTotal = payments
+    .filter((payment: any) => payment.status === "confirmed")
+    .reduce((total: number, payment: any) => total + Number(payment.amount ?? 0), 0);
+
+  return {
+    id: row.id,
+    invoiceNo: row.invoice_no,
+    reservationId: row.reservation_id,
+    reservationCode: row.reservations?.reservation_code ?? null,
+    agencyName: row.reservations?.agency_accounts?.name ?? null,
+    tourName: row.reservations?.quote_cases?.tour_name ?? null,
+    status: row.status,
+    currency: row.currency,
+    totalAmount: Number(row.total_amount),
+    issuedAt: row.issued_at ?? null,
+    dueDate: row.due_date ?? null,
+    storagePath: row.storage_path ?? null,
+    confirmedPaymentTotal,
+    paymentCount: payments.length,
+    createdAt: row.created_at
+  };
+}

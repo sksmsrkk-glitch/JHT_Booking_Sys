@@ -1,4 +1,5 @@
 import { requireWebhookSecret } from "@/lib/api/guards";
+import { writeApiLog } from "@/lib/api/api-log";
 import { fail, HttpError, ok, readJson, requireString } from "@/lib/api/http";
 import { scoreGmailMatch } from "@/lib/domain/gmail-match.mjs";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
@@ -22,6 +23,15 @@ export async function POST(request: Request) {
 
     if (existingError) throw new HttpError(500, existingError.message);
     if (existingMessage) {
+      await writeApiLog(supabase, {
+        source: "gmail_webhook",
+        endpoint: "/api/gmail/webhook",
+        method: "POST",
+        statusCode: 200,
+        requestPayload: { gmailThreadId, gmailMessageId, duplicate: true },
+        responsePayload: { duplicate: true },
+        idempotencyKey: gmailMessageId
+      });
       return ok({ duplicate: true, gmailMessageId });
     }
 
@@ -78,6 +88,22 @@ export async function POST(request: Request) {
 
     if (threadError) throw new HttpError(500, threadError.message);
 
+    const candidateRows = scored.slice(0, 10).map(({ candidate, match }: any) => ({
+      email_thread_id: emailThread.id,
+      quote_case_id: candidate.id,
+      agency_account_id: candidate.agency_account_id,
+      score: match.score,
+      reasons: match.reasons,
+      requires_manual_review: match.requiresManualReview
+    }));
+
+    if (candidateRows.length > 0) {
+      const { error: candidateInsertError } = await supabase.from("gmail_match_candidates").upsert(candidateRows, {
+        onConflict: "email_thread_id,quote_case_id"
+      });
+      if (candidateInsertError) throw new HttpError(500, candidateInsertError.message);
+    }
+
     const { data: message, error: messageError } = await supabase
       .from("email_messages")
       .insert({
@@ -96,15 +122,37 @@ export async function POST(request: Request) {
 
     if (messageError) throw new HttpError(500, messageError.message);
 
-    return ok({
+    const responsePayload = {
       emailThread,
       message,
       match: {
         score: best?.match.score ?? 0,
         requiresManualReview: !shouldLink,
-        reasons: best?.match.reasons ?? []
+        reasons: best?.match.reasons ?? [],
+        candidateCount: candidateRows.length
       }
+    };
+
+    await writeApiLog(supabase, {
+      source: "gmail_webhook",
+      endpoint: "/api/gmail/webhook",
+      method: "POST",
+      statusCode: 200,
+      requestPayload: {
+        gmailThreadId,
+        gmailMessageId,
+        subjectPresent: subject.length > 0,
+        fromDomain: fromEmail.includes("@") ? fromEmail.split("@").pop() : null
+      },
+      responsePayload: {
+        emailThreadId: emailThread.id,
+        emailMessageId: message.id,
+        match: responsePayload.match
+      },
+      idempotencyKey: gmailMessageId
     });
+
+    return ok(responsePayload);
   } catch (error) {
     return fail(error);
   }
