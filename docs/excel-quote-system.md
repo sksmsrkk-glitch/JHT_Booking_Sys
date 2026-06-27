@@ -12,7 +12,8 @@ The analyzed files show a consistent workbook pattern:
 - `quotation` sheets act as the customer-facing quote.
 - Customer quote sheets reference costing sheets heavily.
 - Common public fields include attention/contact, date, tour title, group size, proposed hotel, tour fare, single supplement, inclusions, exclusions, conditions, day-by-day itinerary, meals, entrance fees, and hotel/option alternatives.
-- Common formula patterns include `=sourceCell/sourceCell`, `=(SUM(range))*cell`, direct cross-sheet references, `TEXT(date,"dddd")`, and copied public quotation references from costing rows.
+- Common formula patterns include `=sourceCell/sourceCell`, `=(SUM(range))*cell`, direct cross-sheet references, `TEXT(date,"dddd")`, `unit cost * quantity`, `unit cost * pax * quantity`, `room/vehicle/guide day multipliers`, `CEILING(...)`, and `FLOOR(...)`.
+- A second formula extraction pass is stored in `docs/excel-formula-analysis.json`. The most repeated formula families were division/allocation, summed cost times rate, cross-sheet costing references, direct references, date weekday text, unit multipliers, and rounded totals.
 
 ## Required Behavior
 
@@ -24,6 +25,8 @@ The admin quote builder must behave like the existing Excel quote sheets:
 - Quote versions must copy previous itinerary rows, route segments, and quote item snapshots so a re-quote starts from the last working version.
 - Each quote item must support both database-loaded cost values and manual spreadsheet-style overrides.
 - Each quote item must preserve the calculation context needed to audit a number later, even if the number came from an Excel-like manual model.
+- Admin users must be able to search supplier products by keyword per quote row, then load the matching supplier/product/price snapshot into that row.
+- Itinerary days must be editable through structured Day fields instead of JSON.
 
 ## Implemented V1 Model Extension
 
@@ -68,6 +71,27 @@ The quote detail screen now includes:
 - Service section and formula/calculation-note display.
 - Supplier-cost breakdown JSON preview for internal audit.
 - Quote item creation inputs for service section, itinerary day, calculation mode, Excel cell reference, formula note, manual override, supplier-cost breakdown JSON, and public breakdown JSON.
+
+The quote case creation screen now uses spreadsheet-style entry instead of raw JSON for quote items:
+
+- Keyword search per row calls the internal cost search API and applies supplier product/price snapshots.
+- Calculation presets translate common Excel patterns into controlled system fields:
+  - `Unit x Qty`
+  - `Pax x Qty`
+  - `Room/Night`
+  - `Vehicle/Day`
+  - `Guide/Day`
+  - `Manual Total`
+- The selected preset is saved into `excel_formula` and `public_breakdown` so the calculation remains auditable.
+- Sell amount updates automatically from unit cost, FX rate, quantity, pax, and margin, with manual-total override available.
+- Itinerary days are now entered as structured Day/date/title/meal/description fields instead of JSON.
+- Quote item rows now include a Day selector. During quote creation the API maps that Day number to the inserted `quote_itinerary_days.id` and stores it on `quote_items.itinerary_day_id`, so costing rows and itinerary days remain synchronized.
+- Agency-facing quote detail now renders a final quotation view instead of a raw JSON summary:
+  - quote cover with tour name, tour code, version, status, and public total
+  - customer-safe summary fields
+  - public fare option table
+  - day-by-day itinerary with meal summary, public description, routes, and presentation images
+  - terms and conditions copied from the quote version, matching the role of the terms area in the Excel quotation sheets
 
 ## Agency Portal Changes
 

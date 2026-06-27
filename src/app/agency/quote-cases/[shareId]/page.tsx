@@ -133,72 +133,7 @@ export default async function AgencyQuoteDetailPage({ params }: { params: PagePa
 
       {quoteCase.versions.length > 0 ? (
         quoteCase.versions.map((version) => (
-          <section className="section-block" key={version.id}>
-            <div className="section-heading">
-              <h2>Version {version.versionNo}</h2>
-              <span>{formatLabel(version.status)}</span>
-            </div>
-            <section className="panel">
-              {version.publicFareOptions.length > 0 ? (
-                <section className="table-shell" aria-label={`Version ${version.versionNo} fare options`}>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Option</th>
-                        <th>Hotel</th>
-                        <th>Fare</th>
-                        <th>Single Supp.</th>
-                        <th>Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {version.publicFareOptions.map((option, index) => (
-                        <tr key={`${version.id}-fare-${index}`}>
-                          <td>{stringValue(option.optionName) || `Option ${index + 1}`}</td>
-                          <td>{stringValue(option.hotelName) || stringValue(option.proposedHotel) || "-"}</td>
-                          <td>{stringValue(option.tourFare) || stringValue(option.farePerPerson) || "-"}</td>
-                          <td>{stringValue(option.singleSupplement) || "-"}</td>
-                          <td>{stringValue(option.notes) || "-"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </section>
-              ) : null}
-              {version.agencyVisibleSummary && Object.keys(version.agencyVisibleSummary).length > 0 ? (
-                <pre className="json-preview">{JSON.stringify(version.agencyVisibleSummary, null, 2)}</pre>
-              ) : (
-                <p>No summary attached.</p>
-              )}
-              {version.termsAndConditions ? <p className="subtext">{version.termsAndConditions}</p> : null}
-              <AgencyPresentationGrid blocks={version.presentationBlocks.filter((block) => !block.quoteItineraryDayId)} />
-            </section>
-            <section className="stack section-block">
-              {version.itineraryDays.map((day) => (
-                <article className="panel" key={day.id}>
-                  <h2>
-                    Day {day.dayNo}
-                    {day.title ? ` - ${day.title}` : ""}
-                  </h2>
-                  <p>{day.serviceDate ?? "Date not set"}</p>
-                  {day.publicDescription ? <p>{day.publicDescription}</p> : null}
-                  {day.routeSegments.length > 0 ? (
-                    <ul className="clean-list">
-                      {day.routeSegments.map((segment) => (
-                        <li key={segment.id}>
-                          {segment.originLabel} to {segment.destinationLabel}
-                          <span className="subtext">
-                            {segment.travelMinutes ? `${segment.travelMinutes} min` : "Time not set"}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  <AgencyPresentationGrid blocks={day.presentationBlocks} />
-                </article>
-              ))}
-            </section>
-          </section>
+          <FinalQuotation quoteCase={quoteCase} version={version} key={version.id} />
         ))
       ) : (
         <section className="empty-state">
@@ -216,6 +151,136 @@ export default async function AgencyQuoteDetailPage({ params }: { params: PagePa
         </ul>
       </section>
     </>
+  );
+}
+
+function FinalQuotation({
+  quoteCase,
+  version
+}: {
+  quoteCase: AgencyQuoteDetail;
+  version: AgencyQuoteDetail["versions"][number];
+}) {
+  const summaryEntries = Object.entries(version.agencyVisibleSummary ?? {}).filter(
+    ([, value]) => value !== null && value !== undefined && String(value).trim() !== ""
+  );
+  const coverBlocks = version.presentationBlocks.filter((block) => !block.quoteItineraryDayId);
+
+  return (
+    <section className="final-quote section-block">
+      <div className="final-quote-cover">
+        <div>
+          <p className="eyebrow">Final Quotation</p>
+          <h2>{quoteCase.tourName}</h2>
+          <p>
+            {quoteCase.caseCode} / Version {version.versionNo} / {formatLabel(version.status)}
+          </p>
+        </div>
+        <div className="quote-total-box">
+          <span>Total Quotation</span>
+          <strong>
+            {version.currency} {version.publicTotalAmount.toLocaleString()}
+          </strong>
+        </div>
+      </div>
+
+      {summaryEntries.length > 0 ? (
+        <section className="quote-summary-grid" aria-label="Quotation summary">
+          {summaryEntries.map(([key, value]) => (
+            <div key={key}>
+              <dt>{formatLabel(key)}</dt>
+              <dd>{stringValue(value)}</dd>
+            </div>
+          ))}
+        </section>
+      ) : null}
+
+      <AgencyPresentationGrid blocks={coverBlocks} />
+
+      {version.publicFareOptions.length > 0 ? (
+        <section className="table-shell" aria-label={`Version ${version.versionNo} fare options`}>
+          <table>
+            <thead>
+              <tr>
+                <th>Option</th>
+                <th>Hotel</th>
+                <th>Fare</th>
+                <th>Single Supp.</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {version.publicFareOptions.map((option, index) => (
+                <tr key={`${version.id}-fare-${index}`}>
+                  <td>{stringValue(option.optionName) || `Option ${index + 1}`}</td>
+                  <td>{stringValue(option.hotelName) || stringValue(option.proposedHotel) || "-"}</td>
+                  <td>{stringValue(option.tourFare) || stringValue(option.farePerPerson) || "-"}</td>
+                  <td>{stringValue(option.singleSupplement) || "-"}</td>
+                  <td>{stringValue(option.notes) || "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
+
+      <section className="quote-itinerary">
+        <div className="section-heading">
+          <h2>Itinerary</h2>
+          <span>{version.itineraryDays.length} days</span>
+        </div>
+        {version.itineraryDays.map((day) => (
+          <article className="quote-day-card" key={day.id}>
+            <div>
+              <span className="badge">Day {day.dayNo}</span>
+              <h3>{day.title ?? "Itinerary"}</h3>
+              <p className="subtext">{day.serviceDate ?? "Date not set"}</p>
+            </div>
+            {day.publicDescription ? <p>{day.publicDescription}</p> : null}
+            <MealSummary mealSummary={day.mealSummary} />
+            {day.routeSegments.length > 0 ? (
+              <ul className="clean-list">
+                {day.routeSegments.map((segment) => (
+                  <li key={segment.id}>
+                    {segment.originLabel} to {segment.destinationLabel}
+                    <span className="subtext">
+                      {segment.travelMinutes ? `${segment.travelMinutes} min` : "Time not set"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <AgencyPresentationGrid blocks={day.presentationBlocks} />
+          </article>
+        ))}
+      </section>
+
+      {version.termsAndConditions ? (
+        <section className="quote-terms">
+          <h2>Terms & Conditions</h2>
+          <p>{version.termsAndConditions}</p>
+        </section>
+      ) : null}
+    </section>
+  );
+}
+
+function MealSummary({ mealSummary }: { mealSummary: Record<string, unknown> }) {
+  const meals = ["breakfast", "lunch", "dinner"]
+    .map((key) => ({ key, value: stringValue(mealSummary[key]) }))
+    .filter((meal) => meal.value);
+
+  if (meals.length === 0) return null;
+
+  return (
+    <dl className="meal-summary">
+      {meals.map((meal) => (
+        <div key={meal.key}>
+          <dt>{formatLabel(meal.key)}</dt>
+          <dd>{meal.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

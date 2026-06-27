@@ -99,13 +99,25 @@ export async function POST(request: Request) {
         }))
       : [];
 
+    const dayIdByDayNo = new Map<number, string>();
+
     if (itineraryRows.length > 0) {
-      const { error: itineraryError } = await supabase.from("quote_itinerary_days").insert(itineraryRows);
+      const { data: insertedDays, error: itineraryError } = await supabase
+        .from("quote_itinerary_days")
+        .insert(itineraryRows)
+        .select("id, day_no");
       if (itineraryError) throw new HttpError(500, itineraryError.message);
+      for (const day of insertedDays ?? []) {
+        dayIdByDayNo.set(Number(day.day_no), day.id);
+      }
     }
 
     if (calculatedItems.length > 0) {
-      const quoteItemRows = calculatedItems.map((item) => toQuoteItemRow(version.id, item));
+      const quoteItemRows = calculatedItems.map((item, index) => {
+        const row = toQuoteItemRow(version.id, item);
+        const dayNo = optionalNumber(rawItems[index]?.itineraryDayNo);
+        return dayNo ? { ...row, itinerary_day_id: dayIdByDayNo.get(dayNo) ?? row.itinerary_day_id } : row;
+      });
 
       const { error: itemError } = await supabase.from("quote_items").insert(quoteItemRows);
       if (itemError) throw new HttpError(500, itemError.message);

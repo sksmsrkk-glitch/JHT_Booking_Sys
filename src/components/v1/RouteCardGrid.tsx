@@ -1,17 +1,23 @@
 import Link from "next/link";
 import type { V1RouteCard } from "@/features/v1/site-map";
 
-export function RouteCardGrid({ routes }: { routes: V1RouteCard[] }) {
+export function RouteCardGrid({
+  routes,
+  density = "standard"
+}: {
+  routes: V1RouteCard[];
+  density?: "standard" | "compact";
+}) {
   return (
-    <section className="route-grid">
+    <section className={`route-grid route-grid-${density}`}>
       {routes.map((route) => (
-        <Link className="route-card" href={route.href} key={route.title}>
+        <Link className={`route-card route-card-${density}`} href={route.href} key={route.title}>
           <div className="split-row">
             <h2>{route.title}</h2>
             <span className={`status-dot status-${route.status}`}>{formatLabel(route.status)}</span>
           </div>
-          <p>{route.description}</p>
-          <span className="subtext">Owner: {route.owner}</span>
+          {density === "standard" ? <p>{route.description}</p> : null}
+          <span className="subtext">{density === "standard" ? `Owner: ${route.owner}` : route.owner}</span>
         </Link>
       ))}
     </section>
