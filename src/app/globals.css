@@ -807,6 +807,7 @@ select:disabled {
 }
 
 .exchange-rate-page {
+  --exchange-control-height: 48px;
   display: grid;
   gap: 16px;
 }
@@ -824,6 +825,22 @@ select:disabled {
   gap: 12px;
   grid-template-columns: minmax(360px, 1fr) minmax(130px, 160px) minmax(130px, 160px) minmax(84px, 96px);
   padding: 14px 16px;
+}
+
+.exchange-rate-page input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+.exchange-rate-page select,
+.exchange-rate-page textarea,
+.exchange-rate-filter-toolbar .button-primary {
+  height: var(--exchange-control-height);
+  min-height: var(--exchange-control-height);
+}
+
+.exchange-rate-page textarea {
+  line-height: 1.25;
+  overflow: hidden;
+  padding-bottom: 13px;
+  padding-top: 13px;
+  resize: none;
 }
 
 .exchange-rate-filter-toolbar .button-primary {
@@ -883,7 +900,8 @@ select:disabled {
 }
 
 .exchange-form-submit-cell .button-primary {
-  min-height: 40px;
+  height: var(--exchange-control-height);
+  min-height: var(--exchange-control-height);
   width: 100%;
 }
 
