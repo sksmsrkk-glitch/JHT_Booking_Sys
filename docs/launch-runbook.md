@@ -46,6 +46,7 @@ If Supabase CLI is unavailable, apply the SQL files in this order through the Su
 3. `supabase/migrations/202606270001_quote_excel_model.sql`
 4. `supabase/migrations/202606270002_quote_fare_options.sql`
 5. `supabase/migrations/202606270003_quote_presentation_blocks.sql`
+6. `supabase/migrations/202606270004_supplier_media_attachments.sql`
 
 After migration, open `/admin/readiness` with an internal admin account and confirm database smoke checks are ready.
 
@@ -113,6 +114,7 @@ npm run verify:env
 ## 5. Storage
 
 Create the Supabase Storage bucket configured by `EXPORT_STORAGE_BUCKET`.
+Create a supplier media bucket for item images before enabling direct file uploads.
 
 Default bucket:
 
@@ -121,6 +123,7 @@ exports
 ```
 
 Confirm the quote export worker can write generated XLSX files and that internal users can retrieve completed exports through internal screens.
+Confirm supplier item images can be uploaded or referenced and that each supplier item is limited to 10 images.
 
 ## 6. Bootstrap Admin
 

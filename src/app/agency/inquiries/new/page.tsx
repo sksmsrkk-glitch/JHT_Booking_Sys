@@ -1,15 +1,12 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { InquiryCreateForm } from "@/components/agency/InquiryCreateForm";
-import { getPageAuthorization } from "@/lib/api/page-session";
 
 export const dynamic = "force-dynamic";
 
 const inquiriesRoute = "/agency/inquiries" as Route;
 
 export default async function AgencyNewInquiryPage() {
-  const { authorization } = await getPageAuthorization();
-
   return (
     <>
       <div className="page-header">
@@ -23,12 +20,10 @@ export default async function AgencyNewInquiryPage() {
         </Link>
       </div>
 
-      {!authorization ? (
-        <section className="notice warning">
-          <h2>Agency login required</h2>
-          <p>This page submits through the Agency API, which requires an active agency user JWT.</p>
-        </section>
-      ) : null}
+      <section className="notice">
+        <h2>Development preview mode</h2>
+        <p>Agency login is bypassed while this portal is being designed and tested. Submitted preview inquiries return a tour code.</p>
+      </section>
 
       <InquiryCreateForm />
 

@@ -2,8 +2,9 @@ import type { Route } from "next";
 import Link from "next/link";
 import { getPageAuthorization } from "@/lib/api/page-session";
 import { AGENCY_RECORD_STATUSES } from "@/features/agency/queries";
-import type { AgencyListItem } from "@/features/agency/types";
+import type { AgencyListItem, AgencySignupApplication } from "@/features/agency/types";
 import { AgencyCreateForm } from "@/components/admin/MasterDataCreateForms";
+import { AgencySignupApplicationActions } from "@/components/admin/AgencyGovernanceActions";
 import type { CompanyListItem } from "@/features/company/types";
 
 export const dynamic = "force-dynamic";
@@ -12,10 +13,11 @@ type SearchParams = Promise<{
   q?: string;
   country?: string;
   status?: string;
+  applicationStatus?: string;
 }>;
 
 type LoadState =
-  | { status: "ready"; agencies: AgencyListItem[]; companies: CompanyListItem[] }
+  | { status: "ready"; agencies: AgencyListItem[]; companies: CompanyListItem[]; applications: AgencySignupApplication[] }
   | { status: "auth-required"; message: string }
   | { status: "error"; message: string };
 
@@ -79,6 +81,10 @@ export default async function AdminAgenciesPage({ searchParams }: { searchParams
         <AgencyCreateForm companies={loadState.status === "ready" ? loadState.companies : []} />
       </section>
 
+      {loadState.status === "ready" ? (
+        <SignupApplicationTable applications={loadState.applications} selectedStatus={filters.applicationStatus ?? "pending"} />
+      ) : null}
+
       {loadState.status === "auth-required" ? (
         <section className="notice warning">
           <h2>Internal role required</h2>
@@ -95,6 +101,89 @@ export default async function AdminAgenciesPage({ searchParams }: { searchParams
 
       {loadState.status === "ready" ? <AgencyTable agencies={loadState.agencies} /> : null}
     </>
+  );
+}
+
+function SignupApplicationTable({
+  applications,
+  selectedStatus
+}: {
+  applications: AgencySignupApplication[];
+  selectedStatus: string;
+}) {
+  return (
+    <section className="section-block">
+      <div className="section-heading">
+        <div>
+          <h2>Partner Signup Applications</h2>
+          <p>Approve applications to create an active agency account and mother ID.</p>
+        </div>
+        <form className="inline-actions" action="/admin/agencies">
+          <select name="applicationStatus" defaultValue={selectedStatus}>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <button className="button-secondary" type="submit">
+            View
+          </button>
+        </form>
+      </div>
+      {applications.length === 0 ? (
+        <div className="empty-state compact">
+          <p>No signup applications in this status.</p>
+        </div>
+      ) : (
+        <div className="table-shell">
+          <table>
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>Contact</th>
+                <th>Country</th>
+                <th>Submitted</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {applications.map((application) => (
+                <tr key={application.id}>
+                  <td>
+                    <strong>{application.companyName}</strong>
+                    <span className="subtext">{application.website ?? "No website"}</span>
+                  </td>
+                  <td>
+                    {application.contactName ?? "Not set"}
+                    <span className="subtext">
+                      {application.email} / {application.phone ?? "No phone"}
+                    </span>
+                  </td>
+                  <td>
+                    {application.countryCode}
+                    {application.countryName ? <span className="subtext">{application.countryName}</span> : null}
+                    {application.originalCountryName && application.originalCountryName !== application.countryName ? (
+                      <span className="subtext">Input: {application.originalCountryName}</span>
+                    ) : null}
+                  </td>
+                  <td>{formatDateTime(application.createdAt)}</td>
+                  <td>{formatLabel(application.status)}</td>
+                  <td>
+                    {application.status === "pending" ? (
+                      <AgencySignupApplicationActions application={application} />
+                    ) : application.rejectionReason ? (
+                      application.rejectionReason
+                    ) : (
+                      application.createdAgencyAccountId ?? "Reviewed"
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -120,6 +209,8 @@ function AgencyTable({ agencies }: { agencies: AgencyListItem[] }) {
             <th>Users</th>
             <th>Inquiries</th>
             <th>Status</th>
+            <th>Lifecycle</th>
+            <th>Signup / Login</th>
           </tr>
         </thead>
         <tbody>
@@ -139,6 +230,11 @@ function AgencyTable({ agencies }: { agencies: AgencyListItem[] }) {
               <td>
                 <span className={`status-dot status-${agency.status}`}>{formatLabel(agency.status)}</span>
               </td>
+              <td>{formatLabel(agency.lifecycleStatus)}</td>
+              <td>
+                {formatDateTime(agency.createdAt)}
+                <span className="subtext">Login: {agency.lastLoginAt ? formatDateTime(agency.lastLoginAt) : "No log"}</span>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -147,7 +243,7 @@ function AgencyTable({ agencies }: { agencies: AgencyListItem[] }) {
   );
 }
 
-async function loadAgencies(filters: { q?: string; country?: string; status?: string }): Promise<LoadState> {
+async function loadAgencies(filters: { q?: string; country?: string; status?: string; applicationStatus?: string }): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
     return {
@@ -157,7 +253,7 @@ async function loadAgencies(filters: { q?: string; country?: string; status?: st
     };
   }
 
-  const [agencyResponse, companyResponse] = await Promise.all([
+  const [agencyResponse, companyResponse, applicationResponse] = await Promise.all([
     fetch(buildInternalApiUrl("/api/agencies", filters, headerStore), {
       headers: { authorization },
       cache: "no-store"
@@ -165,19 +261,32 @@ async function loadAgencies(filters: { q?: string; country?: string; status?: st
     fetch(buildInternalApiUrl("/api/companies", {}, headerStore), {
       headers: { authorization },
       cache: "no-store"
+    }),
+    fetch(buildInternalApiUrl("/api/agency/signup-applications", { status: filters.applicationStatus ?? "pending" }, headerStore), {
+      headers: { authorization },
+      cache: "no-store"
     })
   ]);
-  const [agencyPayload, companyPayload] = await Promise.all([agencyResponse.json(), companyResponse.json()]);
+  const [agencyPayload, companyPayload, applicationPayload] = await Promise.all([
+    agencyResponse.json(),
+    companyResponse.json(),
+    applicationResponse.json()
+  ]);
 
-  const failedResponse = [agencyResponse, companyResponse].find((response) => !response.ok);
+  const failedResponse = [agencyResponse, companyResponse, applicationResponse].find((response) => !response.ok);
   if (failedResponse) {
     return {
       status: failedResponse.status === 401 || failedResponse.status === 403 ? "auth-required" : "error",
-      message: agencyPayload.error ?? companyPayload.error ?? "Unknown agency API error"
+      message: agencyPayload.error ?? companyPayload.error ?? applicationPayload.error ?? "Unknown agency API error"
     };
   }
 
-  return { status: "ready", agencies: agencyPayload.data ?? [], companies: companyPayload.data ?? [] };
+  return {
+    status: "ready",
+    agencies: agencyPayload.data ?? [],
+    companies: companyPayload.data ?? [],
+    applications: applicationPayload.data ?? []
+  };
 }
 
 function buildInternalApiUrl(
@@ -199,4 +308,8 @@ function formatLabel(value: string) {
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("en-CA", { dateStyle: "medium" }).format(new Date(value));
 }

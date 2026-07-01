@@ -12,7 +12,8 @@ const dynamicFixtures = new Map([
   ["reservationId", "00000000-0000-4000-8000-000000000001"],
   ["messageId", "00000000-0000-4000-8000-000000000001"],
   ["invoiceId", "00000000-0000-4000-8000-000000000001"],
-  ["shareId", "fake-share-id"]
+  ["shareId", "fake-share-id"],
+  ["workflowCode", "Q-2026-TH-001"]
 ]);
 
 const pagePaths = new Set(listPageFiles(appRoot).map((filePath) => pagePathFromFile(filePath)));

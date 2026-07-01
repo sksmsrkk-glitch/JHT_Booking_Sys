@@ -6,7 +6,7 @@ import type { AgencyReservationListItem } from "@/features/agency-portal/types";
 export const dynamic = "force-dynamic";
 
 type LoadState =
-  | { status: "ready"; reservations: AgencyReservationListItem[] }
+  | { status: "ready"; reservations: AgencyReservationListItem[]; isPreview?: boolean }
   | { status: "auth-required"; message: string }
   | { status: "error"; message: string };
 
@@ -42,10 +42,10 @@ export default async function AgencyReservationsPage() {
         <span className="status-dot status-live">Upload Ready</span>
       </section>
 
-      {loadState.status === "auth-required" ? (
+      {loadState.status === "ready" && loadState.isPreview ? (
         <section className="notice warning">
-          <h2>Agency login required</h2>
-          <p>{loadState.message}</p>
+          <h2>Preview data</h2>
+          <p>Agency login is bypassed during development, so this page shows sample reservation rows.</p>
         </section>
       ) : null}
 
@@ -127,11 +127,7 @@ function ReservationTable({ reservations }: { reservations: AgencyReservationLis
 async function loadReservations(): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
-    return {
-      status: "auth-required",
-      message:
-        "This page reads reservations through the Agency API, which requires an active agency user JWT."
-    };
+    return { status: "ready", reservations: demoReservations, isPreview: true };
   }
 
   const response = await fetch(buildInternalApiUrl("/api/agency/reservations", headerStore), {
@@ -141,14 +137,33 @@ async function loadReservations(): Promise<LoadState> {
   const payload = await response.json();
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      return { status: "ready", reservations: demoReservations, isPreview: true };
+    }
     return {
-      status: response.status === 401 || response.status === 403 ? "auth-required" : "error",
+      status: "error",
       message: payload.error ?? "Unknown reservation API error"
     };
   }
 
   return { status: "ready", reservations: payload.data ?? [] };
 }
+
+const demoReservations: AgencyReservationListItem[] = [
+  {
+    id: "preview-reservation-mhdm",
+    reservationCode: "RSV-MY-WORLDTRAV-20260629",
+    status: "confirmed",
+    tourStartDate: "2026-03-24",
+    tourEndDate: "2026-03-28",
+    quoteCaseId: "preview-quote-mhdm",
+    caseCode: "MY-WORLDTRAV-20260629",
+    tourName: "MHDM Seoul 4N group",
+    statusHistoryCount: 3,
+    roomingListCount: 1,
+    createdAt: "2026-06-29T09:00:00+09:00"
+  }
+];
 
 function buildInternalApiUrl(path: string, headerStore: Headers) {
   const protocol = headerStore.get("x-forwarded-proto") ?? "http";

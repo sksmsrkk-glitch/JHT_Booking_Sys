@@ -148,11 +148,18 @@ export type AgencyInvoiceListItem = {
   reservationCode: string | null;
   agencyName: string | null;
   tourName: string | null;
+  tourCode: string | null;
+  versionNo: number;
   status: string;
   currency: string;
   totalAmount: number;
   issuedAt: string | null;
   dueDate: string | null;
+  paymentDeadline: string | null;
+  collectionTiming: string | null;
+  collectionStatus: string;
+  depositRequired: boolean;
+  depositAmount: number | null;
   storagePath: string | null;
   confirmedPaymentTotal: number;
   paymentCount: number;
@@ -161,6 +168,24 @@ export type AgencyInvoiceListItem = {
 
 export type AgencyInvoiceDetail = AgencyInvoiceListItem & {
   payments: AgencyPaymentSummary[];
+  lineItems: AgencyInvoiceLineItem[];
+  bankAccountSnapshot: Record<string, unknown>;
+  flightDetails: Record<string, unknown>[];
+  itinerarySnapshot: Record<string, unknown>[];
+};
+
+export type AgencyInvoiceLineItem = {
+  id: string;
+  lineNo: number;
+  description: string;
+  serviceDate: string | null;
+  category: string | null;
+  currency: string;
+  unitAmount: number;
+  quantity: number;
+  unitLabel: string | null;
+  totalAmount: number;
+  notes: string | null;
 };
 
 export type AgencyPaymentSummary = {

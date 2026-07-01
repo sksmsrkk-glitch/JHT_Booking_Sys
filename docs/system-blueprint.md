@@ -1694,3 +1694,20 @@ Add server-side auth check for internal users.
 Add empty/loading/error states.
 List changed files and run npm.cmd run typecheck and npm.cmd run build.
 ```
+
+## Guide Actual Cost Reports
+
+`PMB 인센티브.xlsx` is modeled as the post-tour guide expense source of truth. The workbook has one sheet per guide or coach group and repeats the same operating pattern:
+
+- Header: group title, arrival/departure dates, guide name, tour leader name, pax composition.
+- Cost sections: lodging, meals, admissions/tickets, guide cash expenses, guide day fee/tip, and occasional shopping commission.
+- Line columns: date, vendor/place, unit amount, pax or day count, total amount, and notes.
+- Formula patterns: section `SUM(...)`, unit amount times quantity/day count, and manual total overrides for receipt totals.
+
+System implementation:
+
+- `guide_expense_reports` stores one actual-cost report per reservation and can link to the issued invoice.
+- `guide_expense_report_lines` stores every receipt or cost line by section.
+- Submitted report lines upsert into `expenses` through `source_guide_expense_report_line_id`, preventing duplicate settlement costs.
+- Settlement profit analysis compares invoice final revenue against guide-entered actual costs, extra revenues, shopping commissions, and payments.
+- Agency users never query guide expense reports, `expenses`, or settlement internals.

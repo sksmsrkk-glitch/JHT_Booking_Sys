@@ -4,6 +4,8 @@ import { getPageAuthorization } from "@/lib/api/page-session";
 import { SUPPLIER_CATEGORIES, RECORD_STATUSES } from "@/features/supplier/queries";
 import type { SupplierListItem } from "@/features/supplier/types";
 import { DomesticSupplierCreateForm } from "@/components/admin/MasterDataCreateForms";
+import { CostMasterQuickCreateForm, CostMasterSearchPanel } from "@/components/admin/DomesticSupplierCostMasterForms";
+import { DomesticSupplierExcelActions } from "@/components/admin/DomesticSupplierExcelActions";
 import type { CompanyListItem } from "@/features/company/types";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +14,9 @@ type SearchParams = Promise<{
   q?: string;
   category?: string;
   status?: string;
+  costKind?: string;
+  menuRows?: string;
+  attractionRows?: string;
 }>;
 
 const adminRoute = "/admin" as Route;
@@ -29,6 +34,9 @@ export default async function DomesticSuppliersPage({
   const filters = await searchParams;
   const loadState = await loadSuppliers(filters);
   const selectedStatus = filters.status ?? "active";
+  const selectedCostKind = normalizeCostKind(filters.costKind);
+  const selectedMenuRows = normalizeMenuRows(filters.menuRows);
+  const selectedAttractionRows = normalizeRows(filters.attractionRows);
 
   return (
     <>
@@ -84,8 +92,37 @@ export default async function DomesticSuppliersPage({
 
       <section className="panel-section">
         <div className="section-heading">
-          <h2>Add Domestic Supplier</h2>
-          <span>Internal only</span>
+          <h2>Excel Import / Export</h2>
+          <span>Template, bulk upload, full export</span>
+        </div>
+        <DomesticSupplierExcelActions companies={loadState.status === "ready" ? loadState.companies : []} />
+      </section>
+
+      <section className="panel-section">
+        <div className="section-heading">
+          <h2>Cost Master Quick Create</h2>
+          <span>Supplier + item + price</span>
+        </div>
+        <CostMasterQuickCreateForm
+          companies={loadState.status === "ready" ? loadState.companies : []}
+          initialKind={selectedCostKind}
+          initialMenuRows={selectedMenuRows}
+          initialAttractionRows={selectedAttractionRows}
+        />
+      </section>
+
+      <section className="panel-section">
+        <div className="section-heading">
+          <h2>Search Cost Items</h2>
+          <span>Keyword / category lookup</span>
+        </div>
+        <CostMasterSearchPanel />
+      </section>
+
+      <section className="panel-section">
+        <div className="section-heading">
+          <h2>Add Supplier Only</h2>
+          <span>Profile without cost rows</span>
         </div>
         <DomesticSupplierCreateForm companies={loadState.status === "ready" ? loadState.companies : []} />
       </section>
@@ -215,4 +252,19 @@ function formatLabel(value: string) {
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+function normalizeCostKind(value: string | undefined) {
+  const allowed = ["hotel", "vehicle", "restaurant", "attraction", "guide", "other", "incentive_banquet"] as const;
+  return allowed.includes(value as any) ? (value as (typeof allowed)[number]) : "hotel";
+}
+
+function normalizeMenuRows(value: string | undefined) {
+  return normalizeRows(value);
+}
+
+function normalizeRows(value: string | undefined) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return 1;
+  return Math.min(Math.max(parsed, 1), 30);
 }

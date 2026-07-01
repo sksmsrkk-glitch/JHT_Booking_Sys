@@ -15,9 +15,9 @@ type PassengerInput = {
 
 export async function POST(request: Request) {
   try {
-    const body = await readJson<Record<string, unknown>>(request);
     const supabase = createRequestSupabaseClient(request);
     const agencyUser = await requireAgencyUser(supabase);
+    const body = await readJson<Record<string, unknown>>(request);
     const reservationId = requireUuid(body.reservationId, "reservationId");
     await assertAgencyReservation(supabase, reservationId, agencyUser.agencyAccountId);
     const revisionNo = optionalPositiveInteger(body.revisionNo, "revisionNo") ?? (await nextRevisionNo(supabase, reservationId));

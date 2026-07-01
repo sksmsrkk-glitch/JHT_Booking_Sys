@@ -15,6 +15,13 @@ type SupabaseClientLike = {
   from: (table: string) => any;
 };
 
+/*
+ * 예약 조회 레이어입니다.
+ *
+ * Reservations는 accepted quote 이후의 확정 단체 관리 화면입니다.
+ * 단체현황표처럼 단체별 상태, 투어 날짜, 룸링 리스트, 오퍼레이션 task,
+ * 공급사 메시지, 확정 견적 항목을 한 번에 볼 수 있도록 여러 테이블을 조합합니다.
+ */
 export const RESERVATION_STATUSES = [
   "pending",
   "requested",
@@ -28,13 +35,15 @@ export async function listReservations(
   supabase: SupabaseClientLike,
   filters: ReservationFilters = {}
 ): Promise<ReservationListItem[]> {
+  // 월간 캘린더/미완료 대시보드/예약 리스트에서 쓰는 가벼운 목록 조회입니다.
+  // 세부 화면에 필요한 승객/공급사/메시지 전체는 getReservationDetail에서 별도로 불러옵니다.
   const q = normalizeSearchTerm(filters.q);
   const status = normalizeEnum(filters.status, RESERVATION_STATUSES);
 
   let query = supabase
     .from("reservations")
     .select(
-      "id, reservation_code, status, tour_start_date, tour_end_date, confirmed_at, cancelled_at, agency_account_id, quote_case_id, created_at, agency_accounts(name), quote_cases(case_code, tour_name), operation_tasks(id), rooming_lists(id)"
+      "id, reservation_code, status, tour_start_date, tour_end_date, confirmed_at, cancelled_at, agency_account_id, quote_case_id, created_at, agency_accounts(name), quote_cases(case_code, tour_name, estimated_pax), operation_tasks(id, team, task_type, status), rooming_lists(id)"
     )
     .limit(100);
 
@@ -62,10 +71,12 @@ export async function getReservationDetail(
   supabase: SupabaseClientLike,
   reservationId: string
 ): Promise<ReservationDetail | null> {
+  // 예약 상세는 운영자가 바로 follow-up 할 수 있도록 여러 업무 데이터를 병렬 조회합니다.
+  // status history, operation tasks, rooming, accepted quote, supplier messages가 한 화면에 필요합니다.
   const { data: reservation, error: reservationError } = await supabase
     .from("reservations")
     .select(
-      "id, reservation_code, status, tour_start_date, tour_end_date, confirmed_at, cancelled_at, agency_account_id, quote_case_id, accepted_quote_version_id, created_at, agency_accounts(name), quote_cases(case_code, tour_name)"
+      "id, reservation_code, status, tour_start_date, tour_end_date, confirmed_at, cancelled_at, agency_account_id, quote_case_id, accepted_quote_version_id, created_at, agency_accounts(name), quote_cases(case_code, tour_name, estimated_pax)"
     )
     .eq("id", reservationId)
     .maybeSingle();
@@ -84,7 +95,10 @@ export async function getReservationDetail(
     { data: roomingLists, error: roomingError },
     { data: passengers, error: passengerError },
     { data: roomAssignments, error: roomAssignmentError },
-    { data: suppliers, error: supplierError }
+    { data: suppliers, error: supplierError },
+    { data: acceptedQuoteVersion, error: quoteVersionError },
+    { data: quoteItems, error: quoteItemError },
+    { data: supplierMessages, error: supplierMessageError }
   ] =
     await Promise.all([
       supabase
@@ -117,7 +131,26 @@ export async function getReservationDetail(
         .select("id, name_ko, supplier_contacts(id, name, email, phone, receives_booking_messages, status)")
         .eq("status", "active")
         .order("name_ko", { ascending: true })
-        .limit(200)
+        .limit(200),
+      reservation.accepted_quote_version_id
+        ? supabase
+            .from("quote_versions")
+            .select("id, version_no, status, currency, public_total_amount, accepted_at")
+            .eq("id", reservation.accepted_quote_version_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      reservation.accepted_quote_version_id
+        ? supabase
+            .from("quote_items")
+            .select("id, item_category, service_section, snapshot_item_name, snapshot_supplier_name, pricing_unit, quantity, pax_count, total_cost_krw, total_sell_amount, partner_visible_notes, internal_notes")
+            .eq("quote_version_id", reservation.accepted_quote_version_id)
+            .order("created_at", { ascending: true })
+        : Promise.resolve({ data: [], error: null }),
+      supabase
+        .from("supplier_message_outbox")
+        .select("id, domestic_supplier_id, message_type, status, subject, approved_at, second_approved_at, sent_at, created_at, domestic_suppliers(name_ko)")
+        .eq("reservation_id", reservationId)
+        .order("created_at", { ascending: false })
     ]);
 
   if (historyError) throw new Error(historyError.message);
@@ -126,6 +159,9 @@ export async function getReservationDetail(
   if (passengerError) throw new Error(passengerError.message);
   if (roomAssignmentError) throw new Error(roomAssignmentError.message);
   if (supplierError) throw new Error(supplierError.message);
+  if (quoteVersionError) throw new Error(quoteVersionError.message);
+  if (quoteItemError) throw new Error(quoteItemError.message);
+  if (supplierMessageError) throw new Error(supplierMessageError.message);
 
   const passengerItems = (passengers ?? []).map(mapReservationPassengerItem);
 
@@ -136,6 +172,9 @@ export async function getReservationDetail(
       rooming_lists: roomingLists ?? []
     }),
     acceptedQuoteVersionId: reservation.accepted_quote_version_id ?? null,
+    acceptedQuoteVersion: acceptedQuoteVersion ? mapAcceptedQuoteVersion(acceptedQuoteVersion) : null,
+    quoteItems: (quoteItems ?? []).map(mapReservationQuoteItem),
+    supplierMessages: (supplierMessages ?? []).map(mapReservationSupplierMessageItem),
     statusHistory: (history ?? []).map(mapReservationStatusHistoryItem),
     operationTasks: (tasks ?? []).map(mapReservationOperationTaskItem),
     roomingLists: (roomingLists ?? []).map(mapReservationRoomingListItem),
@@ -148,6 +187,8 @@ export async function getReservationDetail(
 }
 
 function mapReservationListItem(row: any): ReservationListItem {
+  // Supabase join 결과는 snake_case와 nested relation이 섞여 있으므로
+  // 화면에서는 camelCase 모델로 고정해 컴포넌트가 DB 구조에 덜 의존하게 합니다.
   return {
     id: row.id,
     reservationCode: row.reservation_code,
@@ -161,6 +202,15 @@ function mapReservationListItem(row: any): ReservationListItem {
     quoteCaseId: row.quote_case_id,
     caseCode: row.quote_cases?.case_code ?? null,
     tourName: row.quote_cases?.tour_name ?? null,
+    estimatedPax: row.quote_cases?.estimated_pax ?? null,
+    operationTaskSummary: Array.isArray(row.operation_tasks)
+      ? row.operation_tasks.map((task: any) => ({
+          id: task.id,
+          team: task.team,
+          taskType: task.task_type,
+          status: task.status
+        }))
+      : [],
     taskCount: Array.isArray(row.operation_tasks) ? row.operation_tasks.length : 0,
     roomingListCount: Array.isArray(row.rooming_lists) ? row.rooming_lists.length : 0,
     createdAt: row.created_at
@@ -190,6 +240,49 @@ function mapReservationOperationTaskItem(row: any): ReservationOperationTaskItem
     blockedReason: row.blocked_reason ?? null,
     domesticSupplierId: row.domestic_supplier_id ?? null,
     domesticSupplierName: row.domestic_suppliers?.name_ko ?? null
+  };
+}
+
+function mapAcceptedQuoteVersion(row: any) {
+  return {
+    id: row.id,
+    versionNo: row.version_no,
+    status: row.status,
+    currency: row.currency,
+    publicTotalAmount: Number(row.public_total_amount ?? 0),
+    acceptedAt: row.accepted_at ?? null
+  };
+}
+
+function mapReservationQuoteItem(row: any) {
+  return {
+    id: row.id,
+    itemCategory: row.item_category,
+    serviceSection: row.service_section ?? null,
+    snapshotItemName: row.snapshot_item_name,
+    snapshotSupplierName: row.snapshot_supplier_name ?? null,
+    pricingUnit: row.pricing_unit,
+    quantity: Number(row.quantity ?? 0),
+    paxCount: row.pax_count ?? null,
+    totalCostKrw: Number(row.total_cost_krw ?? 0),
+    totalSellAmount: Number(row.total_sell_amount ?? 0),
+    partnerVisibleNotes: row.partner_visible_notes ?? null,
+    internalNotes: row.internal_notes ?? null
+  };
+}
+
+function mapReservationSupplierMessageItem(row: any) {
+  return {
+    id: row.id,
+    domesticSupplierId: row.domestic_supplier_id,
+    domesticSupplierName: row.domestic_suppliers?.name_ko ?? null,
+    messageType: row.message_type,
+    status: row.status,
+    subject: row.subject ?? null,
+    approvedAt: row.approved_at ?? null,
+    secondApprovedAt: row.second_approved_at ?? null,
+    sentAt: row.sent_at ?? null,
+    createdAt: row.created_at
   };
 }
 

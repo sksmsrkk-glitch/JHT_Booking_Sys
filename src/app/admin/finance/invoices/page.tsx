@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getPageAuthorization } from "@/lib/api/page-session";
 import { INVOICE_STATUSES } from "@/features/finance/queries";
 import type { InvoiceListItem } from "@/features/finance/types";
+import { demoFinanceInvoices } from "@/features/finance/demo-invoices";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ type SearchParams = Promise<{
 }>;
 
 type LoadState =
-  | { status: "ready"; invoices: InvoiceListItem[] }
+  | { status: "ready"; invoices: InvoiceListItem[]; isPreview?: boolean }
   | { status: "auth-required"; message: string }
   | { status: "error"; message: string };
 
@@ -81,6 +82,13 @@ export default async function AdminFinancePage({ searchParams }: { searchParams:
         </section>
       ) : null}
 
+      {loadState.status === "ready" && loadState.isPreview ? (
+        <section className="notice warning">
+          <h2>Preview data</h2>
+          <p>Finance login is bypassed during development, so this page shows an invoice workflow sample.</p>
+        </section>
+      ) : null}
+
       {loadState.status === "error" ? (
         <section className="notice danger">
           <h2>Finance data could not load</h2>
@@ -136,9 +144,11 @@ function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
           <thead>
             <tr>
               <th>Invoice</th>
+              <th>Tour Code</th>
               <th>Reservation</th>
               <th>Agency</th>
               <th>Status</th>
+              <th>Collection</th>
               <th>Total</th>
               <th>Paid</th>
               <th>Settlement</th>
@@ -151,8 +161,10 @@ function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
                   <Link className="strong-link" href={`/admin/finance/invoices/${invoice.id}` as Route}>
                     {invoice.invoiceNo}
                   </Link>
+                  <span className="subtext">Version {invoice.versionNo}</span>
                   <span className="subtext">Due: {invoice.dueDate ?? "Not set"}</span>
                 </td>
+                <td>{invoice.tourCode ?? "Not set"}</td>
                 <td>
                   {invoice.reservationCode ?? invoice.reservationId}
                   {invoice.tourName ? <span className="subtext">{invoice.tourName}</span> : null}
@@ -160,6 +172,14 @@ function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
                 <td>{invoice.agencyName ?? "Not set"}</td>
                 <td>
                   <span className={`status-dot status-${invoice.status}`}>{formatLabel(invoice.status)}</span>
+                </td>
+                <td>
+                  {formatLabel(invoice.collectionStatus)}
+                  <span className="subtext">
+                    {invoice.depositRequired
+                      ? `Deposit ${invoice.currency} ${(invoice.depositAmount ?? 0).toLocaleString()}`
+                      : "No deposit"}
+                  </span>
                 </td>
                 <td>
                   {invoice.currency} {invoice.totalAmount.toLocaleString()}
@@ -186,11 +206,7 @@ function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
 async function loadInvoices(filters: { q?: string; status?: string }): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
-    return {
-      status: "auth-required",
-      message:
-        "This page reads finance data through the finance API, which requires a Supabase user JWT with finance/admin role."
-    };
+    return { status: "ready", invoices: demoFinanceInvoices, isPreview: true };
   }
 
   const response = await fetch(buildInternalApiUrl("/api/finance/invoices", filters, headerStore), {
@@ -200,8 +216,11 @@ async function loadInvoices(filters: { q?: string; status?: string }): Promise<L
   const payload = await response.json();
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      return { status: "ready", invoices: demoFinanceInvoices, isPreview: true };
+    }
     return {
-      status: response.status === 401 || response.status === 403 ? "auth-required" : "error",
+      status: "error",
       message: payload.error ?? "Unknown finance API error"
     };
   }

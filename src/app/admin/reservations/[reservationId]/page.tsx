@@ -1,10 +1,12 @@
 import type { Route } from "next";
 import Link from "next/link";
+import { FinalOperationSnapshotForm } from "@/components/admin/FinalOperationSnapshotForm";
 import { InvoiceCreateFromReservationAction } from "@/components/admin/InvoiceCreateFromReservationAction";
 import { ReservationActions } from "@/components/admin/ReservationActions";
 import { ReservationStatusForm } from "@/components/admin/ReservationStatusForm";
 import { RoomAssignmentCreateForm } from "@/components/admin/RoomAssignmentCreateForm";
 import { SupplierMessageDraftForm } from "@/components/admin/SupplierMessageDraftForm";
+import { getDemoReservationDetail } from "@/features/reservation/demo-data";
 import type { ReservationDetail } from "@/features/reservation/types";
 import { getPageAuthorization } from "@/lib/api/page-session";
 
@@ -21,6 +23,7 @@ type LoadState =
 const reservationsRoute = "/admin/reservations" as Route;
 const tasksRoute = "/admin/operations/tasks" as Route;
 const supplierMessagesRoute = "/admin/supplier-messages" as Route;
+const guideExpensesRoute = "/admin/guide-expenses" as Route;
 
 export default async function AdminReservationDetailPage({ params }: { params: PageParams }) {
   const { reservationId } = await params;
@@ -144,13 +147,49 @@ export default async function AdminReservationDetailPage({ params }: { params: P
 
       <section className="action-band">
         <div>
-          <h2>Finance Setup</h2>
-          <p>Issue an agency-visible invoice from the accepted quote total, then track payments from finance.</p>
+          <h2>Final Operation Confirmation</h2>
+          <p>Confirm final hotel, room type, day schedule, meals, flights, and payment snapshot, then issue the invoice automatically.</p>
+        </div>
+        <span className="status-dot status-live">Quote to Invoice</span>
+      </section>
+
+      <section className="panel-section">
+        <div className="section-heading">
+          <div>
+            <h2>Final Confirmation Snapshot</h2>
+            <p>This snapshot overrides quote itinerary fields when the invoice is generated.</p>
+          </div>
+          <span>{reservation.acceptedQuoteVersion ? `Quote v${reservation.acceptedQuoteVersion.versionNo}` : "No accepted quote"}</span>
+        </div>
+        <FinalOperationSnapshotForm
+          disabledReason={
+            !reservation.acceptedQuoteVersionId
+              ? "Accepted quote version is required."
+              : operationsLockedReason ?? undefined
+          }
+          reservationId={reservation.id}
+        />
+      </section>
+
+      <section className="action-band">
+        <div>
+          <h2>Finance Fallback</h2>
+          <p>Use only when you need to issue from accepted quote total without final operation snapshot details.</p>
         </div>
         <InvoiceCreateFromReservationAction
           canInvoice={Boolean(reservation.acceptedQuoteVersionId) && reservation.status !== "cancelled"}
           reservationId={reservation.id}
         />
+      </section>
+
+      <section className="action-band">
+        <div>
+          <h2>Guide Actual Cost Report</h2>
+          <p>After tour completion, collect guide-entered actual expenses and sync submitted rows to finance settlement costs.</p>
+        </div>
+        <Link className="button-secondary" href={`${guideExpensesRoute}/${reservation.id}` as Route}>
+          Open Guide Expenses
+        </Link>
       </section>
 
       <section className="section-block">
@@ -328,8 +367,10 @@ export default async function AdminReservationDetailPage({ params }: { params: P
 }
 
 async function loadReservation(reservationId: string): Promise<LoadState> {
+  const demoReservation = getDemoReservationDetail(reservationId);
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
+    if (demoReservation) return { status: "ready", reservation: demoReservation };
     return {
       status: "auth-required",
       message:
@@ -344,6 +385,9 @@ async function loadReservation(reservationId: string): Promise<LoadState> {
   const payload = await response.json();
 
   if (!response.ok) {
+    if ((response.status === 401 || response.status === 403 || response.status === 404) && demoReservation) {
+      return { status: "ready", reservation: demoReservation };
+    }
     if (response.status === 404) {
       return { status: "not-found", message: payload.error ?? "Reservation not found" };
     }

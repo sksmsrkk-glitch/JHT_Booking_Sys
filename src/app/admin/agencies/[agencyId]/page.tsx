@@ -1,7 +1,9 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 import { AgencyContactCreateForm, AgencyUserCreateForm } from "@/components/admin/AgencyPeopleForms";
+import { AgencyLifecycleActions, AgencyUserGovernanceActions } from "@/components/admin/AgencyGovernanceActions";
 import { getPageAuthorization } from "@/lib/api/page-session";
 import type { AgencyDetail } from "@/features/agency/types";
 
@@ -67,7 +69,15 @@ export default async function AdminAgencyDetailPage({ params }: PageProps) {
           <dl className="definition-list">
             <div>
               <dt>Status</dt>
-              <dd>{formatLabel(agency.status)}</dd>
+              <dd>
+                {formatLabel(agency.status)} / {formatLabel(agency.lifecycleStatus)}
+              </dd>
+            </div>
+            <div>
+              <dt>Governance</dt>
+              <dd>
+                <AgencyLifecycleActions agencyId={agency.id} lifecycleStatus={agency.lifecycleStatus} />
+              </dd>
             </div>
             <div>
               <dt>Email Domain</dt>
@@ -101,6 +111,12 @@ export default async function AdminAgencyDetailPage({ params }: PageProps) {
             <div>
               <dt>Inquiries</dt>
               <dd>{agency.inquiryCount}</dd>
+            </div>
+            <div>
+              <dt>Signup / Last Login</dt>
+              <dd>
+                {formatDateTime(agency.createdAt)} / {agency.lastLoginAt ? formatDateTime(agency.lastLoginAt) : "No log"}
+              </dd>
             </div>
           </dl>
         </article>
@@ -141,14 +157,15 @@ export default async function AdminAgencyDetailPage({ params }: PageProps) {
         </section>
         <SimpleTable
           emptyText="No agency portal users are registered."
-          headers={["Name", "Email", "Title", "Auth Linked", "Admin", "Status"]}
+          headers={["Name", "Email", "Role", "Auth / PW", "Last Login", "Status", "Action"]}
           rows={agency.users.map((user) => [
             user.name,
             user.email,
-            user.title ?? "Not set",
-            user.authUserId ? "Linked" : "Pending",
-            user.isAccountAdmin ? "Yes" : "No",
-            formatLabel(user.status)
+            `${formatLabel(user.accountRole)}${user.title ? ` / ${user.title}` : ""}`,
+            `${user.authUserId ? "Linked" : "Pending"} / ${user.passwordResetRequired ? "Reset required" : "PW set"}`,
+            user.lastLoginAt ? formatDateTime(user.lastLoginAt) : "No log",
+            formatLabel(user.status),
+            <AgencyUserGovernanceActions key={user.id} agencyId={agency.id} userId={user.id} />
           ])}
         />
       </section>
@@ -172,6 +189,42 @@ export default async function AdminAgencyDetailPage({ params }: PageProps) {
         />
       </section>
 
+      <section className="section-block">
+        <div className="section-heading">
+          <h2>Account Email Events</h2>
+          <span>{agency.emailEvents.length} shown</span>
+        </div>
+        <SimpleTable
+          emptyText="No account email events are queued."
+          headers={["Event", "Recipient", "Subject", "Delivery", "Created"]}
+          rows={agency.emailEvents.map((event) => [
+            formatLabel(event.eventType),
+            event.recipientEmail,
+            event.subject,
+            formatLabel(event.deliveryStatus),
+            formatDateTime(event.createdAt)
+          ])}
+        />
+      </section>
+
+      <section className="section-block">
+        <div className="section-heading">
+          <h2>Login Log</h2>
+          <span>{agency.loginEvents.length} shown</span>
+        </div>
+        <SimpleTable
+          emptyText="No partner login records are available."
+          headers={["Event", "User", "IP", "User Agent", "Created"]}
+          rows={agency.loginEvents.map((event) => [
+            formatLabel(event.eventType),
+            event.agencyUserId ?? "Unknown",
+            event.ipAddress ?? "Not captured",
+            event.userAgent ?? "Not captured",
+            formatDateTime(event.createdAt)
+          ])}
+        />
+      </section>
+
       <section className="notice">
         <h2>Boundary Guardrails</h2>
         <ul className="clean-list">
@@ -190,7 +243,7 @@ function SimpleTable({
   emptyText
 }: {
   headers: string[];
-  rows: string[][];
+  rows: ReactNode[][];
   emptyText: string;
 }) {
   if (rows.length === 0) {
@@ -215,7 +268,7 @@ function SimpleTable({
           {rows.map((row, rowIndex) => (
             <tr key={`${row[0]}-${rowIndex}`}>
               {row.map((cell, cellIndex) => (
-                <td key={`${cell}-${cellIndex}`}>{cell}</td>
+                <td key={cellIndex}>{cell}</td>
               ))}
             </tr>
           ))}
@@ -271,4 +324,8 @@ function formatLabel(value: string) {
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("en-CA", { dateStyle: "medium" }).format(new Date(value));
 }

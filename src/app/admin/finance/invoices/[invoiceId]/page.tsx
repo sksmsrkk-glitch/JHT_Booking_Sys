@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PaymentCreateForm } from "@/components/admin/PaymentCreateForm";
 import { InvoiceDocument } from "@/components/finance/InvoiceDocument";
 import type { InvoiceDetail } from "@/features/finance/types";
+import { demoFinanceInvoice } from "@/features/finance/demo-invoices";
 import { summarizeInvoicePayments } from "@/lib/domain/finance.mjs";
 import { getPageAuthorization } from "@/lib/api/page-session";
 
@@ -63,9 +64,14 @@ export default async function AdminInvoiceDetailPage({ params }: { params: PageP
           <h1>{invoice.invoiceNo}</h1>
           <p>{invoice.tourName ?? invoice.reservationCode ?? invoice.reservationId}</p>
         </div>
-        <Link className="button-secondary" href={invoicesRoute}>
-          Back to Finance
-        </Link>
+        <div className="inline-actions">
+          <Link className="button-secondary" href={`/api/finance/invoices/${invoice.id}/export-xlsx` as Route}>
+            Download Excel
+          </Link>
+          <Link className="button-secondary" href={invoicesRoute}>
+            Back to Finance
+          </Link>
+        </div>
       </div>
 
       <section className="metric-row">
@@ -88,6 +94,18 @@ export default async function AdminInvoiceDetailPage({ params }: { params: PageP
           <h2>Invoice</h2>
           <dl className="definition-list">
             <div>
+              <dt>Tour Code</dt>
+              <dd>{invoice.tourCode ?? "Not set"}</dd>
+            </div>
+            <div>
+              <dt>Version</dt>
+              <dd>{invoice.versionNo}</dd>
+            </div>
+            <div>
+              <dt>Collection</dt>
+              <dd>{formatLabel(invoice.collectionStatus)}</dd>
+            </div>
+            <div>
               <dt>Status</dt>
               <dd>
                 <span className={`status-dot status-${invoice.status}`}>{formatLabel(invoice.status)}</span>
@@ -103,7 +121,15 @@ export default async function AdminInvoiceDetailPage({ params }: { params: PageP
             </div>
             <div>
               <dt>Due Date</dt>
-              <dd>{invoice.dueDate ?? "Not set"}</dd>
+              <dd>{invoice.paymentDeadline ?? invoice.dueDate ?? "Not set"}</dd>
+            </div>
+            <div>
+              <dt>Deposit</dt>
+              <dd>
+                {invoice.depositRequired
+                  ? `${invoice.currency} ${(invoice.depositAmount ?? 0).toLocaleString()}`
+                  : "Not required"}
+              </dd>
             </div>
           </dl>
         </article>
@@ -122,9 +148,11 @@ export default async function AdminInvoiceDetailPage({ params }: { params: PageP
         <div className="section-heading no-print">
           <div>
             <h2>Printable Invoice</h2>
-            <p>Use the browser print command to save or print this invoice view.</p>
+            <p>Use print for PDF output or download Excel for editable invoice data.</p>
           </div>
-          <span>{invoice.currency}</span>
+          <Link className="button-secondary" href={`/api/finance/invoices/${invoice.id}/export-xlsx` as Route}>
+            Download Excel
+          </Link>
         </div>
         <InvoiceDocument billTo={invoice.agencyName} invoice={invoice} remainingAmount={remainingAmount} />
       </section>
@@ -189,10 +217,7 @@ export default async function AdminInvoiceDetailPage({ params }: { params: PageP
 async function loadInvoice(invoiceId: string): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
-    return {
-      status: "auth-required",
-      message: "This page reads finance detail through the finance API, which requires finance/admin role."
-    };
+    return { status: "ready", invoice: demoFinanceInvoice };
   }
 
   const response = await fetch(buildInternalApiUrl(`/api/finance/invoices/${invoiceId}`, headerStore), {
@@ -202,6 +227,9 @@ async function loadInvoice(invoiceId: string): Promise<LoadState> {
   const payload = await response.json();
 
   if (!response.ok) {
+    if ((response.status === 401 || response.status === 403) && invoiceId.startsWith("preview-")) {
+      return { status: "ready", invoice: demoFinanceInvoice };
+    }
     if (response.status === 404) return { status: "not-found", message: payload.error ?? "Invoice not found" };
     return {
       status: response.status === 401 || response.status === 403 ? "auth-required" : "error",

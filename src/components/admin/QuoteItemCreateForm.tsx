@@ -30,6 +30,9 @@ export function QuoteItemCreateForm({
   const [snapshotSupplierName, setSnapshotSupplierName] = useState("");
   const [snapshotCostCurrency, setSnapshotCostCurrency] = useState("KRW");
   const [snapshotUnitCostAmount, setSnapshotUnitCostAmount] = useState("0");
+  const [exchangeRateCountryCode, setExchangeRateCountryCode] = useState("");
+  const [exchangeRateToKrw, setExchangeRateToKrw] = useState("1");
+  const [exchangeRateNotice, setExchangeRateNotice] = useState("");
   const [pricingUnit, setPricingUnit] = useState("per_group");
   const [paxCount, setPaxCount] = useState("1");
   const activeCostOptions = costItems.flatMap((item) =>
@@ -96,6 +99,28 @@ export function QuoteItemCreateForm({
     setSnapshotUnitCostAmount(String(Number(option.price.cost_amount ?? 0)));
     setPricingUnit(option.price.pricing_unit);
     setPaxCount(String(option.price.min_pax ?? option.price.max_pax ?? 1));
+    void applyCommonExchangeRate(option.price.currency, exchangeRateCountryCode);
+  }
+
+  async function applyCommonExchangeRate(currency = snapshotCostCurrency, countryCode = exchangeRateCountryCode) {
+    const normalized = currency.trim().toUpperCase() || "KRW";
+    const normalizedCountry = countryCode.trim().toUpperCase();
+    try {
+      const params = new URLSearchParams({ latest: "true", baseCurrency: normalized });
+      if (normalizedCountry) params.set("countryCode", normalizedCountry);
+      const response = await fetch(`/api/exchange-rates?${params.toString()}`);
+      const payload = await response.json();
+      if (!response.ok || !payload.data) {
+        setExchangeRateNotice(`No active common FX rate found for ${normalized}${normalizedCountry ? ` / ${normalizedCountry}` : ""}.`);
+        return;
+      }
+      setExchangeRateToKrw(String(payload.data.rate));
+      setExchangeRateNotice(
+        `${payload.data.countryCode ? `${payload.data.countryCode} ` : ""}${payload.data.baseCurrency}/${payload.data.quoteCurrency} ${Number(payload.data.rate).toLocaleString()} applied from common FX.`
+      );
+    } catch {
+      setExchangeRateNotice("Common FX lookup failed. Enter manually.");
+    }
   }
 
   return (
@@ -181,7 +206,7 @@ export function QuoteItemCreateForm({
           <input
             disabled={!quoteVersionId || isBusy}
             name="snapshotCostCurrency"
-            onChange={(event) => setSnapshotCostCurrency(event.target.value)}
+            onChange={(event) => setSnapshotCostCurrency(event.target.value.toUpperCase())}
             value={snapshotCostCurrency}
           />
         </label>
@@ -199,16 +224,29 @@ export function QuoteItemCreateForm({
           />
         </label>
         <label>
+          FX Country Code
+          <input
+            disabled={!quoteVersionId || isBusy}
+            onChange={(event) => setExchangeRateCountryCode(event.target.value.toUpperCase())}
+            placeholder="TH, MY, SG"
+            value={exchangeRateCountryCode}
+          />
+        </label>
+        <label>
           FX to KRW
           <input
-            defaultValue="1"
             disabled={!quoteVersionId || isBusy}
             min="0"
             name="exchangeRateToKrw"
+            onChange={(event) => setExchangeRateToKrw(event.target.value)}
             required
             step="0.000001"
             type="number"
+            value={exchangeRateToKrw}
           />
+          <button className="button-secondary mini-button" disabled={!quoteVersionId || isBusy} onClick={() => applyCommonExchangeRate()} type="button">
+            Apply Common FX
+          </button>
         </label>
         <label>
           Pricing Unit
@@ -318,6 +356,7 @@ export function QuoteItemCreateForm({
           Add Quote Item
         </button>
         {message ? <span className="danger-text">{message}</span> : null}
+        {exchangeRateNotice ? <span className="subtext">{exchangeRateNotice}</span> : null}
       </div>
     </form>
   );

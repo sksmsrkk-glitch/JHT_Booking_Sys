@@ -40,8 +40,8 @@ const mutationSmokePayload = {
 };
 
 const checks = [
-  { path: "/", status: 200, includes: ["Jungho Travel Operations Platform", "Internal Admin", "Overseas Agency Portal"] },
-  { path: "/admin", status: 200, includes: ["Internal Admin", "Version 1 Build Map"] },
+  { path: "/", status: 200, includes: ["Jungho Travel Operations Platform", "Internal Workbench", "Overseas Agency Portal"] },
+  { path: "/admin", status: 200, includes: ["Internal Admin", "Operations Dashboard"] },
   { path: "/agency", status: 200, includes: ["Overseas Agency Portal", "Customer-safe view"] },
   { path: "/auth/login", status: 200, includes: ["Sign in", "Supabase user"] },
   { path: "/admin/bootstrap", status: 200, includes: ["Admin Bootstrap", "Create Initial Admin"] },
@@ -50,12 +50,33 @@ const checks = [
   { path: "/admin/users", status: 200, includes: ["Internal Users", "Admin role required"] },
   { path: "/admin/agencies", status: 200, includes: ["Overseas Agencies", "Internal role required"] },
   { path: "/admin/domestic-suppliers", status: 200, includes: ["Domestic Suppliers", "Internal role required"] },
+  { path: "/admin/exchange-rates", status: 200, includes: ["Exchange Rates", "Internal role required"] },
   { path: "/admin/costing/search", status: 200, includes: ["Cost Search", "Internal role required"] },
   { path: "/admin/quote-cases", status: 200, includes: ["Quote Cases", "Internal role required"] },
-  { path: "/admin/reservations", status: 200, includes: ["Reservations", "Internal role required"] },
+  { path: "/admin/reservations", status: 200, includes: ["Reservations", "Preview data"] },
+  { path: "/admin/reservations/incomplete", status: 200, includes: ["Incomplete Reservation Follow-up", "Incomplete groups"] },
+  {
+    path: "/admin/reservations/00000000-0000-4000-8000-000000000001/operation-checklist",
+    status: 200,
+    includes: ["Reservation Operation Checklist", "Internal role required"]
+  },
+  { path: "/admin/confirmations", status: 200, includes: ["Final Confirmations", "Preview data"] },
+  {
+    path: "/admin/confirmations/00000000-0000-4000-8000-000000000001",
+    status: 200,
+    includes: ["Confirmation Document", "Reservation not found"]
+  },
+  { path: "/admin/guide-expenses", status: 200, includes: ["Guide Expense Reports", "Preview data"] },
+  {
+    path: "/admin/guide-expenses/00000000-0000-4000-8000-000000000001",
+    status: 200,
+    includes: ["Guide Expense Report", "Report could not load"]
+  },
+  { path: "/admin/workflows", status: 200, includes: ["Workflow Communication", "Preview data"] },
+  { path: "/admin/workflows/Q-2026-TH-001", status: 200, includes: ["Workflow Communication Ledger", "Communication History"] },
   { path: "/admin/operations/tasks", status: 200, includes: ["Operation Tasks", "Internal role required"] },
   { path: "/admin/supplier-messages", status: 200, includes: ["Supplier Messages", "Internal role required"] },
-  { path: "/admin/finance/invoices", status: 200, includes: ["Finance", "Finance role required"] },
+  { path: "/admin/finance/invoices", status: 200, includes: ["Finance", "Preview data"] },
   { path: "/admin/finance/settlements", status: 200, includes: ["Settlements", "Finance role required"] },
   { path: "/admin/automation/gmail-review", status: 200, includes: ["Gmail Review", "Internal role required"] },
   { path: "/admin/automation/failed-jobs", status: 200, includes: ["Failed Jobs", "Internal role required"] },
@@ -67,16 +88,19 @@ const checks = [
   { path: "/admin/quote-cases/00000000-0000-4000-8000-000000000001", status: 200, includes: ["Quote Case Detail", "Quote case could not load"] },
   { path: "/admin/reservations/00000000-0000-4000-8000-000000000001", status: 200, includes: ["Reservation Detail", "Reservation could not load"] },
   { path: "/admin/supplier-messages/00000000-0000-4000-8000-000000000001", status: 200, includes: ["Supplier Message Detail", "Message could not load"] },
-  { path: "/admin/finance/invoices/00000000-0000-4000-8000-000000000001", status: 200, includes: ["Invoice Detail", "Invoice could not load"] },
-  { path: "/agency/inquiries", status: 200, includes: ["Inquiries", "Agency login required"] },
-  { path: "/agency/inquiries/new", status: 200, includes: ["New Inquiry", "Agency login required"] },
-  { path: "/agency/quote-cases", status: 200, includes: ["Quotes", "Agency login required"] },
-  { path: "/agency/reservations", status: 200, includes: ["Reservations", "Agency login required"] },
-  { path: "/agency/invoices", status: 200, includes: ["Invoices", "Agency login required"] },
+  { path: "/admin/finance/invoices/00000000-0000-4000-8000-000000000001", status: 200, includes: ["SHTTV0611G-v1", "Payment"] },
+  { path: "/agency/inquiries", status: 200, includes: ["Inquiries", "Preview data"] },
+  { path: "/agency/inquiries/new", status: 200, includes: ["New Inquiry", "Development preview mode"] },
+  { path: "/agency/signup", status: 200, includes: ["Partner Sign-up", "Partner Sign-up Application"] },
+  { path: "/agency/quote-cases", status: 200, includes: ["Quotes", "Preview data"] },
+  { path: "/agency/reservations", status: 200, includes: ["Reservations", "Preview data"] },
+  { path: "/agency/invoices", status: 200, includes: ["Invoices", "Preview data"] },
+  { path: "/agency/workflows", status: 200, includes: ["Communication", "Preview data"] },
+  { path: "/agency/workflows/Q-2026-TH-001", status: 200, includes: ["Partner Communication", "Communication History"] },
   { path: "/agency/quote-cases/fake-share-id", status: 200, includes: ["Quote Detail", "Quote could not load"] },
   { path: "/agency/reservations/00000000-0000-4000-8000-000000000001", status: 200, includes: ["Reservation Detail", "Reservation could not load"] },
   { path: "/agency/reservations/00000000-0000-4000-8000-000000000001/rooming-lists", status: 200, includes: ["Rooming Lists", "Reservation could not load"] },
-  { path: "/agency/invoices/00000000-0000-4000-8000-000000000001", status: 200, includes: ["Invoice Detail", "Invoice could not load"] }
+  { path: "/agency/invoices/00000000-0000-4000-8000-000000000001", status: 200, includes: ["SHTTV0611G-v1", "Payment"] }
 ];
 
 const apiChecks = buildApiChecks();
@@ -189,6 +213,60 @@ function buildApiChecks() {
           method,
           status: 200,
           includes: ["jht-operations-platform", "supabaseUrlConfigured"],
+          headers: [{ name: "cache-control", value: "no-store" }]
+        };
+      }
+      if (path === "/api/agency/signup-applications" && method === "POST") {
+        return {
+          path,
+          method,
+          status: 400,
+          includes: ["country is required"],
+          headers: [{ name: "cache-control", value: "no-store" }]
+        };
+      }
+      if (path === "/api/agency/inquiries" && method === "POST") {
+        return {
+          path,
+          method,
+          status: 201,
+          includes: ["preview_submitted"],
+          headers: [{ name: "cache-control", value: "no-store" }]
+        };
+      }
+      if (path === "/api/countries" && method === "GET") {
+        return {
+          path,
+          method,
+          status: 200,
+          includes: ["Malaysia"],
+          headers: [{ name: "cache-control", value: "no-store" }]
+        };
+      }
+      if (path === "/api/workflows" && method === "GET") {
+        return {
+          path,
+          method,
+          status: 200,
+          includes: ["Q-2026-TH-001"],
+          headers: [{ name: "cache-control", value: "no-store" }]
+        };
+      }
+      if (path === "/api/workflows/00000000-0000-4000-8000-000000000001" && method === "GET") {
+        return {
+          path,
+          method,
+          status: 200,
+          includes: ["data"],
+          headers: [{ name: "cache-control", value: "no-store" }]
+        };
+      }
+      if (path === "/api/workflows/00000000-0000-4000-8000-000000000001/messages" && method === "POST") {
+        return {
+          path,
+          method,
+          status: 400,
+          includes: ["body is required"],
           headers: [{ name: "cache-control", value: "no-store" }]
         };
       }

@@ -8,9 +8,9 @@ type RouteContext = { params: Promise<{ id: string }> };
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const body = await readJson<Record<string, unknown>>(request);
     const supabase = createRequestSupabaseClient(request);
     const agencyUser = await requireAgencyUser(supabase);
+    const body = await readJson<Record<string, unknown>>(request);
 
     const { data: quoteCase, error: quoteError } = await supabase
       .from("quote_cases")

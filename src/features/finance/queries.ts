@@ -1,6 +1,7 @@
 import type {
   InvoiceDetail,
   InvoiceFilters,
+  InvoiceLineItem,
   InvoiceListItem,
   PaymentListItem,
   SettlementFilters,
@@ -11,6 +12,13 @@ type SupabaseClientLike = {
   from: (table: string) => any;
 };
 
+/*
+ * 회계/정산 조회 레이어입니다.
+ *
+ * 인보이스는 예약과 연결되고, 예약에는 expenses/settlements/payments가 연결됩니다.
+ * 이 파일은 회계 대시보드가 인보이스 발행액, 입금액, 미수금, 실제 비용,
+ * 최종 손익을 같은 기준으로 보여주도록 DB row를 화면 model로 변환합니다.
+ */
 export const INVOICE_STATUSES = ["draft", "issued", "partially_paid", "paid", "void", "overdue"];
 export const SETTLEMENT_STATUSES = ["draft", "review", "approved", "closed"];
 
@@ -18,13 +26,15 @@ export async function listInvoices(
   supabase: SupabaseClientLike,
   filters: InvoiceFilters = {}
 ): Promise<InvoiceListItem[]> {
+  // 인보이스 목록에서는 상세 일정까지 가져오지 않고,
+  // 수금/정산 상태를 판단할 수 있는 payments, expenses, settlements 요약만 함께 조회합니다.
   const status = normalizeEnum(filters.status, INVOICE_STATUSES);
   const q = normalizeSearchTerm(filters.q);
 
   let query = supabase
     .from("invoices")
     .select(
-      "id, reservation_id, invoice_no, status, currency, total_amount, issued_at, due_date, storage_path, created_at, reservations(reservation_code, quote_cases(tour_name), agency_accounts(name), expenses(id), settlements(status, final_profit_amount)), payments(id, status, amount)"
+      "id, reservation_id, invoice_no, tour_code, version_no, status, currency, total_amount, issued_at, due_date, payment_deadline, collection_timing, collection_status, deposit_required, deposit_amount, storage_path, created_at, reservations(reservation_code, quote_cases(tour_name), agency_accounts(name), expenses(id), settlements(status, final_profit_amount)), payments(id, status, amount)"
     )
     .limit(150);
 
@@ -43,10 +53,12 @@ export async function getInvoiceDetail(
   supabase: SupabaseClientLike,
   invoiceId: string
 ): Promise<InvoiceDetail | null> {
+  // 인보이스 상세/엑셀 출력에는 라인아이템, 결제내역, 항공/일정/계좌 snapshot이 필요합니다.
+  // 이 snapshot들은 발행 당시 문서 기준을 보존하기 위한 JSONB 데이터입니다.
   const { data: invoice, error } = await supabase
     .from("invoices")
     .select(
-      "id, reservation_id, invoice_no, status, currency, total_amount, issued_at, due_date, storage_path, created_at, reservations(reservation_code, quote_cases(tour_name), agency_accounts(name), expenses(id), settlements(status, final_profit_amount)), payments(id, status, currency, amount, received_at, method, reference_no, idempotency_key, created_at)"
+      "id, reservation_id, invoice_no, tour_code, version_no, status, currency, total_amount, issued_at, due_date, payment_deadline, collection_timing, collection_status, deposit_required, deposit_amount, storage_path, bank_account_snapshot, flight_details, itinerary_snapshot, invoice_payload, created_at, reservations(reservation_code, quote_cases(tour_name), agency_accounts(name), expenses(id), settlements(status, final_profit_amount)), payments(id, status, currency, amount, received_at, method, reference_no, idempotency_key, created_at), invoice_line_items(id, line_no, description, service_date, category, currency, unit_amount, quantity, unit_label, total_amount, notes, metadata)"
     )
     .eq("id", invoiceId)
     .maybeSingle();
@@ -56,7 +68,14 @@ export async function getInvoiceDetail(
 
   return {
     ...mapInvoiceListItem(invoice),
-    payments: (invoice.payments ?? []).map(mapPaymentListItem)
+    payments: (invoice.payments ?? []).map(mapPaymentListItem),
+    lineItems: (invoice.invoice_line_items ?? [])
+      .map(mapInvoiceLineItem)
+      .sort((left: InvoiceLineItem, right: InvoiceLineItem) => left.lineNo - right.lineNo),
+    bankAccountSnapshot: asObject(invoice.bank_account_snapshot),
+    flightDetails: asObjectArray(invoice.flight_details),
+    itinerarySnapshot: asObjectArray(invoice.itinerary_snapshot),
+    invoicePayload: asObject(invoice.invoice_payload)
   };
 }
 
@@ -88,6 +107,8 @@ export async function listSettlements(
 
 function mapInvoiceListItem(row: any): InvoiceListItem {
   const payments = Array.isArray(row.payments) ? row.payments : [];
+  // confirmed 상태만 실제 수금액으로 봅니다.
+  // pending/received/review는 대시보드에서 별도 follow-up 대상으로 다룹니다.
   const confirmedPaymentTotal = payments
     .filter((payment: any) => payment.status === "confirmed")
     .reduce((total: number, payment: any) => total + Number(payment.amount ?? 0), 0);
@@ -103,11 +124,18 @@ function mapInvoiceListItem(row: any): InvoiceListItem {
     agencyName: row.reservations?.agency_accounts?.name ?? null,
     tourName: row.reservations?.quote_cases?.tour_name ?? null,
     invoiceNo: row.invoice_no,
+    tourCode: row.tour_code ?? null,
+    versionNo: Number(row.version_no ?? 1),
     status: row.status,
     currency: row.currency,
     totalAmount: Number(row.total_amount),
     issuedAt: row.issued_at ?? null,
     dueDate: row.due_date ?? null,
+    paymentDeadline: row.payment_deadline ?? null,
+    collectionTiming: row.collection_timing ?? null,
+    collectionStatus: row.collection_status ?? "unpaid",
+    depositRequired: Boolean(row.deposit_required),
+    depositAmount: row.deposit_amount === null || row.deposit_amount === undefined ? null : Number(row.deposit_amount),
     storagePath: row.storage_path ?? null,
     paymentCount: payments.length,
     confirmedPaymentTotal,
@@ -118,6 +146,23 @@ function mapInvoiceListItem(row: any): InvoiceListItem {
         ? null
         : Number(settlement.final_profit_amount),
     createdAt: row.created_at
+  };
+}
+
+function mapInvoiceLineItem(row: any): InvoiceLineItem {
+  return {
+    id: row.id,
+    lineNo: Number(row.line_no ?? 1),
+    description: row.description,
+    serviceDate: row.service_date ?? null,
+    category: row.category ?? null,
+    currency: row.currency,
+    unitAmount: Number(row.unit_amount ?? 0),
+    quantity: Number(row.quantity ?? 1),
+    unitLabel: row.unit_label ?? null,
+    totalAmount: Number(row.total_amount ?? 0),
+    notes: row.notes ?? null,
+    metadata: asObject(row.metadata)
   };
 }
 
@@ -162,4 +207,15 @@ function normalizeSearchTerm(value: string | undefined) {
 function normalizeEnum<T extends string>(value: string | undefined, allowed: readonly T[]) {
   if (!value) return null;
   return allowed.includes(value as T) ? (value as T) : null;
+}
+
+function asObject(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
+  return {};
+}
+
+function asObjectArray(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+    : [];
 }

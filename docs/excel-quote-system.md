@@ -84,7 +84,7 @@ The quote case creation screen now uses spreadsheet-style entry instead of raw J
   - `Manual Total`
 - The selected preset is saved into `excel_formula` and `public_breakdown` so the calculation remains auditable.
 - Sell amount updates automatically from unit cost, FX rate, quantity, pax, and margin, with manual-total override available.
-- Itinerary days are now entered as structured Day/date/title/meal/description fields instead of JSON.
+- Itinerary days are now entered as an Excel-style table instead of JSON or cards. The table follows the quotation sheet rhythm: Day, Date, Weekday, City/Area, Title, Program Description, Breakfast, Lunch, Dinner, Hotel, and Remarks.
 - Quote item rows now include a Day selector. During quote creation the API maps that Day number to the inserted `quote_itinerary_days.id` and stores it on `quote_items.itinerary_day_id`, so costing rows and itinerary days remain synchronized.
 - Agency-facing quote detail now renders a final quotation view instead of a raw JSON summary:
   - quote cover with tour name, tour code, version, status, and public total
@@ -104,6 +104,43 @@ The agency quote detail screen now includes a customer-safe request thread:
 - Message/reference summary.
 
 Supplier costs, quote item internals, margins, internal totals, operation tasks, supplier messages, expenses, commissions, settlements, internal payment references, and passport numbers remain hidden.
+
+## Domestic Supplier Cost Master UI
+
+The Domestic Suppliers admin page now supports direct manual cost-master entry before the Notion CSV import workflow is used.
+
+The quick-create form saves data through the existing internal-only boundary:
+
+- `domestic_suppliers`: supplier profile, category, region, address, keywords, internal notes.
+- `supplier_products`: searchable cost item such as room type, route, menu, attraction ticket, guide service, banquet room, or other cost item.
+- `supplier_prices`: currency, amount, pax range, validity period, weekday/weekend/holiday rule, season label, tax flag, and notes.
+- `supplier_media`: item image attachments, up to 10 images per supplier product, with Storage path or image URL, public label, alt text, and sort order.
+
+Supported manual entry templates:
+
+- Hotel: hotel profile, room type, room price, breakfast price, banquet room, banquet capacity, banquet price, facility price, period and weekday/weekend/holiday rules.
+- Vehicle: vehicle supplier, vehicle type, seat count, from-to route price, and extra usage time fee.
+- Meal: restaurant profile, address/region, mouse-selectable operation hours and closed days, repeatable menu-price key/value rows, dietary tags, special dietary notes, and capacity. Each menu row is saved as its own searchable `meal` product with its own price.
+- Attraction: attraction name, mouse-selectable operation hours and closed days, repeatable ticket/program rows, audience price columns for adult/child/group/all, and content tags such as experience, history, performance, or team building. Each non-empty ticket/audience price is saved as its own searchable `ticket` product with its own price.
+- Guide: guide name, shopping-tour day cost, non-shopping day cost, and in-house/freelancer tag.
+- Other cost: ad hoc cost item such as luggage truck, KTX, or flight.
+- Incentive banquet: venue, banquet room, capacity, menu, menu price, room rental, and facility checkboxes such as beam projector, LED projector, and PA system.
+
+The same page also includes a keyword/category/region search panel backed by `/api/cost-items/search`, so manually created items can be found and later applied to quote rows by keyword.
+
+Image attachment design:
+
+- Every manually created cost item can receive up to 10 image links at creation time.
+- The API route `POST /api/supplier-products/:id/media` and the database trigger both enforce the 10-image maximum.
+- Current V1 UI accepts Supabase Storage paths or HTTPS image URLs. Direct binary upload should use the same API after a supplier media Storage bucket and signed upload flow are configured.
+- Supplier images remain internal master data until explicitly copied into quote presentation blocks for Agency-facing quotations.
+
+Excel import/export design:
+
+- `/api/domestic-suppliers/excel-template` downloads the controlled supplier cost-master workbook template.
+- `/api/domestic-suppliers/export-xlsx` exports all current Domestic Supplier cost-master rows in the same workbook layout.
+- `/api/domestic-suppliers/import-xlsx` accepts that workbook format, creates or reuses suppliers and products, inserts price rows, and attaches image references.
+- The template uses one flat row per supplier item price so it can cover hotels, rooms, breakfast, vehicles, meals, attractions, guides, banquet rooms, other costs, and image references without mixing Overseas Agency data.
 
 ## Follow-Up Workbook Extraction Checklist
 

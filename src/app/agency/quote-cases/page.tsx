@@ -7,7 +7,7 @@ import { QuoteRequestActions } from "@/components/agency/QuoteRequestActions";
 export const dynamic = "force-dynamic";
 
 type LoadState =
-  | { status: "ready"; quoteCases: AgencyQuoteListItem[] }
+  | { status: "ready"; quoteCases: AgencyQuoteListItem[]; isPreview?: boolean }
   | { status: "auth-required"; message: string }
   | { status: "error"; message: string };
 
@@ -32,10 +32,10 @@ export default async function AgencyQuoteCasesPage() {
         </Link>
       </div>
 
-      {loadState.status === "auth-required" ? (
+      {loadState.status === "ready" && loadState.isPreview ? (
         <section className="notice warning">
-          <h2>Agency login required</h2>
-          <p>{loadState.message}</p>
+          <h2>Preview data</h2>
+          <p>Agency login is bypassed during development, so this page shows sample quote rows.</p>
         </section>
       ) : null}
 
@@ -123,11 +123,7 @@ function QuoteTable({ quoteCases }: { quoteCases: AgencyQuoteListItem[] }) {
 async function loadQuoteCases(): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
-    return {
-      status: "auth-required",
-      message:
-        "This page reads quotes through the Agency API, which requires an active agency user JWT."
-    };
+    return { status: "ready", quoteCases: demoQuoteCases, isPreview: true };
   }
 
   const response = await fetch(buildInternalApiUrl("/api/agency/quote-cases", headerStore), {
@@ -137,14 +133,38 @@ async function loadQuoteCases(): Promise<LoadState> {
   const payload = await response.json();
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      return { status: "ready", quoteCases: demoQuoteCases, isPreview: true };
+    }
     return {
-      status: response.status === 401 || response.status === 403 ? "auth-required" : "error",
+      status: "error",
       message: payload.error ?? "Unknown quote API error"
     };
   }
 
   return { status: "ready", quoteCases: payload.data ?? [] };
 }
+
+const demoQuoteCases: AgencyQuoteListItem[] = [
+  {
+    id: "preview-quote-mhdm",
+    caseCode: "MY-WORLDTRAV-20260629",
+    shareId: "preview-quote-mhdm",
+    tourName: "MHDM Seoul 4N group",
+    tourType: "incentive_tour",
+    status: "sent",
+    currency: "MYR",
+    estimatedPax: 26,
+    startDate: "2026-03-24",
+    endDate: "2026-03-28",
+    latestVersionNo: 2,
+    latestVersionStatus: "sent",
+    publicTotalAmount: 183740,
+    sentAt: "2026-06-29T09:30:00+09:00",
+    acceptedAt: null,
+    createdAt: "2026-06-29T09:00:00+09:00"
+  }
+];
 
 function buildInternalApiUrl(path: string, headerStore: Headers) {
   const protocol = headerStore.get("x-forwarded-proto") ?? "http";

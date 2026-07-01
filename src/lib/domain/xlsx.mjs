@@ -1,3 +1,13 @@
+/**
+ * 최소 XLSX 생성기입니다.
+ *
+ * 서버 API에서 견적서/인보이스/공급사 원가표를 바로 다운로드해야 하므로,
+ * 현재는 외부 엑셀 라이브러리에 강하게 의존하지 않고 Office Open XML 파일을 직접 만듭니다.
+ * 복잡한 서식보다 "엑셀에서 열리는 안정적인 데이터 파일"을 우선합니다.
+ *
+ * 향후 고급 서식, 병합 셀, 이미지 삽입이 필요해지면 이 계층을 xlsx 라이브러리로
+ * 교체하되, 상위 함수(buildInvoiceWorkbook 등)의 입력 구조는 유지하는 것이 좋습니다.
+ */
 const XLSX_CONTENT_TYPES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
@@ -40,6 +50,8 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 </styleSheet>`;
 
 export function buildQuoteExportWorkbook({ summary, itineraryDays = [], items = [] }) {
+  // 내부 관리자용 견적 export입니다.
+  // partner-safe 문서가 아니라 내부 스냅샷 확인용이므로 supplier/cost/margin 정보가 포함됩니다.
   const rows = [
     ["Jungho Travel Quote Export"],
     ["Case Code", summary.caseCode ?? ""],
@@ -77,12 +89,100 @@ export function buildQuoteExportWorkbook({ summary, itineraryDays = [], items = 
   return createXlsxBuffer(rows);
 }
 
-export function createXlsxBuffer(rows) {
+export function buildInvoiceWorkbook({ invoice, remainingAmount = 0 }) {
+  // 파트너/회계가 함께 보는 인보이스 export입니다.
+  // 최종 확정 일정, 라인아이템, 결제 내역, 계좌 정보를 한 파일에 담습니다.
+  const bank = invoice.bankAccountSnapshot ?? {};
+  const rows = [
+    ["JUNGHOTRAVEL INVOICE"],
+    ["Invoice No", invoice.invoiceNo],
+    ["Tour Code", invoice.tourCode ?? ""],
+    ["Version", invoice.versionNo ?? ""],
+    ["Status", invoice.status ?? ""],
+    ["Collection Status", invoice.collectionStatus ?? ""],
+    ["Agency", invoice.agencyName ?? ""],
+    ["Tour Name", invoice.tourName ?? ""],
+    ["Reservation", invoice.reservationCode ?? invoice.reservationId ?? ""],
+    ["Issued At", invoice.issuedAt ?? ""],
+    ["Due Date", invoice.paymentDeadline ?? invoice.dueDate ?? ""],
+    ["Currency", invoice.currency ?? ""],
+    ["Invoice Total", Number(invoice.totalAmount ?? 0)],
+    ["Confirmed Paid", Number(invoice.confirmedPaymentTotal ?? 0)],
+    ["Remaining", Number(remainingAmount ?? 0)],
+    ["Deposit Required", invoice.depositRequired ? "Yes" : "No"],
+    ["Deposit Amount", Number(invoice.depositAmount ?? 0)],
+    [],
+    ["Line Items"],
+    ["No", "Service Date", "Category", "Description", "Unit", "Quantity", "Unit Label", "Currency", "Total", "Notes"],
+    ...(invoice.lineItems ?? []).map((item) => [
+      item.lineNo ?? "",
+      item.serviceDate ?? "",
+      item.category ?? "",
+      item.description ?? "",
+      Number(item.unitAmount ?? 0),
+      Number(item.quantity ?? 0),
+      item.unitLabel ?? "",
+      item.currency ?? invoice.currency ?? "",
+      Number(item.totalAmount ?? 0),
+      item.notes ?? ""
+    ]),
+    [],
+    ["Confirmed Itinerary"],
+    ["Day", "Date", "Title", "Hotel", "Breakfast", "Lunch", "Dinner", "Attractions", "Description", "Special Notes"],
+    ...(invoice.itinerarySnapshot ?? []).map((day) => [
+      day.day ?? day.dayNo ?? "",
+      day.date ?? day.serviceDate ?? "",
+      day.title ?? "",
+      day.hotel ?? "",
+      normalizeMeal(day.meals, "breakfast"),
+      normalizeMeal(day.meals, "lunch"),
+      normalizeMeal(day.meals, "dinner"),
+      Array.isArray(day.attractions) ? day.attractions.join(", ") : day.attractions ?? "",
+      day.description ?? "",
+      day.specialNotes ?? ""
+    ]),
+    [],
+    ["Flight Details"],
+    ["Type", "Flight No", "Date", "Time", "Route"],
+    ...(invoice.flightDetails ?? []).map((flight) => [
+      flight.type ?? "",
+      flight.flightNo ?? "",
+      flight.date ?? "",
+      flight.time ?? "",
+      flight.route ?? ""
+    ]),
+    [],
+    ["Payment Records"],
+    ["Status", "Method", "Currency", "Amount", "Received At", "Reference"],
+    ...(invoice.payments ?? []).map((payment) => [
+      payment.status ?? "",
+      payment.method ?? "",
+      payment.currency ?? invoice.currency ?? "",
+      Number(payment.amount ?? 0),
+      payment.receivedAt ?? "",
+      payment.referenceNo ?? ""
+    ]),
+    [],
+    ["Bank / Payment"],
+    ["Payable To", bank.payableTo ?? ""],
+    ["Bank Name", bank.bankName ?? ""],
+    ["Account No", bank.accountNo ?? ""],
+    ["Swift Code", bank.swiftCode ?? ""],
+    ["Remark", bank.remark ?? ""]
+  ];
+
+  return createXlsxBuffer(rows, { sheetName: "Invoice" });
+}
+
+export function createXlsxBuffer(rows, options = {}) {
+  // rows 배열을 단일 worksheet XLSX 패키지로 감쌉니다.
+  // zipStore는 압축 없이 store 방식으로 묶으므로 구현은 단순하지만 엑셀 호환성은 유지됩니다.
+  const sheetName = options.sheetName ?? "Quote Export";
   const now = new Date().toISOString();
   const files = [
     { path: "[Content_Types].xml", content: XLSX_CONTENT_TYPES },
     { path: "_rels/.rels", content: ROOT_RELS },
-    { path: "xl/workbook.xml", content: WORKBOOK_XML },
+    { path: "xl/workbook.xml", content: buildWorkbookXml(sheetName) },
     { path: "xl/_rels/workbook.xml.rels", content: WORKBOOK_RELS },
     { path: "xl/styles.xml", content: STYLES_XML },
     { path: "xl/worksheets/sheet1.xml", content: buildSheetXml(rows) },
@@ -93,7 +193,18 @@ export function createXlsxBuffer(rows) {
   return zipStore(files);
 }
 
+function buildWorkbookXml(sheetName) {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="${escapeXml(sheetName)}" sheetId="1" r:id="rId1"/>
+  </sheets>
+</workbook>`;
+}
+
 function buildSheetXml(rows) {
+  // 모든 셀은 숫자 또는 inline string으로 기록합니다.
+  // sharedStrings를 만들지 않아도 되므로 작은 운영용 파일을 빠르게 생성할 수 있습니다.
   const rowXml = rows
     .map((row, rowIndex) => {
       const rowNo = rowIndex + 1;
@@ -116,6 +227,11 @@ function buildCellXml(rowNo, columnNo, value) {
     return `<c r="${ref}"><v>${value}</v></c>`;
   }
   return `<c r="${ref}" t="inlineStr"><is><t>${escapeXml(String(value ?? ""))}</t></is></c>`;
+}
+
+function normalizeMeal(meals, key) {
+  if (!meals || typeof meals !== "object" || Array.isArray(meals)) return "";
+  return meals[key] ?? "";
 }
 
 function columnName(index) {

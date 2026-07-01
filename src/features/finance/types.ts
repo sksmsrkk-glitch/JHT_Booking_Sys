@@ -5,11 +5,18 @@ export type InvoiceListItem = {
   agencyName: string | null;
   tourName: string | null;
   invoiceNo: string;
+  tourCode: string | null;
+  versionNo: number;
   status: string;
   currency: string;
   totalAmount: number;
   issuedAt: string | null;
   dueDate: string | null;
+  paymentDeadline: string | null;
+  collectionTiming: string | null;
+  collectionStatus: string;
+  depositRequired: boolean;
+  depositAmount: number | null;
   storagePath: string | null;
   paymentCount: number;
   confirmedPaymentTotal: number;
@@ -21,6 +28,26 @@ export type InvoiceListItem = {
 
 export type InvoiceDetail = InvoiceListItem & {
   payments: PaymentListItem[];
+  lineItems: InvoiceLineItem[];
+  bankAccountSnapshot: Record<string, unknown>;
+  flightDetails: Record<string, unknown>[];
+  itinerarySnapshot: Record<string, unknown>[];
+  invoicePayload: Record<string, unknown>;
+};
+
+export type InvoiceLineItem = {
+  id: string;
+  lineNo: number;
+  description: string;
+  serviceDate: string | null;
+  category: string | null;
+  currency: string;
+  unitAmount: number;
+  quantity: number;
+  unitLabel: string | null;
+  totalAmount: number;
+  notes: string | null;
+  metadata: Record<string, unknown>;
 };
 
 export type PaymentListItem = {

@@ -26,6 +26,11 @@ import {
   summarizeInvoicePayments
 } from "../src/lib/domain/finance.mjs";
 import {
+  buildFinanceExpenseRowsFromGuideReport,
+  summarizeGuideExpenseReport
+} from "../src/lib/domain/guide-expenses.mjs";
+import { buildInvoiceFromFinalQuote } from "../src/features/finance/auto-invoice.ts";
+import {
   READINESS_SMOKE_TABLES,
   buildReadinessReport,
   summarizeReadinessLaunchChecks,
@@ -412,6 +417,95 @@ test("invoice payment summary counts confirmed payments toward balance only", ()
   assert.equal(summary.isPaid, false);
 });
 
+test("auto invoice builder uses accepted quote items and final operation itinerary snapshot", () => {
+  const result = buildInvoiceFromFinalQuote({
+    reservation: {
+      id: "reservation-1",
+      reservation_code: "RSV-MY-WT-001",
+      tour_start_date: "2026-03-24",
+      tour_end_date: "2026-03-28"
+    },
+    quoteCase: {
+      id: "case-1",
+      case_code: "Q-MY-WT-001",
+      tour_name: "WorldTravellers Seoul",
+      currency: "MYR"
+    },
+    quoteVersion: {
+      id: "version-1",
+      version_no: 2,
+      status: "accepted",
+      currency: "MYR",
+      public_total_amount: 1300,
+      public_fare_options: [{ label: "Adult", amount: 1000 }],
+      terms_and_conditions: "Final payment before deadline.",
+      accepted_at: "2026-06-29T10:00:00Z"
+    },
+    quoteItems: [
+      {
+        id: "item-hotel",
+        item_category: "room",
+        service_section: "hotel",
+        snapshot_item_name: "Final hotel twin room block",
+        pricing_unit: "per_room",
+        quantity: 2,
+        pax_count: 20,
+        total_sell_amount: 1000,
+        partner_visible_notes: "Twin sharing"
+      },
+      {
+        id: "item-meal",
+        item_category: "meal",
+        service_section: "meal",
+        snapshot_item_name: "Confirmed meals",
+        pricing_unit: "per_person",
+        quantity: 20,
+        pax_count: 20,
+        total_sell_amount: 300,
+        partner_visible_notes: "Halal-friendly option"
+      }
+    ],
+    itineraryDays: [
+      {
+        id: "day-1",
+        day_no: 1,
+        service_date: "2026-03-24",
+        title: "Arrival",
+        meal_summary: { dinner: "Korean set" },
+        public_description: "Arrival transfer"
+      }
+    ],
+    finalSnapshot: {
+      day_snapshots: [
+        {
+          day: 1,
+          date: "2026-03-24",
+          title: "Arrival Seoul",
+          hotel: "Confirmed Seoul Hotel",
+          roomType: "Twin",
+          meals: { dinner: "Confirmed BBQ dinner" },
+          attractions: ["Myeongdong"],
+          description: "Operator confirmed arrival flow",
+          specialNotes: "Late check-in"
+        }
+      ],
+      flight_details: [{ type: "Arrival", flightNo: "MH066" }],
+      bank_account_snapshot: { payableTo: "JHT" },
+      operator_notes: "Ready to issue"
+    },
+    versionNo: 3
+  });
+
+  assert.equal(result.invoice.version_no, 3);
+  assert.equal(result.invoice.currency, "MYR");
+  assert.equal(result.invoice.total_amount, 1300);
+  assert.equal(result.lineItems.length, 2);
+  assert.equal(result.invoice.itinerary_snapshot[0].hotel, "Confirmed Seoul Hotel");
+  assert.equal(result.invoice.itinerary_snapshot[0].roomType, "Twin");
+  assert.equal(result.invoice.itinerary_snapshot[0].meals.dinner, "Confirmed BBQ dinner");
+  assert.equal(result.invoice.invoice_payload.termsAndConditions, "Final payment before deadline.");
+});
+
 test("settlement status update approves and prevents invalid closing", () => {
   const approved = buildSettlementStatusUpdate(
     {
@@ -447,6 +541,33 @@ test("finance adjustments are blocked after settlement close", () => {
   assert.equal(assertFinanceAdjustmentAllowed({ settlementStatus: "approved" }), true);
   assert.throws(() => assertFinanceAdjustmentAllowed({ settlementStatus: "closed" }));
   assert.throws(() => assertFinanceEntryAllowed({ settlementStatus: "closed" }));
+});
+
+test("guide expense report summarizes PMB-style actual costs and sync rows", () => {
+  const summary = summarizeGuideExpenseReport(
+    [
+      { section: "meal", vendorName: "울산청해횟집", description: "중식", unitAmount: 23000, quantity: 30 },
+      { section: "ticket", vendorName: "블루라인", description: "입장료", totalAmount: 360000 },
+      { section: "cash_expense", description: "기사일비", totalAmount: "190,000" },
+      { section: "guide_fee", description: "가이드 일비", unitAmount: 200000, quantity: 5 }
+    ],
+    100000
+  );
+
+  assert.equal(summary.sectionTotals.meal, 690000);
+  assert.equal(summary.sectionTotals.ticket, 360000);
+  assert.equal(summary.sectionTotals.cash_expense, 190000);
+  assert.equal(summary.sectionTotals.guide_fee, 1000000);
+  assert.equal(summary.totalAmount, 2240000);
+  assert.equal(summary.settlementAmount, 2140000);
+
+  const rows = buildFinanceExpenseRowsFromGuideReport(
+    { reservationId: "reservation-1", currency: "KRW", actorProfileId: "profile-1" },
+    summary.lines.map((line, index) => ({ ...line, id: `line-${index + 1}` }))
+  );
+  assert.equal(rows.length, 4);
+  assert.equal(rows[0].category, "restaurant");
+  assert.equal(rows[0].source_guide_expense_report_line_id, "line-1");
 });
 
 test("readiness report marks required environment variables without exposing values", () => {

@@ -3,6 +3,8 @@
 ## Public APIs
 
 - `GET /api/health`
+- `POST /api/agency/signup-applications`
+- `GET /api/countries`
 
 ## Agency APIs
 
@@ -25,14 +27,25 @@
 - `GET /api/agencies/:id`
 - `POST /api/agencies/:id/contacts`
 - `POST /api/agencies/:id/users`
+- `PATCH /api/agencies/:id/lifecycle`
+- `PATCH /api/agencies/:id/users/:userId`
+- `GET /api/agency/signup-applications`
+- `POST /api/agency/signup-applications/:id/decision`
 - `GET /api/companies`
 - `POST /api/companies`
+- `POST /api/countries`
 - `GET /api/domestic-suppliers`
 - `POST /api/domestic-suppliers`
+- `GET /api/domestic-suppliers/excel-template`
+- `GET /api/domestic-suppliers/export-xlsx`
+- `POST /api/domestic-suppliers/import-xlsx`
 - `GET /api/domestic-suppliers/:id`
 - `POST /api/domestic-suppliers/:id/contacts`
 - `POST /api/domestic-suppliers/:id/products`
 - `POST /api/supplier-products/:id/prices`
+- `POST /api/supplier-products/:id/media`
+- `GET /api/exchange-rates`
+- `POST /api/exchange-rates`
 - `GET /api/cost-items/search`
 - `GET /api/quote-cases`
 - `POST /api/quote-cases`
@@ -50,6 +63,10 @@
 - `POST /api/reservations`
 - `GET /api/reservations/:id`
 - `PATCH /api/reservations/:id`
+- `GET /api/reservations/:id/final-operation-snapshot`
+- `POST /api/reservations/:id/final-operation-snapshot`
+- `GET /api/reservations/:id/guide-expense-report`
+- `POST /api/reservations/:id/guide-expense-report`
 - `POST /api/reservations/:id/generate-operation-tasks`
 - `POST /api/reservations/:id/room-assignments`
 - `GET /api/operation-tasks`
@@ -69,6 +86,7 @@
 - `GET /api/finance/invoices`
 - `POST /api/finance/invoices`
 - `GET /api/finance/invoices/:id`
+- `GET /api/finance/invoices/:id/export-xlsx`
 - `POST /api/finance/invoices/:id/payments`
 - `GET /api/finance/settlements`
 - `POST /api/finance/settlements/recalculate`
@@ -88,6 +106,9 @@
 - `PATCH /api/automation/gmail-review/:id`
 - `GET /api/audit`
 - `GET /api/audit/api-logs`
+- `GET /api/workflows`
+- `GET /api/workflows/:workflowCode`
+- `POST /api/workflows/:workflowCode/messages`
 
 ## Authorization Defaults
 
@@ -105,7 +126,7 @@
 - Internal user role management requires admin role, manages existing Supabase Auth users through `profiles`/`user_roles`, validates the optional default company against active companies, and audits role changes.
 - Automation endpoints require `x-automation-secret`.
 - External provider callbacks require `x-webhook-secret` and the matching provider-specific webhook secret environment variable.
-- `npm run verify:api-guards` audits every App Router API handler and fails if a handler lacks an internal, agency, finance, admin, automation, webhook, or bootstrap guard. `/api/health` is the only public API allowlist entry.
+- `npm run verify:api-guards` audits every App Router API handler and fails if a handler lacks an internal, agency, finance, admin, automation, webhook, bootstrap, or route-specific helper guard. Public allowlist entries are limited to health checks, partner signup submission, and shared country selector reads.
 - `npm run verify:api-body-order` audits API handlers so request bodies are parsed only after an auth or shared-secret guard.
 - `npm run verify:api-responses` audits API handlers so JSON responses go through shared no-store helpers.
 - `npm run verify:api-contract` audits this file against `src/app/api/**/route.ts` so implemented handlers and documented handlers stay aligned.
@@ -120,10 +141,18 @@
 - High-risk actions require approval fields and audit logs.
 - API logs are internal-only technical traces for webhook/automation/API support; Gmail webhooks, provider callbacks, and automation workers write sanitized logs that redact secrets, tokens, passport fields, and large message bodies.
 - Health checks are public, do not touch the database, and expose only boolean configuration presence.
+- Partner signup applications can be submitted without an existing login, resolve country data through the shared country reference master, and enter an internal approval queue before an Agency account or mother account is created.
+- Agency signup application list and approve/reject decisions are internal-only; approval creates the Agency account, mother agency user, queued email event, and audit evidence.
+- Agency lifecycle changes are internal-only. Freezing or withdrawing an agency also inactivates its users and queues account status email events.
+- Agency user lifecycle changes are internal-only and support mother account governance over sub accounts while preserving audit evidence.
+- Country references are the shared country code/country name master used by exchange rates, partner signup, partner records, and quote screens. Public selection reads may be used by forms, while creation/upsert is internal-only.
+- Exchange rates are internal-only writes and are shared by quote costing, supplier cost snapshots, invoice currency handling, and finance review.
 - Gmail review updates are internal-only, validate selected quote/reservation agency consistency, clear or restore manual review state, and write audit evidence.
 - Gmail webhooks are secret-protected, reject duplicate Gmail message IDs, score quote case candidates, store candidate evidence for manual review, and auto-link only high-confidence matches.
 - Agency contact and portal user membership writes are internal-only and audit logged; Portal access remains scoped by active agency_users membership.
-- Supplier contact, product, and price writes are internal-only and audit logged; Agency Portal must never query supplier contacts/products/prices directly.
+- Supplier contact, product, price, and media writes are internal-only and audit logged; Agency Portal must never query supplier contacts/products/prices directly.
+- Supplier product media accepts up to 10 images per item using Supabase Storage paths and/or external image URLs; the API and DB trigger both enforce the maximum.
+- Domestic supplier cost master data can be downloaded as an Excel template, imported from that template, and exported as a full Excel workbook. Import creates or reuses suppliers and products, inserts price rows, and attaches up to 10 image references per item.
 - Supplier message drafts validate that a selected supplier contact belongs to the selected domestic supplier and can fall back to reservation/supplier-aware default templates.
 - Supplier message draft screens use reservation and domestic supplier selectors, and disable drafting when either side is unavailable.
 - Supplier message draft creation rejects cancelled/completed reservations, matching the reservation detail UI lock.
@@ -149,9 +178,13 @@
 - Room assignment creation is internal-only, rejects cancelled/completed reservations, validates all passenger IDs and the optional rooming list belong to the reservation, and audits the room grouping.
 - Operation task generation and updates are internal-only, reject cancelled/completed reservations, validate task status, require a blocked reason for blocked tasks, maintain completed timestamps, validate linked domestic suppliers, and audit before/after data.
 - Operation task reminders are internal/automation-only, reject terminal `done`/`cancelled` tasks for both automated and manual reminder paths, and manual reminder queueing writes audit evidence.
-- Invoice creation is finance/admin-only, requires a non-cancelled reservation with an accepted quote version, rejects reservations with closed settlements, defaults to the accepted public quote total, and audits the invoice.
+- Final operation snapshots are internal-only reservation records for operator-confirmed hotel names, room types, day-by-day itinerary, menus, flight details, bank/payment snapshots, and notes. Saving a snapshot as `finalized` with invoice issue enabled generates a versioned invoice from the accepted quote version plus the final operation snapshot.
+- Invoice creation requires an internal workflow, a non-cancelled reservation with an accepted quote version, and an open settlement. Finance/admin users can issue directly, and finalized operation snapshots can issue automatically. The invoice stores a version by reservation or `tour_code`, partner-safe line items, bank/payment deadline snapshots, flight details, final itinerary snapshots, collection timing/status, optional deposit data, and audit evidence.
+- Invoice XLSX export reads a stored invoice version and produces a partner-facing workbook with invoice totals, payment summary, itinerary, hotel, meal, attraction, flight, and bank/payment sections.
 - Payment writes require finance/admin role, idempotency keys, invoice status refresh, and high-risk audit logs.
-- Internal and Agency invoice detail pages expose printable invoice views that show only invoice totals, confirmed payments, balance due, and agency-safe payment summaries; Agency responses omit internal payment reference numbers.
+- Internal and Agency invoice detail pages expose printable invoice views that show invoice version, tour code, line items, confirmed payments, balance due, payment deadline, flight details, and agency-safe payment summaries; Agency responses omit internal payment reference numbers, supplier costs, expenses, commissions, and settlements.
+- `GET/POST /api/reservations/:id/guide-expense-report` is internal-only. It stores the post-tour guide actual-cost report by reservation, preserves PMB-style section lines, and on `submitted` upserts each positive line into finance `expenses` through `source_guide_expense_report_line_id` so settlement profit analysis can compare final invoice revenue against actual tour costs without duplicate expense rows.
+- Workflow communication APIs keep partner communication scoped to a single workflow code. Internal users may read/write internal and partner-visible messages; Agency users may read/write only their own agency's partner-visible messages. Development preview without a JWT returns safe demo data only.
 - Expense, extra revenue, shopping commission, settlement recalculation, and settlement status changes are finance/admin-only and audit logged; finance pages should use reservation and supplier selectors instead of raw UUID entry for routine operation.
 - Finance entries, including invoice creation, adjustments, and payment writes, must be rejected once a reservation settlement is `closed`.
 - Notion CSV migration batches are internal-only; validation writes `staging_rows.validation_status`, stores row-level `migration_errors`, approval is allowed only after a validated batch has no errors, and import inserts valid mapped rows into the approved target table with high-risk audit evidence.

@@ -43,17 +43,16 @@ export async function POST(request: Request) {
       throw new HttpError(409, "Reservation must have an accepted quote version before invoice creation");
     }
 
-    const { data: existingInvoice, error: existingError } = await supabase
+    const tourCode = optionalString(body.tourCode);
+    const { data: latestInvoice, error: existingError } = await supabase
       .from("invoices")
-      .select("id, invoice_no, status, reservation_id, total_amount")
-      .eq("reservation_id", reservationId)
-      .neq("status", "void")
-      .order("created_at", { ascending: false })
+      .select("id, invoice_no, status, reservation_id, total_amount, version_no")
+      .eq(tourCode ? "tour_code" : "reservation_id", tourCode ?? reservationId)
+      .order("version_no", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (existingError) throw new HttpError(500, existingError.message);
-    if (existingInvoice) return ok({ invoice: existingInvoice, existing: true });
     await assertReservationFinanceOpen(supabase, reservationId);
 
     const quoteVersion = await getAcceptedQuoteVersion(supabase, reservation.accepted_quote_version_id);
@@ -66,33 +65,64 @@ export async function POST(request: Request) {
     if (!["draft", "issued"].includes(status)) {
       throw new HttpError(400, "Invoice status must be draft or issued");
     }
+    const versionNo = optionalNumber(body.versionNo) ?? Number(latestInvoice?.version_no ?? 0) + 1;
+    const lineItems = normalizeLineItems(body.lineItems, optionalString(body.currency) ?? quoteVersion.currency ?? "KRW");
+    const computedLineTotal = lineItems.reduce((sum, item) => sum + item.total_amount, 0);
+    const finalTotal = computedLineTotal > 0 ? computedLineTotal : roundMoney(totalAmount);
 
     const { data: invoice, error: invoiceError } = await supabase
       .from("invoices")
       .insert({
         reservation_id: reservationId,
         invoice_no: optionalString(body.invoiceNo) ?? makeInvoiceNo(),
+        tour_code: tourCode,
+        version_no: versionNo,
         status,
         currency: optionalString(body.currency) ?? quoteVersion.currency ?? "KRW",
-        total_amount: roundMoney(totalAmount),
+        total_amount: finalTotal,
         issued_at: status === "issued" ? new Date().toISOString() : null,
         due_date: optionalString(body.dueDate),
-        storage_path: optionalString(body.storagePath)
+        payment_deadline: optionalString(body.paymentDeadline) ?? optionalString(body.dueDate),
+        collection_timing: optionalString(body.collectionTiming),
+        collection_status: optionalString(body.collectionStatus) ?? "unpaid",
+        deposit_required: Boolean(body.depositRequired),
+        deposit_amount: optionalNumber(body.depositAmount),
+        storage_path: optionalString(body.storagePath),
+        bank_account_snapshot: optionalJsonObject(body.bankAccountSnapshot),
+        flight_details: optionalJsonArray(body.flightDetails),
+        itinerary_snapshot: optionalJsonArray(body.itinerarySnapshot),
+        invoice_payload: optionalJsonObject(body.invoicePayload)
       })
-      .select("id, invoice_no, status, reservation_id, currency, total_amount, issued_at, due_date")
+      .select("id, invoice_no, tour_code, version_no, status, reservation_id, currency, total_amount, issued_at, due_date, payment_deadline, collection_status")
       .single();
 
     if (invoiceError) throw new HttpError(500, invoiceError.message);
+
+    if (lineItems.length > 0) {
+      const { error: lineItemError } = await supabase.from("invoice_line_items").insert(
+        lineItems.map((item) => ({
+          ...item,
+          invoice_id: invoice.id
+        }))
+      );
+      if (lineItemError) throw new HttpError(500, lineItemError.message);
+    }
 
     await writeAuditLog(supabase, {
       actorProfileId: financeUser.profileId,
       action: "invoice.created",
       entityTable: "invoices",
       entityId: invoice.id,
-      afterData: { invoice, reservationId, acceptedQuoteVersionId: reservation.accepted_quote_version_id }
+      afterData: {
+        invoice,
+        lineItemCount: lineItems.length,
+        previousInvoiceId: latestInvoice?.id ?? null,
+        reservationId,
+        acceptedQuoteVersionId: reservation.accepted_quote_version_id
+      }
     });
 
-    return created({ invoice, existing: false });
+    return created({ invoice, existing: false, previousInvoice: latestInvoice ?? null });
   } catch (error) {
     return fail(error);
   }
@@ -139,4 +169,41 @@ function optionalNumber(value: unknown) {
 
 function roundMoney(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function optionalJsonObject(value: unknown) {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value;
+  return {};
+}
+
+function optionalJsonArray(value: unknown) {
+  return Array.isArray(value) ? value : [];
+}
+
+function normalizeLineItems(value: unknown, fallbackCurrency: string) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((raw, index) => {
+      if (!raw || typeof raw !== "object") return null;
+      const row = raw as Record<string, unknown>;
+      const description = optionalString(row.description);
+      if (!description) return null;
+      const quantity = optionalNumber(row.quantity) ?? 1;
+      const unitAmount = optionalNumber(row.unitAmount) ?? optionalNumber(row.unit_amount) ?? 0;
+      const totalAmount = optionalNumber(row.totalAmount) ?? optionalNumber(row.total_amount) ?? quantity * unitAmount;
+      return {
+        line_no: optionalNumber(row.lineNo) ?? optionalNumber(row.line_no) ?? index + 1,
+        description,
+        service_date: optionalString(row.serviceDate) ?? optionalString(row.service_date),
+        category: optionalString(row.category),
+        currency: optionalString(row.currency) ?? fallbackCurrency,
+        unit_amount: roundMoney(unitAmount),
+        quantity,
+        unit_label: optionalString(row.unitLabel) ?? optionalString(row.unit_label),
+        total_amount: roundMoney(totalAmount),
+        notes: optionalString(row.notes),
+        metadata: optionalJsonObject(row.metadata)
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 }

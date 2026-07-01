@@ -87,6 +87,28 @@ export async function POST(request: Request) {
 
     if (versionError) throw new HttpError(500, versionError.message);
 
+    const exchangeRateSnapshots = body.exchangeRates
+      ? requireArray<Record<string, unknown>>(body.exchangeRates, "exchangeRates")
+          .map((rate) => ({
+            quote_version_id: version.id,
+            country_code: optionalString(rate.countryCode)?.toUpperCase() ?? null,
+            country_name: optionalString(rate.countryName),
+            base_currency: optionalString(rate.baseCurrency)?.toUpperCase() ?? "KRW",
+            quote_currency: optionalString(rate.quoteCurrency)?.toUpperCase() ?? "KRW",
+            rate: optionalNumber(rate.rate) ?? 1,
+            effective_date: optionalString(rate.effectiveDate),
+            source_exchange_rate_id: optionalUuidLoose(rate.sourceExchangeRateId),
+            source: optionalString(rate.source),
+            notes: optionalString(rate.notes)
+          }))
+          .filter((rate) => rate.base_currency && rate.quote_currency && rate.rate > 0)
+      : [];
+
+    if (exchangeRateSnapshots.length > 0) {
+      const { error: exchangeRateError } = await supabase.from("quote_exchange_rate_snapshots").insert(exchangeRateSnapshots);
+      if (exchangeRateError) throw new HttpError(500, exchangeRateError.message);
+    }
+
     const itineraryRows = body.itineraryDays
       ? requireArray<Record<string, unknown>>(body.itineraryDays, "itineraryDays").map((day) => ({
           quote_version_id: version.id,
@@ -152,6 +174,14 @@ function optionalNumber(value: unknown) {
 function optionalUuid(value: unknown) {
   if (value === undefined || value === null || value === "") return null;
   return requireUuid(value, "agencyInquiryId");
+}
+
+function optionalUuidLoose(value: unknown) {
+  if (value === undefined || value === null || value === "") return null;
+  const normalized = String(value);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(normalized)
+    ? normalized
+    : null;
 }
 
 function normalizeObject(value: unknown) {

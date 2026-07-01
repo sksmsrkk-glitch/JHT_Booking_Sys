@@ -3,7 +3,9 @@ import { relative, resolve, sep } from "node:path";
 
 const apiRoot = resolve("src/app/api");
 const publicRoutes = new Map([
-  ["src/app/api/health/route.ts", { methods: new Set(["GET"]), reason: "public health check" }]
+  ["src/app/api/health/route.ts", { methods: new Set(["GET"]), reason: "public health check" }],
+  ["src/app/api/agency/signup-applications/route.ts", { methods: new Set(["POST"]), reason: "public partner signup application" }],
+  ["src/app/api/countries/route.ts", { methods: new Set(["GET"]), reason: "public country selector options" }]
 ]);
 
 const guardPatterns = [
@@ -13,7 +15,9 @@ const guardPatterns = [
   { name: "agency user guard", pattern: /\brequireAgencyUser\s*\(/ },
   { name: "automation secret guard", pattern: /\brequireAutomationSecret\s*\(/ },
   { name: "webhook secret guard", pattern: /\brequireWebhookSecret\s*\(/ },
-  { name: "bootstrap secret guard", pattern: /\brequireBootstrapSecret\s*\(/ }
+  { name: "bootstrap secret guard", pattern: /\brequireBootstrapSecret\s*\(/ },
+  { name: "workflow actor guard", pattern: /\bresolveActor\s*\(/ },
+  { name: "invoice export loader guard", pattern: /\bloadInvoiceForExport\s*\(/ }
 ];
 
 const httpMethodPattern = /\bexport\s+async\s+function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*\(/g;
@@ -36,14 +40,8 @@ for (const filePath of listRouteFiles(apiRoot)) {
   const publicConfig = publicRoutes.get(normalizedPath);
   for (const handler of handlers) {
     handlerCount += 1;
-    if (publicConfig) {
-      if (!publicConfig.methods.has(handler.method)) {
-        failures.push(
-          `${normalizedPath} exports public ${handler.method}, but only ${[...publicConfig.methods].join(", ")} is allowlisted`
-        );
-      } else {
-        publicHandlerCount += 1;
-      }
+    if (publicConfig?.methods.has(handler.method)) {
+      publicHandlerCount += 1;
       continue;
     }
 

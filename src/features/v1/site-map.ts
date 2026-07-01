@@ -38,6 +38,13 @@ export const adminRoutes: V1RouteCard[] = [
     owner: "Sales Ops"
   },
   {
+    href: "/admin/exchange-rates" as Route,
+    title: "Exchange Rates",
+    description: "Central KRW exchange-rate master used by quotes, cost snapshots, invoices, and settlements.",
+    status: "live",
+    owner: "Finance"
+  },
+  {
     href: "/admin/quote-cases" as Route,
     title: "Quote Cases",
     description: "Build quote cases, versions, itineraries, route segments, and exports.",
@@ -50,6 +57,20 @@ export const adminRoutes: V1RouteCard[] = [
     description: "Track accepted quotes through reservation status, rooming lists, and history.",
     status: "live",
     owner: "Operations"
+  },
+  {
+    href: "/admin/confirmations" as Route,
+    title: "Final Confirmations",
+    description: "Create partner-ready confirmation documents from accepted quotes and final operation values.",
+    status: "live",
+    owner: "Operations"
+  },
+  {
+    href: "/admin/guide-expenses" as Route,
+    title: "Guide Expenses",
+    description: "Guide-entered actual tour costs connected to invoices, expenses, and settlement profit analysis.",
+    status: "live",
+    owner: "Finance"
   },
   {
     href: "/admin/operations/tasks" as Route,

@@ -1,5 +1,12 @@
 import { HttpError } from "./http";
 
+/*
+ * API 권한 경계입니다.
+ *
+ * 이 시스템은 Overseas Agency와 Domestic Supplier, Internal Admin을 엄격히 분리해야 합니다.
+ * 각 route는 body를 처리하기 전에 아래 require* 함수를 호출해 요청자가 어떤 영역에 접근 가능한지
+ * 먼저 확인하는 것을 기본 원칙으로 합니다.
+ */
 export const INTERNAL_ROLES = [
   "admin",
   "sales",
@@ -20,6 +27,7 @@ export async function requireCurrentUser(supabase: any) {
 }
 
 export async function requireInternalUser(supabase: any) {
+  // Supabase Auth 사용자가 있더라도 user_roles에 내부 역할이 없으면 내부 관리자 API를 사용할 수 없습니다.
   const user = await requireCurrentUser(supabase);
   const { data, error } = await supabase
     .from("user_roles")
@@ -40,6 +48,7 @@ export async function requireInternalUser(supabase: any) {
 }
 
 export async function requireFinanceUser(supabase: any) {
+  // 인보이스, 입금, 정산, 실제 비용 데이터는 finance/admin만 접근합니다.
   const internalUser = await requireInternalUser(supabase);
   if (!internalUser.roles.some((role: string) => role === "admin" || role === "finance")) {
     throw new HttpError(403, "Finance role is required");
@@ -56,6 +65,8 @@ export async function requireAdminUser(supabase: any) {
 }
 
 export async function requireAgencyUser(supabase: any) {
+  // 파트너 포털 사용자는 agency_users에 active로 연결된 계정만 허용합니다.
+  // 이 경계 때문에 파트너는 supplier cost, internal margin, operation task를 직접 조회할 수 없습니다.
   const user = await requireCurrentUser(supabase);
   const { data, error } = await supabase
     .from("agency_users")

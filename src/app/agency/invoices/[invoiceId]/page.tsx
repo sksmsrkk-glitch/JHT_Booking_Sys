@@ -2,6 +2,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { InvoiceDocument } from "@/components/finance/InvoiceDocument";
 import type { AgencyInvoiceDetail } from "@/features/agency-portal/types";
+import { demoAgencyInvoice } from "@/features/finance/demo-invoices";
 import { summarizeInvoicePayments } from "@/lib/domain/finance.mjs";
 import { getPageAuthorization } from "@/lib/api/page-session";
 
@@ -85,6 +86,18 @@ export default async function AgencyInvoiceDetailPage({ params }: { params: Page
           <h2>Invoice</h2>
           <dl className="definition-list">
             <div>
+              <dt>Tour Code</dt>
+              <dd>{invoice.tourCode ?? "Not set"}</dd>
+            </div>
+            <div>
+              <dt>Version</dt>
+              <dd>{invoice.versionNo}</dd>
+            </div>
+            <div>
+              <dt>Collection</dt>
+              <dd>{formatLabel(invoice.collectionStatus)}</dd>
+            </div>
+            <div>
               <dt>Status</dt>
               <dd>
                 <span className={`status-dot status-${invoice.status}`}>{formatLabel(invoice.status)}</span>
@@ -107,6 +120,18 @@ export default async function AgencyInvoiceDetailPage({ params }: { params: Page
         <article className="panel">
           <h2>Payment Summary</h2>
           <dl className="definition-list">
+            <div>
+              <dt>Payment Deadline</dt>
+              <dd>{invoice.paymentDeadline ?? invoice.dueDate ?? "Not set"}</dd>
+            </div>
+            <div>
+              <dt>Deposit</dt>
+              <dd>
+                {invoice.depositRequired
+                  ? `${invoice.currency} ${(invoice.depositAmount ?? 0).toLocaleString()}`
+                  : "Not required"}
+              </dd>
+            </div>
             <div>
               <dt>Currency</dt>
               <dd>{invoice.currency}</dd>
@@ -197,7 +222,7 @@ export default async function AgencyInvoiceDetailPage({ params }: { params: Page
 async function loadInvoice(invoiceId: string): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
-    return { status: "auth-required", message: "This page requires an active agency user JWT." };
+    return { status: "ready", invoice: demoAgencyInvoice };
   }
 
   const response = await fetch(buildInternalApiUrl(`/api/agency/invoices/${invoiceId}`, headerStore), {
@@ -207,6 +232,9 @@ async function loadInvoice(invoiceId: string): Promise<LoadState> {
   const payload = await response.json();
 
   if (!response.ok) {
+    if ((response.status === 401 || response.status === 403) && invoiceId.startsWith("preview-")) {
+      return { status: "ready", invoice: demoAgencyInvoice };
+    }
     if (response.status === 404) return { status: "not-found", message: payload.error ?? "Invoice not found" };
     return {
       status: response.status === 401 || response.status === 403 ? "auth-required" : "error",

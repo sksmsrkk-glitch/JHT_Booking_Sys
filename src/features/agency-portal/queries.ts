@@ -1,5 +1,6 @@
 import type {
   AgencyInvoiceDetail,
+  AgencyInvoiceLineItem,
   AgencyInvoiceListItem,
   AgencyPaymentSummary,
   AgencyPassengerItem,
@@ -111,7 +112,7 @@ export async function listAgencyInvoices(
   const { data, error } = await supabase
     .from("invoices")
     .select(
-      "id, invoice_no, reservation_id, status, currency, total_amount, issued_at, due_date, storage_path, created_at, reservations!inner(id, reservation_code, agency_account_id, quote_cases(tour_name), agency_accounts(name)), payments(id, status, amount)"
+      "id, invoice_no, tour_code, version_no, reservation_id, status, currency, total_amount, issued_at, due_date, payment_deadline, collection_timing, collection_status, deposit_required, deposit_amount, storage_path, created_at, reservations!inner(id, reservation_code, agency_account_id, quote_cases(tour_name), agency_accounts(name)), payments(id, status, amount)"
     )
     .eq("reservations.agency_account_id", agencyAccountId)
     .in("status", ["issued", "partially_paid", "paid", "overdue"])
@@ -130,7 +131,7 @@ export async function getAgencyInvoiceDetail(
   const { data, error } = await supabase
     .from("invoices")
     .select(
-      "id, invoice_no, reservation_id, status, currency, total_amount, issued_at, due_date, storage_path, created_at, reservations!inner(id, reservation_code, agency_account_id, quote_cases(tour_name), agency_accounts(name)), payments(id, status, currency, amount, received_at, method, created_at)"
+      "id, invoice_no, tour_code, version_no, reservation_id, status, currency, total_amount, issued_at, due_date, payment_deadline, collection_timing, collection_status, deposit_required, deposit_amount, storage_path, bank_account_snapshot, flight_details, itinerary_snapshot, created_at, reservations!inner(id, reservation_code, agency_account_id, quote_cases(tour_name), agency_accounts(name)), payments(id, status, currency, amount, received_at, method, created_at), invoice_line_items(id, line_no, description, service_date, category, currency, unit_amount, quantity, unit_label, total_amount, notes)"
     )
     .eq("id", invoiceId)
     .eq("reservations.agency_account_id", agencyAccountId)
@@ -142,7 +143,13 @@ export async function getAgencyInvoiceDetail(
 
   return {
     ...mapAgencyInvoiceListItem(data),
-    payments: (data.payments ?? []).map(mapAgencyPaymentSummary)
+    payments: (data.payments ?? []).map(mapAgencyPaymentSummary),
+    lineItems: (data.invoice_line_items ?? [])
+      .map(mapAgencyInvoiceLineItem)
+      .sort((left: AgencyInvoiceLineItem, right: AgencyInvoiceLineItem) => left.lineNo - right.lineNo),
+    bankAccountSnapshot: asObject(data.bank_account_snapshot),
+    flightDetails: asObjectArray(data.flight_details),
+    itinerarySnapshot: asObjectArray(data.itinerary_snapshot)
   };
 }
 
@@ -251,14 +258,48 @@ function mapAgencyInvoiceListItem(row: any): AgencyInvoiceListItem {
     reservationCode: row.reservations?.reservation_code ?? null,
     agencyName: row.reservations?.agency_accounts?.name ?? null,
     tourName: row.reservations?.quote_cases?.tour_name ?? null,
+    tourCode: row.tour_code ?? null,
+    versionNo: Number(row.version_no ?? 1),
     status: row.status,
     currency: row.currency,
     totalAmount: Number(row.total_amount),
     issuedAt: row.issued_at ?? null,
     dueDate: row.due_date ?? null,
+    paymentDeadline: row.payment_deadline ?? null,
+    collectionTiming: row.collection_timing ?? null,
+    collectionStatus: row.collection_status ?? "unpaid",
+    depositRequired: Boolean(row.deposit_required),
+    depositAmount: row.deposit_amount === null || row.deposit_amount === undefined ? null : Number(row.deposit_amount),
     storagePath: row.storage_path ?? null,
     confirmedPaymentTotal,
     paymentCount: payments.length,
     createdAt: row.created_at
   };
+}
+
+function mapAgencyInvoiceLineItem(row: any): AgencyInvoiceLineItem {
+  return {
+    id: row.id,
+    lineNo: Number(row.line_no ?? 1),
+    description: row.description,
+    serviceDate: row.service_date ?? null,
+    category: row.category ?? null,
+    currency: row.currency,
+    unitAmount: Number(row.unit_amount ?? 0),
+    quantity: Number(row.quantity ?? 1),
+    unitLabel: row.unit_label ?? null,
+    totalAmount: Number(row.total_amount ?? 0),
+    notes: row.notes ?? null
+  };
+}
+
+function asObject(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
+  return {};
+}
+
+function asObjectArray(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+    : [];
 }

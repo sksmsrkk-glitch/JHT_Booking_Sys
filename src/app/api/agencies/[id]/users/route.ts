@@ -24,6 +24,8 @@ export async function POST(request: Request, context: RouteContext) {
         name: requireString(body.name, "name"),
         title: optionalString(body.title),
         is_account_admin: optionalBoolean(body.isAccountAdmin) ?? false,
+        account_role: normalizeAccountRole(body.accountRole),
+        password_reset_required: optionalBoolean(body.passwordResetRequired) ?? true,
         status: "active"
       })
       .select("id, agency_account_id, auth_user_id, email, name, is_account_admin, status")
@@ -73,4 +75,9 @@ function optionalBoolean(value: unknown) {
 function optionalUuid(value: unknown, field: string) {
   if (value === undefined || value === null || value === "") return null;
   return requireUuid(value, field);
+}
+
+function normalizeAccountRole(value: unknown) {
+  if (value === "mother" || value === "sub_account") return value;
+  return "sub_account";
 }

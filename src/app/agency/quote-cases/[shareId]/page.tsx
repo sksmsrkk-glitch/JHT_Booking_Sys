@@ -287,10 +287,9 @@ function MealSummary({ mealSummary }: { mealSummary: Record<string, unknown> }) 
 async function loadQuoteCase(shareId: string): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
-    return {
-      status: "auth-required",
-      message: "This page requires an active agency user JWT."
-    };
+    const preview = getPreviewQuoteDetail(shareId);
+    if (preview) return { status: "ready", quoteCase: preview };
+    return { status: "auth-required", message: "This page requires an active agency user JWT." };
   }
 
   const response = await fetch(buildInternalApiUrl(`/api/agency/quote-cases/${shareId}`, headerStore), {
@@ -300,6 +299,10 @@ async function loadQuoteCase(shareId: string): Promise<LoadState> {
   const payload = await response.json();
 
   if (!response.ok) {
+    const preview = getPreviewQuoteDetail(shareId);
+    if ((response.status === 401 || response.status === 403 || response.status === 404) && preview) {
+      return { status: "ready", quoteCase: preview };
+    }
     if (response.status === 404) return { status: "not-found", message: payload.error ?? "Quote not found" };
     return {
       status: response.status === 401 || response.status === 403 ? "auth-required" : "error",
@@ -308,6 +311,121 @@ async function loadQuoteCase(shareId: string): Promise<LoadState> {
   }
 
   return { status: "ready", quoteCase: mapQuoteDetail(payload.data) };
+}
+
+function getPreviewQuoteDetail(shareId: string): AgencyQuoteDetail | null {
+  if (shareId !== "preview-quote-mhdm") return null;
+
+  return {
+    id: "preview-quote-mhdm",
+    caseCode: "MY-WORLDTRAV-20260629",
+    shareId: "preview-quote-mhdm",
+    tourName: "MHDM Seoul 4N group",
+    tourType: "incentive_tour",
+    status: "sent",
+    currency: "MYR",
+    estimatedPax: 26,
+    startDate: "2026-03-24",
+    endDate: "2026-03-28",
+    createdAt: "2026-06-29T09:00:00+09:00",
+    requestTimeline: [
+      {
+        id: "preview-request-1",
+        inquiryType: "new_quote",
+        title: "MHDM Seoul 4N group",
+        status: "received",
+        requestPayload: {
+          message: "4 nights Seoul incentive group with hotel, meals, attractions, guide, and coach."
+        },
+        createdAt: "2026-06-29T09:00:00+09:00"
+      }
+    ],
+    versions: [
+      {
+        id: "preview-version-2",
+        versionNo: 2,
+        status: "sent",
+        currency: "MYR",
+        agencyVisibleSummary: {
+          group: "MHDM Seoul 4N group",
+          pax: "26 adults",
+          period: "24-28 March 2026",
+          hotel: "Seoul 4-star business hotel or similar"
+        },
+        publicFareOptions: [
+          {
+            optionName: "Seoul 4N Package",
+            hotelName: "Seoul 4-star business hotel or similar",
+            tourFare: "MYR 6,120 per pax",
+            singleSupplement: "MYR 1,080",
+            notes: "Based on 26 paying pax, twin sharing, private coach, guide, meals, and attractions."
+          }
+        ],
+        publicTotalAmount: 183740,
+        termsAndConditions:
+          "Fare is based on the proposed group size and final availability. Hotel, meals, attractions, and vehicle are subject to final confirmation. Full payment must be completed before invoice deadline.",
+        sentAt: "2026-06-29T09:30:00+09:00",
+        acceptedAt: null,
+        presentationBlocks: [
+          {
+            id: "preview-cover-desc",
+            quoteItineraryDayId: null,
+            blockType: "description",
+            displayContext: "cover",
+            title: "Seoul Incentive Program",
+            description:
+              "Customer-safe quotation preview with hotel, meal, attraction, vehicle, and guide inclusions summarized for partner review.",
+            imageStoragePath: null,
+            imageUrl: null,
+            altText: null,
+            sortOrder: 1,
+            metadata: {}
+          }
+        ],
+        itineraryDays: [
+          makePreviewItineraryDay(1, "2026-03-24", "Arrival Seoul", "Arrival assistance, private coach transfer, city orientation, and hotel check-in.", {
+            dinner: "Confirmed dinner menu"
+          }),
+          makePreviewItineraryDay(2, "2026-03-25", "Seoul city tour", "Gyeongbokgung Palace, Bukchon Hanok Village, Insadong, and N Seoul Tower photo stop.", {
+            breakfast: "Hotel breakfast",
+            lunch: "Bibimbap set",
+            dinner: "Korean BBQ"
+          }),
+          makePreviewItineraryDay(3, "2026-03-26", "Business visit and incentive dinner", "Corporate visit, team building program, banquet setup, and private dinner.", {
+            breakfast: "Hotel breakfast",
+            lunch: "Conference lunch",
+            dinner: "Private banquet dinner"
+          }),
+          makePreviewItineraryDay(4, "2026-03-27", "Shopping and leisure", "Cosmetic shop, ginseng center, Hongdae free time, and flexible coach standby.", {
+            breakfast: "Hotel breakfast",
+            dinner: "Seafood hotpot"
+          }),
+          makePreviewItineraryDay(5, "2026-03-28", "Departure", "Hotel check-out, airport transfer, luggage support, and departure assistance.", {
+            breakfast: "Hotel breakfast"
+          })
+        ]
+      }
+    ]
+  };
+}
+
+function makePreviewItineraryDay(
+  dayNo: number,
+  serviceDate: string,
+  title: string,
+  publicDescription: string,
+  mealSummary: Record<string, unknown>
+) {
+  return {
+    id: `preview-day-${dayNo}`,
+    dayNo,
+    serviceDate,
+    title,
+    mealSummary,
+    publicDescription,
+    routeSegments: [],
+    presentationBlocks: []
+  };
 }
 
 function mapQuoteDetail(row: any): AgencyQuoteDetail {

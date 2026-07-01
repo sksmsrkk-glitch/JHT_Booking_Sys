@@ -93,7 +93,9 @@ export function AgencyUserCreateForm({ agencyId }: { agencyId: string }) {
       name: String(formData.get("name") ?? "").trim(),
       title: normalizeOptionalString(formData.get("title")),
       authUserId: normalizeOptionalString(formData.get("authUserId")),
-      isAccountAdmin: formData.get("isAccountAdmin") === "true"
+      isAccountAdmin: formData.get("accountRole") === "mother" || formData.get("isAccountAdmin") === "true",
+      accountRole: String(formData.get("accountRole") ?? "sub_account"),
+      passwordResetRequired: formData.get("passwordResetRequired") !== "false"
     };
 
     const response = await fetch(`/api/agencies/${agencyId}/users`, {
@@ -130,10 +132,17 @@ export function AgencyUserCreateForm({ agencyId }: { agencyId: string }) {
           <input disabled={isBusy} name="authUserId" placeholder="Optional UUID" />
         </label>
         <label>
-          Account Admin
-          <select defaultValue="false" disabled={isBusy} name="isAccountAdmin">
-            <option value="false">No</option>
-            <option value="true">Yes</option>
+          Account Role
+          <select defaultValue="sub_account" disabled={isBusy} name="accountRole">
+            <option value="sub_account">Sub account</option>
+            <option value="mother">Mother ID</option>
+          </select>
+        </label>
+        <label>
+          Password
+          <select defaultValue="true" disabled={isBusy} name="passwordResetRequired">
+            <option value="true">Reset required</option>
+            <option value="false">Already set</option>
           </select>
         </label>
       </div>

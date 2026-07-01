@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+// 운영/회계/파트너 데이터는 화면마다 최신 상태가 중요하므로 API JSON 응답은 기본적으로 캐시하지 않습니다.
 const noStoreHeaders = { "Cache-Control": "no-store" };
 
 export async function readJson<T = Record<string, unknown>>(request: Request): Promise<T> {
@@ -33,6 +34,7 @@ export function fail(error: unknown) {
   }
 
   if (error instanceof Error) {
+    // 서버 내부 에러 메시지는 DB 구조나 보안 정보를 포함할 수 있으므로 외부에 그대로 노출하지 않습니다.
     return jsonResponse({ error: "Internal server error" }, { status: 500 });
   }
 
@@ -40,6 +42,8 @@ export function fail(error: unknown) {
 }
 
 function publicErrorMessage(error: HttpError) {
+  // 4xx는 사용자가 고칠 수 있는 입력/권한 오류라 메시지를 보여주고,
+  // 5xx는 내부 오류라 일반 문구로 감춥니다.
   if (error.status >= 500) {
     return "Internal server error";
   }

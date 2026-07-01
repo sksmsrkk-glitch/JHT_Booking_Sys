@@ -144,6 +144,11 @@ Use:
 - `/admin/reservations/[reservationId]`
 - `/admin/operations/tasks`
 
+The Reservations first screen is a monthly group status board modeled after JHT's legacy
+`단체현황표`: each reservation is placed on the date axis with ARR, STAY, and DEP cells,
+while rooming and hotel/vehicle/guide/content/finance task progress stay visible on the same row.
+See `docs/reservation-group-status-board.md` for the source-sheet analysis and future CSV import mapping.
+
 Typical reservation flow:
 
 1. Create a reservation from an accepted quote case/version.
@@ -183,6 +188,7 @@ Use:
 - `/admin/finance/invoices`
 - `/admin/finance/invoices/[invoiceId]`
 - `/admin/finance/settlements`
+- `/admin/guide-expenses`
 
 Typical finance flow:
 
@@ -194,6 +200,14 @@ Typical finance flow:
 6. Close settlement when final.
 
 Closed settlements reject later invoice, payment, expense, revenue, commission, and settlement changes.
+
+### Guide Expense Reports
+
+Use `/admin/guide-expenses` after a confirmed group finishes the Korea tour. The page follows the attached PMB incentive expense workbook pattern: one reservation has one guide expense report, and each report is divided into lodging, meals, tickets/admissions, cash expenses, guide fee/tip, shopping commission, and other rows.
+
+Guides or internal operators can enter date, day number, vendor, description, unit amount, quantity/day count, pax, manual total, payment method, and notes. Unit amount times quantity is calculated automatically, but the total amount can still be manually overridden because the legacy workbook includes both formula rows and hand-entered receipt totals.
+
+When the report is submitted, each positive line is synced to the finance `expenses` table with the original guide expense line ID. This keeps invoice revenue and actual tour cost together for settlement and profit analysis while preventing duplicate expense rows from the same submitted guide line.
 
 ### 10. Automation And Audit
 

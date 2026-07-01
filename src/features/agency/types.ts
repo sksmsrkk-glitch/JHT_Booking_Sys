@@ -1,4 +1,6 @@
 export type AgencyRecordStatus = "active" | "inactive" | "archived";
+export type AgencyLifecycleStatus = "pending_approval" | "active" | "frozen" | "withdrawn" | "rejected";
+export type AgencyApplicationStatus = "pending" | "approved" | "rejected";
 
 export type AgencyListItem = {
   id: string;
@@ -9,9 +11,12 @@ export type AgencyListItem = {
   phone: string | null;
   website: string | null;
   status: AgencyRecordStatus;
+  lifecycleStatus: AgencyLifecycleStatus;
   contactCount: number;
   userCount: number;
   inquiryCount: number;
+  createdAt: string;
+  lastLoginAt: string | null;
   updatedAt: string;
 };
 
@@ -34,6 +39,10 @@ export type AgencyUserSummary = {
   name: string;
   title: string | null;
   isAccountAdmin: boolean;
+  accountRole: "mother" | "sub_account";
+  parentAgencyUserId: string | null;
+  passwordResetRequired: boolean;
+  lastLoginAt: string | null;
   status: AgencyRecordStatus;
 };
 
@@ -54,10 +63,51 @@ export type AgencyDetail = AgencyListItem & {
   contacts: AgencyContact[];
   users: AgencyUserSummary[];
   inquiries: AgencyInquirySummary[];
+  emailEvents: AgencyEmailEvent[];
+  loginEvents: AgencyLoginEvent[];
 };
 
 export type AgencyListFilters = {
   q?: string;
   status?: string;
   country?: string;
+};
+
+export type AgencySignupApplication = {
+  id: string;
+  companyName: string;
+  contactName: string | null;
+  phone: string | null;
+  email: string;
+  countryCode: string;
+  countryName: string | null;
+  originalCountryName: string | null;
+  website: string | null;
+  notes: string | null;
+  status: AgencyApplicationStatus;
+  rejectionReason: string | null;
+  createdAgencyAccountId: string | null;
+  createdMotherAgencyUserId: string | null;
+  emailNotificationStatus: string;
+  createdAt: string;
+  reviewedAt: string | null;
+};
+
+export type AgencyEmailEvent = {
+  id: string;
+  eventType: string;
+  recipientEmail: string;
+  subject: string;
+  deliveryStatus: string;
+  createdAt: string;
+  sentAt: string | null;
+};
+
+export type AgencyLoginEvent = {
+  id: string;
+  agencyUserId: string | null;
+  eventType: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
 };

@@ -7,7 +7,7 @@ import { InquiryCreateForm } from "@/components/agency/InquiryCreateForm";
 export const dynamic = "force-dynamic";
 
 type LoadState =
-  | { status: "ready"; inquiries: AgencyInquirySummary[] }
+  | { status: "ready"; inquiries: AgencyInquirySummary[]; isPreview?: boolean }
   | { status: "auth-required"; message: string }
   | { status: "error"; message: string };
 
@@ -44,10 +44,10 @@ export default async function AgencyInquiriesPage() {
 
       <InquiryCreateForm />
 
-      {loadState.status === "auth-required" ? (
+      {loadState.status === "ready" && loadState.isPreview ? (
         <section className="notice warning">
-          <h2>Agency login required</h2>
-          <p>{loadState.message}</p>
+          <h2>Preview data</h2>
+          <p>Agency login is bypassed during development, so this list shows sample inquiry workflow rows.</p>
         </section>
       ) : null}
 
@@ -87,9 +87,11 @@ function InquiryTable({ inquiries }: { inquiries: AgencyInquirySummary[] }) {
       <table>
         <thead>
           <tr>
+            <th>Tour Code</th>
             <th>Title</th>
             <th>Type</th>
-            <th>Dates</th>
+            <th>Submitted</th>
+            <th>Period</th>
             <th>Pax</th>
             <th>Tour Type</th>
             <th>Status</th>
@@ -98,9 +100,11 @@ function InquiryTable({ inquiries }: { inquiries: AgencyInquirySummary[] }) {
         <tbody>
           {inquiries.map((inquiry) => (
             <tr key={inquiry.id}>
+              <td>{(inquiry as any).tourCode ?? "-"}</td>
               <td>{inquiry.title}</td>
               <td>{formatLabel(inquiry.inquiryType)}</td>
-              <td>{formatDateRange(inquiry.requestedStartDate, inquiry.requestedEndDate)}</td>
+              <td>{inquiry.createdAt.slice(0, 10)}</td>
+              <td>{(inquiry as any).periodText ?? formatDateRange(inquiry.requestedStartDate, inquiry.requestedEndDate)}</td>
               <td>{inquiry.paxCount ?? "Not set"}</td>
               <td>{inquiry.tourType ? formatLabel(inquiry.tourType) : "Not set"}</td>
               <td>{inquiry.status}</td>
@@ -116,9 +120,9 @@ async function loadInquiries(): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
     return {
-      status: "auth-required",
-      message:
-        "This page reads inquiries through the Agency API, which requires an active agency user JWT."
+      status: "ready",
+      inquiries: demoAgencyInquiries,
+      isPreview: true
     };
   }
 
@@ -130,17 +134,20 @@ async function loadInquiries(): Promise<LoadState> {
 
   if (!response.ok) {
     return {
-      status: response.status === 401 || response.status === 403 ? "auth-required" : "error",
+      status: response.status === 401 || response.status === 403 ? "ready" : "error",
+      ...(response.status === 401 || response.status === 403 ? { inquiries: demoAgencyInquiries, isPreview: true } : {}),
       message: payload.error ?? "Unknown inquiry API error"
-    };
+    } as LoadState;
   }
 
   const inquiries = (payload.data ?? []).map((row: any) => ({
     id: row.id,
+    tourCode: row.tour_code ?? row.request_payload?.tourCode ?? null,
     inquiryType: row.inquiry_type,
     title: row.title,
     requestedStartDate: row.requested_start_date ?? null,
     requestedEndDate: row.requested_end_date ?? null,
+    periodText: row.period_text ?? row.request_payload?.periodText ?? null,
     paxCount: row.pax_count ?? null,
     tourType: row.tour_type ?? null,
     status: row.status,
@@ -149,6 +156,35 @@ async function loadInquiries(): Promise<LoadState> {
 
   return { status: "ready", inquiries };
 }
+
+const demoAgencyInquiries = [
+  {
+    id: "preview-inquiry-new",
+    tourCode: "MY-WORLDTRAV-20260629",
+    inquiryType: "new_inquiry",
+    title: "MHDM Seoul 4N group",
+    requestedStartDate: "2026-03-24",
+    requestedEndDate: "2026-03-28",
+    periodText: "24-28 Mar 2026 / 4 nights",
+    paxCount: 26,
+    tourType: "incentive_tour",
+    status: "new",
+    createdAt: "2026-06-29T09:00:00+09:00"
+  },
+  {
+    id: "preview-inquiry-revision",
+    tourCode: "MY-WORLDTRAV-20260629",
+    inquiryType: "revision_request",
+    title: "MHDM Seoul 4N group - hotel/date change",
+    requestedStartDate: null,
+    requestedEndDate: null,
+    periodText: "Change from 4N to 5N, move start date to September",
+    paxCount: 26,
+    tourType: "incentive_tour",
+    status: "reviewing",
+    createdAt: "2026-06-29T10:00:00+09:00"
+  }
+] as any[];
 
 function buildInternalApiUrl(path: string, headerStore: Headers) {
   const protocol = headerStore.get("x-forwarded-proto") ?? "http";
