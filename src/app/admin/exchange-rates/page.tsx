@@ -2,6 +2,8 @@ import type { Route } from "next";
 import Link from "next/link";
 import { CountryReferenceCreateForm } from "@/components/admin/CountryReferenceCreateForm";
 import { ExchangeRateCreateForm } from "@/components/admin/ExchangeRateCreateForm";
+import { ExchangeRateFilterForm } from "@/components/admin/ExchangeRateFilterForm";
+import { mergeCountryReferences } from "@/features/countries/defaults";
 import type { CountryReference } from "@/features/countries/types";
 import type { ExchangeRateListItem } from "@/features/exchange-rates/types";
 import { getPageAuthorization } from "@/lib/api/page-session";
@@ -22,6 +24,7 @@ type LoadState =
 export default async function ExchangeRatesPage({ searchParams }: { searchParams: SearchParams }) {
   const filters = await searchParams;
   const loadState = await loadExchangeRates(filters);
+  const countryOptions = mergeCountryReferences(loadState.status === "ready" ? loadState.countries : []);
 
   return (
     <>
@@ -36,34 +39,14 @@ export default async function ExchangeRatesPage({ searchParams }: { searchParams
         </Link>
       </div>
 
-      <form className="toolbar" action="/admin/exchange-rates">
-        <label>
-          Country Code
-          <input name="countryCode" defaultValue={filters.countryCode ?? ""} placeholder="TH, MY, SG, PH" />
-        </label>
-        <label>
-          Base Currency
-          <input name="baseCurrency" defaultValue={filters.baseCurrency ?? ""} placeholder="USD, SGD, KRW" />
-        </label>
-        <label>
-          Status
-          <select name="status" defaultValue={filters.status ?? "active"}>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="archived">Archived</option>
-          </select>
-        </label>
-        <button className="button-primary" type="submit">
-          Filter
-        </button>
-      </form>
+      <ExchangeRateFilterForm countries={countryOptions} filters={filters} />
 
       <section className="panel-section">
         <div className="section-heading">
           <h2>Common Country Master</h2>
           <span>Country code + default name</span>
         </div>
-        <CountryReferenceCreateForm />
+        <CountryReferenceCreateForm countries={countryOptions} />
       </section>
 
       {loadState.status === "ready" ? <CountryReferenceTable countries={loadState.countries} /> : null}
@@ -73,7 +56,7 @@ export default async function ExchangeRatesPage({ searchParams }: { searchParams
           <h2>Create Exchange Rate</h2>
           <span>Country-linked FX</span>
         </div>
-        <ExchangeRateCreateForm />
+        <ExchangeRateCreateForm countries={countryOptions} />
       </section>
 
       {loadState.status === "auth-required" ? (

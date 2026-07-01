@@ -497,6 +497,14 @@ a {
   gap: 6px;
 }
 
+.exchange-rate-filter-toolbar {
+  grid-template-columns: minmax(360px, 1.8fr) minmax(150px, 0.55fr) minmax(150px, 0.55fr) auto;
+}
+
+.exchange-rate-create-grid {
+  grid-template-columns: minmax(360px, 1.8fr) repeat(5, minmax(130px, 0.75fr));
+}
+
 input,
 select,
 textarea {
@@ -3518,6 +3526,7 @@ html.dark .danger-metric {
   .form-preview,
   .form-grid.two-column,
   .form-grid.three-column,
+  .exchange-rate-create-grid,
   .finance-action-grid,
   .metric-row,
   .workflow-ledger,

@@ -1,37 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { buildCurrencyOptions, mergeCountryReferences } from "@/features/countries/defaults";
+import type { CountryReference } from "@/features/countries/types";
 
-type CountryOption = {
-  countryCode: string;
-  countryName: string;
-  defaultCurrency: string | null;
-};
-
-const FALLBACK_COUNTRIES: CountryOption[] = [
-  { countryCode: "MY", countryName: "Malaysia", defaultCurrency: "MYR" },
-  { countryCode: "TH", countryName: "Thailand", defaultCurrency: "THB" },
-  { countryCode: "VN", countryName: "Vietnam", defaultCurrency: "VND" },
-  { countryCode: "ID", countryName: "Indonesia", defaultCurrency: "IDR" },
-  { countryCode: "PH", countryName: "Philippines", defaultCurrency: "PHP" },
-  { countryCode: "SG", countryName: "Singapore", defaultCurrency: "SGD" },
-  { countryCode: "JP", countryName: "Japan", defaultCurrency: "JPY" },
-  { countryCode: "CN", countryName: "China", defaultCurrency: "CNY" },
-  { countryCode: "TW", countryName: "Taiwan", defaultCurrency: "TWD" },
-  { countryCode: "HK", countryName: "Hong Kong", defaultCurrency: "HKD" },
-  { countryCode: "IN", countryName: "India", defaultCurrency: "INR" },
-  { countryCode: "AE", countryName: "United Arab Emirates", defaultCurrency: "AED" },
-  { countryCode: "US", countryName: "United States", defaultCurrency: "USD" },
-  { countryCode: "AU", countryName: "Australia", defaultCurrency: "AUD" }
-];
-
-export function ExchangeRateCreateForm() {
+export function ExchangeRateCreateForm({ countries = [] }: { countries?: CountryReference[] }) {
+  const initialCountries = useMemo(() => mergeCountryReferences(countries), [countries]);
   const [message, setMessage] = useState("");
   const [isBusy, setIsBusy] = useState(false);
-  const [countryOptions, setCountryOptions] = useState<CountryOption[]>(FALLBACK_COUNTRIES);
+  const [countryOptions, setCountryOptions] = useState<CountryReference[]>(initialCountries);
   const [selectedCountryCode, setSelectedCountryCode] = useState("");
   const [selectedCountryName, setSelectedCountryName] = useState("");
   const [baseCurrency, setBaseCurrency] = useState("USD");
+  const currencyOptions = buildCurrencyOptions(countryOptions, baseCurrency);
 
   useEffect(() => {
     let mounted = true;
@@ -39,13 +20,7 @@ export function ExchangeRateCreateForm() {
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         if (!mounted || !payload?.data?.length) return;
-        setCountryOptions(
-          payload.data.map((country: CountryOption) => ({
-            countryCode: country.countryCode,
-            countryName: country.countryName,
-            defaultCurrency: country.defaultCurrency ?? null
-          }))
-        );
+        setCountryOptions(mergeCountryReferences(payload.data));
       })
       .catch(() => undefined);
     return () => {
@@ -57,6 +32,8 @@ export function ExchangeRateCreateForm() {
     const country = countryOptions.find((item) => item.countryCode === countryCode);
     setSelectedCountryCode(country?.countryCode ?? "");
     setSelectedCountryName(country?.countryName ?? "");
+    // 국가 마스터에 저장된 기본 통화를 기준통화로 자동 적용합니다.
+    // 예: MY - Malaysia 선택 시 기준통화 MYR, TH - Thailand 선택 시 THB.
     if (country?.defaultCurrency) setBaseCurrency(country.defaultCurrency);
   }
 
@@ -91,55 +68,63 @@ export function ExchangeRateCreateForm() {
 
   return (
     <form action={submit} className="stacked-form">
-      <div className="form-grid three-column">
+      <div className="form-grid exchange-rate-create-grid">
         <label>
-          Country
-          <select disabled={isBusy} value={selectedCountryCode} onChange={(event) => selectCountry(event.target.value)}>
-            <option value="">Global / no country</option>
+          국가
+          <select disabled={isBusy} name="countryCode" value={selectedCountryCode} onChange={(event) => selectCountry(event.target.value)}>
+            <option value="">전체 / 국가 미지정</option>
             {countryOptions.map((country) => (
               <option key={country.countryCode} value={country.countryCode}>
                 {country.countryCode} - {country.countryName}
+                {country.defaultCurrency ? ` (${country.defaultCurrency})` : ""}
               </option>
             ))}
           </select>
-          <input name="countryCode" readOnly type="hidden" value={selectedCountryCode} />
           <input name="countryName" readOnly type="hidden" value={selectedCountryName} />
+          <span className="subtext">국가 선택 시 Country Code와 기준통화가 공통 마스터 기준으로 연결됩니다.</span>
         </label>
         <label>
-          Base Currency
-          <input
+          기준 통화
+          <select
             disabled={isBusy}
             name="baseCurrency"
-            placeholder="USD"
+            onChange={(event) => setBaseCurrency(event.target.value.toUpperCase())}
             required
             value={baseCurrency}
-            onChange={(event) => setBaseCurrency(event.target.value.toUpperCase())}
-          />
+          >
+            {currencyOptions.map((currency) => (
+              <option key={currency} value={currency}>
+                {currency}
+              </option>
+            ))}
+          </select>
         </label>
         <label>
-          Quote Currency
-          <input defaultValue="KRW" disabled={isBusy} name="quoteCurrency" placeholder="KRW" required />
+          상대 통화
+          <select defaultValue="KRW" disabled={isBusy} name="quoteCurrency" required>
+            <option value="KRW">KRW</option>
+          </select>
         </label>
         <label>
-          Rate to KRW
+          KRW 환산율
           <input disabled={isBusy} min="0" name="rate" placeholder="1380.50" required step="0.000001" type="number" />
         </label>
         <label>
-          Effective Date
+          적용일
           <input defaultValue={new Date().toISOString().slice(0, 10)} disabled={isBusy} name="effectiveDate" type="date" />
         </label>
         <label>
-          Source
+          출처
           <input defaultValue="manual" disabled={isBusy} name="source" placeholder="manual, bank, accounting" />
         </label>
       </div>
       <label className="full-width-field">
-        Notes
+        메모
         <textarea disabled={isBusy} name="notes" placeholder="Internal exchange-rate note" rows={2} />
       </label>
       <div className="inline-actions">
         <button className="button-primary" disabled={isBusy} type="submit">
-          Save Exchange Rate
+          환율 저장
         </button>
         {message ? <span className="danger-text">{message}</span> : null}
       </div>

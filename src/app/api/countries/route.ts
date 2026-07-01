@@ -1,4 +1,5 @@
 import { listCountryReferences } from "@/features/countries/queries";
+import { DEFAULT_COUNTRY_REFERENCES } from "@/features/countries/defaults";
 import { requireInternalUser } from "@/lib/api/auth";
 import { writeAuditLog } from "@/lib/api/audit";
 import { created, fail, HttpError, ok, readJson, requireString } from "@/lib/api/http";
@@ -11,32 +12,6 @@ import { createRequestSupabaseClient } from "@/lib/supabase/server";
  * defaultCurrency를 기준으로 환율, 파트너사, 견적서를 연결합니다. 가입 신청 화면은
  * 로그인 전에도 국가 선택이 필요하므로 GET은 기본 국가 목록을 public fallback으로 제공합니다.
  */
-const defaultCountryReferences = [
-  ["MY", "Malaysia", "MYR"],
-  ["TH", "Thailand", "THB"],
-  ["VN", "Vietnam", "VND"],
-  ["ID", "Indonesia", "IDR"],
-  ["PH", "Philippines", "PHP"],
-  ["SG", "Singapore", "SGD"],
-  ["JP", "Japan", "JPY"],
-  ["CN", "China", "CNY"],
-  ["TW", "Taiwan", "TWD"],
-  ["HK", "Hong Kong", "HKD"],
-  ["IN", "India", "INR"],
-  ["AE", "United Arab Emirates", "AED"],
-  ["EG", "Egypt", "EGP"],
-  ["US", "United States", "USD"],
-  ["AU", "Australia", "AUD"]
-].map(([countryCode, countryName, defaultCurrency]) => ({
-  countryCode,
-  countryName,
-  defaultCurrency,
-  aliases: [],
-  source: "default",
-  status: "active",
-  createdAt: null
-}));
-
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -133,8 +108,8 @@ function hasAuthSession(request: Request) {
 
 function filterDefaultCountries(query: string | null) {
   const q = query?.trim().toLowerCase();
-  if (!q) return defaultCountryReferences;
-  return defaultCountryReferences.filter(
+  if (!q) return DEFAULT_COUNTRY_REFERENCES;
+  return DEFAULT_COUNTRY_REFERENCES.filter(
     (country) => country.countryCode.toLowerCase().includes(q) || country.countryName.toLowerCase().includes(q)
   );
 }

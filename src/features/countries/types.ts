@@ -5,7 +5,7 @@ export type CountryReference = {
   aliases: string[];
   source: string;
   status: string;
-  createdAt: string;
+  createdAt: string | null;
 };
 
 export type CountryReferenceFilters = {
