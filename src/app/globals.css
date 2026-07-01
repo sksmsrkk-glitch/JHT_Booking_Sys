@@ -429,6 +429,27 @@ a {
   padding: 18px;
 }
 
+.action-band-link {
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.action-band-link:hover {
+  border-color: #9fb3c8;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.action-band-link:focus-visible {
+  border-color: #0f609b;
+  box-shadow: 0 0 0 3px rgba(15, 96, 155, 0.18);
+  outline: none;
+}
+
 .action-band h2,
 .notice h2,
 .empty-state h2,

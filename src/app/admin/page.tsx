@@ -114,17 +114,21 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
 
       <AdminDashboard filters={filters} loadState={loadState} data={data} />
 
-      <section className="action-band">
+      <Link
+        aria-label={locale === "ko" ? "파트너 소통 워크플로우 열기" : "Open partner communication workflow"}
+        className="action-band action-band-link"
+        href={"/admin/workflows" as Route}
+      >
         <div>
-          <h2>{locale === "ko" ? "핵심 업무 흐름" : "Main Workflow"}</h2>
+          <h2>{locale === "ko" ? "파트너 소통 워크플로우" : "Partner Communication Workflow"}</h2>
           <p>
             {locale === "ko"
-              ? "문의에서 견적, 견적에서 예약, 예약에서 공급사 운영, 인보이스와 정산까지 이어집니다."
-              : "Request to quote, quote to reservation, reservation to supplier operations, invoice, and settlement."}
+              ? "파트너 문의, 재견적 요청, 내부 회신, 운영 메모와 follow-up action item을 하나의 workflow code로 관리합니다."
+              : "Partner requests, quote revisions, JHT replies, internal notes, and follow-up action items under one workflow code."}
           </p>
         </div>
         <span className="status-dot status-live">{locale === "ko" ? "운영중" : "Live"}</span>
-      </section>
+      </Link>
       <RouteCardGrid locale={locale} routes={primaryRoutes} />
       <section className="section-block">
         <div className="section-heading">
