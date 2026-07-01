@@ -41,6 +41,8 @@ export async function POST(request: Request, context: RouteContext) {
           id: `preview-message-${Date.now()}`,
           threadId: demo?.id ?? `preview-${workflowCode}`,
           senderType: "internal",
+          senderProfileId: "22222222-2222-4222-8222-222222222222",
+          senderAgencyUserId: null,
           senderName: "Preview user",
           senderEmail: null,
           messageType,
@@ -81,6 +83,8 @@ export async function POST(request: Request, context: RouteContext) {
       .insert({
         workflow_thread_id: thread.id,
         sender_type: actor.type,
+        sender_profile_id: actor.profileId,
+        sender_agency_user_id: actor.agencyUserId,
         sender_name: actor.displayName,
         sender_email: actor.email,
         message_type: messageType,
@@ -88,7 +92,7 @@ export async function POST(request: Request, context: RouteContext) {
         visibility,
         created_by: actor.profileId
       })
-      .select("id, workflow_thread_id, sender_type, sender_name, sender_email, message_type, body, visibility, linked_quote_version_id, linked_invoice_id, created_at")
+      .select("id, workflow_thread_id, sender_type, sender_profile_id, sender_agency_user_id, sender_name, sender_email, message_type, body, visibility, linked_quote_version_id, linked_invoice_id, created_at")
       .single();
 
     if (messageError) throw new HttpError(500, messageError.message);
@@ -149,20 +153,28 @@ export async function POST(request: Request, context: RouteContext) {
 async function resolveActor(supabase: any) {
   try {
     const internalUser = await requireInternalUser(supabase);
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("display_name, email")
+      .eq("id", internalUser.profileId)
+      .maybeSingle();
+
     return {
       type: "internal" as const,
       profileId: internalUser.profileId,
+      agencyUserId: null,
       agencyAccountId: null,
-      displayName: "JHT Internal",
-      email: null
+      displayName: profile?.display_name ?? profile?.email ?? "JHT Internal",
+      email: profile?.email ?? null
     };
   } catch {
     const agencyUser = await requireAgencyUser(supabase);
     return {
       type: "agency" as const,
       profileId: null,
+      agencyUserId: agencyUser.agencyUserId,
       agencyAccountId: agencyUser.agencyAccountId,
-      displayName: agencyUser.name ?? "Agency user",
+      displayName: agencyUser.name ?? agencyUser.email ?? "Agency user",
       email: agencyUser.email ?? null
     };
   }

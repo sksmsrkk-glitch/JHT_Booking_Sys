@@ -17,6 +17,8 @@ export type WorkflowMessage = {
   id: string;
   threadId: string;
   senderType: "agency" | "internal" | "system";
+  senderProfileId: string | null;
+  senderAgencyUserId: string | null;
   senderName: string | null;
   senderEmail: string | null;
   messageType: string;

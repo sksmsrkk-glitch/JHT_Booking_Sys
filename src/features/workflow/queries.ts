@@ -30,7 +30,7 @@ export async function getWorkflowThreadByCode(
 
   let messagesQuery = supabase
     .from("workflow_messages")
-    .select("id, workflow_thread_id, sender_type, sender_name, sender_email, message_type, body, visibility, linked_quote_version_id, linked_invoice_id, created_at")
+    .select("id, workflow_thread_id, sender_type, sender_profile_id, sender_agency_user_id, sender_name, sender_email, message_type, body, visibility, linked_quote_version_id, linked_invoice_id, created_at")
     .eq("workflow_thread_id", thread.id)
     .order("created_at", { ascending: true });
 
@@ -224,6 +224,8 @@ function mapWorkflowMessage(row: any): WorkflowMessage {
     id: row.id,
     threadId: row.workflow_thread_id,
     senderType: row.sender_type,
+    senderProfileId: row.sender_profile_id ?? null,
+    senderAgencyUserId: row.sender_agency_user_id ?? null,
     senderName: row.sender_name ?? null,
     senderEmail: row.sender_email ?? null,
     messageType: row.message_type,

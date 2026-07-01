@@ -59,7 +59,11 @@ const workflowPortalCommunicationMigration = readFileSync(
   new URL("../supabase/migrations/202606300003_workflow_portal_communication.sql", import.meta.url),
   "utf8"
 );
-const schema = `${initialSchema}\n${gmailCandidatesMigration}\n${quoteExcelModelMigration}\n${quoteFareOptionsMigration}\n${quotePresentationBlocksMigration}\n${supplierMediaAttachmentsMigration}\n${partnerReceivableLedgerMigration}\n${exchangeRatesMigration}\n${agencyInquiryTourWorkflowMigration}\n${invoiceVersioningMigration}\n${finalOperationInvoiceMigration}\n${guideExpenseReportsMigration}\n${agencyOnboardingGovernanceMigration}\n${countryReferenceExchangeRatesMigration}\n${workflowPortalCommunicationMigration}`;
+const workflowMessageActorLinksMigration = readFileSync(
+  new URL("../supabase/migrations/202607010001_workflow_message_actor_links.sql", import.meta.url),
+  "utf8"
+);
+const schema = `${initialSchema}\n${gmailCandidatesMigration}\n${quoteExcelModelMigration}\n${quoteFareOptionsMigration}\n${quotePresentationBlocksMigration}\n${supplierMediaAttachmentsMigration}\n${partnerReceivableLedgerMigration}\n${exchangeRatesMigration}\n${agencyInquiryTourWorkflowMigration}\n${invoiceVersioningMigration}\n${finalOperationInvoiceMigration}\n${guideExpenseReportsMigration}\n${agencyOnboardingGovernanceMigration}\n${countryReferenceExchangeRatesMigration}\n${workflowPortalCommunicationMigration}\n${workflowMessageActorLinksMigration}`;
 const agencyPortalQueries = readFileSync(new URL("../src/features/agency-portal/queries.ts", import.meta.url), "utf8");
 const apiHttp = readFileSync(new URL("../src/lib/api/http.ts", import.meta.url), "utf8");
 const seedSql = readFileSync(new URL("../supabase/seed.sql", import.meta.url), "utf8");
@@ -233,6 +237,10 @@ test("workflow communication ledger keeps portal messages code-scoped", () => {
   assert.match(schema, /reservation_id uuid references reservations\(id\)/);
   assert.match(schema, /create table if not exists workflow_messages/);
   assert.match(schema, /sender_type text not null check \(sender_type in \('agency', 'internal', 'system'\)\)/);
+  assert.match(schema, /add column if not exists sender_profile_id uuid references profiles\(id\) on delete set null/);
+  assert.match(schema, /add column if not exists sender_agency_user_id uuid references agency_users\(id\) on delete set null/);
+  assert.match(schema, /workflow_messages_sender_profile_idx/);
+  assert.match(schema, /workflow_messages_sender_agency_user_idx/);
   assert.match(schema, /visibility text not null default 'partner_visible'/);
   assert.match(schema, /create table if not exists workflow_action_items/);
   assert.match(schema, /partner_visible boolean not null default true/);

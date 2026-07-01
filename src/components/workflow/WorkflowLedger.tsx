@@ -158,6 +158,7 @@ export function WorkflowLedger({
               <p>{message.body}</p>
               <footer>
                 <span>{message.visibility === "internal_only" ? "Internal only" : "Partner visible"}</span>
+                {formatActorReference(message) ? <span>{formatActorReference(message)}</span> : null}
                 {message.senderEmail ? <span>{message.senderEmail}</span> : null}
               </footer>
             </article>
@@ -239,6 +240,8 @@ function mapMessage(row: any): WorkflowMessage {
     id: row.id,
     threadId: row.threadId ?? row.workflow_thread_id,
     senderType: row.senderType ?? row.sender_type,
+    senderProfileId: row.senderProfileId ?? row.sender_profile_id ?? null,
+    senderAgencyUserId: row.senderAgencyUserId ?? row.sender_agency_user_id ?? null,
     senderName: row.senderName ?? row.sender_name ?? null,
     senderEmail: row.senderEmail ?? row.sender_email ?? null,
     messageType: row.messageType ?? row.message_type,
@@ -266,6 +269,17 @@ function mapActionItem(row: any): WorkflowActionItem {
     resolvedAt: row.resolvedAt ?? row.resolved_at ?? null,
     createdAt: row.createdAt ?? row.created_at
   };
+}
+
+function formatActorReference(message: WorkflowMessage) {
+  if (message.senderAgencyUserId) return `Agency user ${shortId(message.senderAgencyUserId)}`;
+  if (message.senderProfileId) return `Profile ${shortId(message.senderProfileId)}`;
+  return null;
+}
+
+function shortId(value: string) {
+  if (value.length <= 12) return value;
+  return `${value.slice(0, 8)}...${value.slice(-4)}`;
 }
 
 function formatLabel(value: string) {
