@@ -69,7 +69,7 @@ export function ExchangeRateCreateForm({ countries = [] }: { countries?: Country
   return (
     <form action={submit} className="stacked-form">
       <div className="form-grid exchange-rate-create-grid">
-        <label>
+        <label className="exchange-rate-country-field">
           국가
           <select disabled={isBusy} name="countryCode" value={selectedCountryCode} onChange={(event) => selectCountry(event.target.value)}>
             <option value="">전체 / 국가 미지정</option>
@@ -113,20 +113,20 @@ export function ExchangeRateCreateForm({ countries = [] }: { countries?: Country
           적용일
           <input defaultValue={new Date().toISOString().slice(0, 10)} disabled={isBusy} name="effectiveDate" type="date" />
         </label>
-        <label>
+        <label className="exchange-rate-source-field">
           출처
           <input defaultValue="manual" disabled={isBusy} name="source" placeholder="manual, bank, accounting" />
         </label>
-      </div>
-      <label className="full-width-field">
-        메모
-        <textarea disabled={isBusy} name="notes" placeholder="Internal exchange-rate note" rows={2} />
-      </label>
-      <div className="inline-actions">
-        <button className="button-primary" disabled={isBusy} type="submit">
-          환율 저장
-        </button>
-        {message ? <span className="danger-text">{message}</span> : null}
+        <label className="exchange-rate-notes-field">
+          메모
+          <textarea disabled={isBusy} name="notes" placeholder="Internal exchange-rate note" rows={2} />
+        </label>
+        <div className="exchange-form-submit-cell">
+          <button className="button-primary" disabled={isBusy} type="submit">
+            환율 저장
+          </button>
+          {message ? <span className="danger-text">{message}</span> : null}
+        </div>
       </div>
     </form>
   );

@@ -497,14 +497,6 @@ a {
   gap: 6px;
 }
 
-.exchange-rate-filter-toolbar {
-  grid-template-columns: minmax(360px, 1.8fr) minmax(150px, 0.55fr) minmax(150px, 0.55fr) auto;
-}
-
-.exchange-rate-create-grid {
-  grid-template-columns: minmax(360px, 1.8fr) repeat(5, minmax(130px, 0.75fr));
-}
-
 input,
 select,
 textarea {
@@ -513,7 +505,14 @@ textarea {
   border-radius: 6px;
   color: #1f2933;
   font: inherit;
+  min-width: 0;
   padding: 0 10px;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+select,
+textarea {
+  width: 100%;
 }
 
 input,
@@ -805,6 +804,98 @@ select:disabled {
   font-weight: 700;
   gap: 6px;
   margin: 12px 0;
+}
+
+.exchange-rate-page {
+  display: grid;
+  gap: 16px;
+}
+
+.exchange-rate-page .page-header,
+.exchange-rate-page .toolbar,
+.exchange-rate-page .panel-section,
+.exchange-rate-page .table-shell,
+.exchange-rate-page .notice {
+  margin: 0;
+}
+
+.exchange-rate-filter-toolbar {
+  align-items: end;
+  gap: 12px;
+  grid-template-columns: minmax(360px, 1fr) minmax(130px, 160px) minmax(130px, 160px) minmax(84px, 96px);
+  padding: 14px 16px;
+}
+
+.exchange-rate-filter-toolbar .button-primary {
+  width: 100%;
+}
+
+.exchange-rate-admin-grid {
+  align-items: start;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(420px, 0.9fr) minmax(560px, 1.1fr);
+}
+
+.exchange-rate-card-panel {
+  padding: 16px;
+}
+
+.exchange-rate-card-panel .section-heading {
+  margin-bottom: 10px;
+}
+
+.exchange-country-master-grid {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(84px, 0.35fr) minmax(170px, 1fr) minmax(110px, 0.45fr) minmax(104px, 0.4fr);
+}
+
+.exchange-country-preset-field,
+.exchange-rate-country-field {
+  grid-column: 1 / -1;
+}
+
+.exchange-country-alias-field {
+  grid-column: 1 / span 3;
+}
+
+.exchange-rate-create-grid {
+  align-items: end;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.exchange-rate-source-field {
+  grid-column: 1;
+}
+
+.exchange-rate-notes-field {
+  grid-column: 2 / span 2;
+}
+
+.exchange-form-submit-cell {
+  align-items: end;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.exchange-form-submit-cell .button-primary {
+  min-height: 40px;
+  width: 100%;
+}
+
+.compact-data-table table {
+  font-size: 13px;
+  min-width: 760px;
+}
+
+.compact-data-table th,
+.compact-data-table td {
+  padding: 9px 12px;
+  vertical-align: top;
 }
 
 .success-text {
@@ -3526,6 +3617,8 @@ html.dark .danger-metric {
   .form-preview,
   .form-grid.two-column,
   .form-grid.three-column,
+  .exchange-rate-admin-grid,
+  .exchange-country-master-grid,
   .exchange-rate-create-grid,
   .finance-action-grid,
   .metric-row,
@@ -3546,6 +3639,14 @@ html.dark .danger-metric {
 
   .guide-expense-code-field,
   .guide-expense-title-field {
+    grid-column: auto;
+  }
+
+  .exchange-country-preset-field,
+  .exchange-country-alias-field,
+  .exchange-rate-country-field,
+  .exchange-rate-source-field,
+  .exchange-rate-notes-field {
     grid-column: auto;
   }
 

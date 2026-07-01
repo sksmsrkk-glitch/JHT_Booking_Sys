@@ -84,21 +84,21 @@ export function CountryReferenceCreateForm({ countries = [] }: { countries?: Cou
   }
 
   return (
-    <form action={submit} className="stacked-form">
-      <label className="full-width-field">
-        국가 마스터 프리셋
-        <select disabled={isBusy} value={selectedCountry} onChange={(event) => selectCountry(event.target.value)}>
-          {countryOptions.map((country) => (
-            <option key={country.countryCode} value={country.countryCode}>
-              {country.countryCode} - {country.countryName}
-              {country.defaultCurrency ? ` (${country.defaultCurrency})` : ""}
-            </option>
-          ))}
-          <option value="__custom__">직접 입력</option>
-        </select>
-        <span className="subtext">선택한 국가의 Country Code, Country Name, Default Currency가 아래 입력값에 자동 반영됩니다.</span>
-      </label>
-      <div className="form-grid three-column">
+    <form action={submit} className="stacked-form exchange-country-master-form">
+      <div className="exchange-country-master-grid">
+        <label className="exchange-country-preset-field">
+          국가 마스터 프리셋
+          <select disabled={isBusy} value={selectedCountry} onChange={(event) => selectCountry(event.target.value)}>
+            {countryOptions.map((country) => (
+              <option key={country.countryCode} value={country.countryCode}>
+                {country.countryCode} - {country.countryName}
+                {country.defaultCurrency ? ` (${country.defaultCurrency})` : ""}
+              </option>
+            ))}
+            <option value="__custom__">직접 입력</option>
+          </select>
+          <span className="subtext">선택한 국가의 Country Code, Country Name, Default Currency가 아래 입력값에 자동 반영됩니다.</span>
+        </label>
         <label>
           국가 코드
           <input
@@ -111,7 +111,7 @@ export function CountryReferenceCreateForm({ countries = [] }: { countries?: Cou
             value={formState.countryCode}
           />
         </label>
-        <label>
+        <label className="exchange-country-name-field">
           국가명
           <input
             disabled={isBusy}
@@ -139,22 +139,22 @@ export function CountryReferenceCreateForm({ countries = [] }: { countries?: Cou
             ))}
           </select>
         </label>
-      </div>
-      <label className="full-width-field">
-        별칭
-        <input
-          disabled={isBusy}
-          name="aliases"
-          onChange={(event) => updateField("aliases", event.target.value)}
-          placeholder="Malay, Malaysia Partner typed names"
-          value={formState.aliases}
-        />
-      </label>
-      <div className="inline-actions">
-        <button className="button-primary" disabled={isBusy} type="submit">
-          국가 저장
-        </button>
-        {message ? <span className="danger-text">{message}</span> : null}
+        <label className="exchange-country-alias-field">
+          별칭
+          <input
+            disabled={isBusy}
+            name="aliases"
+            onChange={(event) => updateField("aliases", event.target.value)}
+            placeholder="Malay, Malaysia Partner typed names"
+            value={formState.aliases}
+          />
+        </label>
+        <div className="exchange-form-submit-cell">
+          <button className="button-primary" disabled={isBusy} type="submit">
+            국가 저장
+          </button>
+          {message ? <span className="danger-text">{message}</span> : null}
+        </div>
       </div>
     </form>
   );

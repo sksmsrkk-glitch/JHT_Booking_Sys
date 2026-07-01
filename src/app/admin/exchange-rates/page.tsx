@@ -27,37 +27,39 @@ export default async function ExchangeRatesPage({ searchParams }: { searchParams
   const countryOptions = mergeCountryReferences(loadState.status === "ready" ? loadState.countries : []);
 
   return (
-    <>
+    <div className="exchange-rate-page">
       <div className="page-header">
         <div>
-          <p className="eyebrow">Internal Admin</p>
-          <h1>Exchange Rates</h1>
-          <p>Central KRW exchange-rate management for quotes, supplier cost snapshots, invoices, and settlement checks.</p>
+          <p className="eyebrow">내부 관리자</p>
+          <h1>환율 관리</h1>
+          <p>견적, 공급사 원가, 인보이스, 정산에 공통 적용되는 국가별 기준 통화와 KRW 환산율을 관리합니다.</p>
         </div>
         <Link className="button-secondary" href={"/admin" as Route}>
-          Back to Admin
+          관리자 홈
         </Link>
       </div>
 
       <ExchangeRateFilterForm countries={countryOptions} filters={filters} />
 
-      <section className="panel-section">
-        <div className="section-heading">
-          <h2>Common Country Master</h2>
-          <span>Country code + default name</span>
-        </div>
-        <CountryReferenceCreateForm countries={countryOptions} />
-      </section>
+      <div className="exchange-rate-admin-grid">
+        <section className="panel-section exchange-rate-card-panel">
+          <div className="section-heading">
+            <h2>국가 공통 마스터</h2>
+            <span>국가 코드 + 기본 통화</span>
+          </div>
+          <CountryReferenceCreateForm countries={countryOptions} />
+        </section>
+
+        <section className="panel-section exchange-rate-card-panel">
+          <div className="section-heading">
+            <h2>환율 등록</h2>
+            <span>국가별 KRW 환산율</span>
+          </div>
+          <ExchangeRateCreateForm countries={countryOptions} />
+        </section>
+      </div>
 
       {loadState.status === "ready" ? <CountryReferenceTable countries={loadState.countries} /> : null}
-
-      <section className="panel-section">
-        <div className="section-heading">
-          <h2>Create Exchange Rate</h2>
-          <span>Country-linked FX</span>
-        </div>
-        <ExchangeRateCreateForm countries={countryOptions} />
-      </section>
 
       {loadState.status === "auth-required" ? (
         <section className="notice warning">
@@ -76,13 +78,13 @@ export default async function ExchangeRatesPage({ searchParams }: { searchParams
       {loadState.status === "ready" ? <ExchangeRateTable rates={loadState.rates} /> : null}
 
       <section className="notice">
-        <h2>Usage Rule</h2>
+        <h2>적용 원칙</h2>
         <p>
-          Quote and finance forms should load the latest active rate, then save that rate as a snapshot on the quote or finance
-          record. Existing quotes must not recalculate automatically when the common rate changes.
+          견적과 회계 화면은 최신 운영 환율을 불러오되, 확정된 견적/정산에는 당시 환율을 스냅샷으로 저장합니다.
+          공통 환율이 바뀌어도 기존 확정 견적 금액은 자동 재계산하지 않습니다.
         </p>
       </section>
-    </>
+    </div>
   );
 }
 
@@ -96,15 +98,15 @@ function CountryReferenceTable({ countries }: { countries: CountryReference[] })
   }
 
   return (
-    <section className="table-shell" aria-label="Country references">
+    <section className="table-shell compact-data-table" aria-label="Country references">
       <table>
         <thead>
           <tr>
-            <th>Country Code</th>
-            <th>Country Name</th>
-            <th>Default Currency</th>
-            <th>Aliases</th>
-            <th>Source</th>
+            <th>국가 코드</th>
+            <th>국가명</th>
+            <th>기본 통화</th>
+            <th>별칭</th>
+            <th>출처</th>
           </tr>
         </thead>
         <tbody>
@@ -136,17 +138,17 @@ function ExchangeRateTable({ rates }: { rates: ExchangeRateListItem[] }) {
   }
 
   return (
-    <section className="table-shell" aria-label="Exchange rates">
+    <section className="table-shell compact-data-table" aria-label="Exchange rates">
       <table>
         <thead>
           <tr>
-            <th>Currency</th>
-            <th>Country</th>
-            <th>Rate</th>
-            <th>Effective Date</th>
-            <th>Source</th>
-            <th>Status</th>
-            <th>Notes</th>
+            <th>통화</th>
+            <th>국가</th>
+            <th>환산율</th>
+            <th>적용일</th>
+            <th>출처</th>
+            <th>상태</th>
+            <th>메모</th>
           </tr>
         </thead>
         <tbody>
@@ -164,7 +166,7 @@ function ExchangeRateTable({ rates }: { rates: ExchangeRateListItem[] }) {
               <td>{rate.effectiveDate}</td>
               <td>{rate.source ?? "-"}</td>
               <td>
-                <span className={`status-dot status-${rate.status}`}>{formatLabel(rate.status)}</span>
+                <span className={`status-dot status-${rate.status}`}>{formatStatusLabel(rate.status)}</span>
               </td>
               <td>{rate.notes ?? "-"}</td>
             </tr>
@@ -216,9 +218,11 @@ function buildInternalApiUrl(path: string, filters: { countryCode?: string; base
   return url;
 }
 
-function formatLabel(value: string) {
-  return value
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+function formatStatusLabel(value: string) {
+  const labels: Record<string, string> = {
+    active: "운영중",
+    inactive: "비활성",
+    archived: "보관"
+  };
+  return labels[value] ?? value;
 }
