@@ -1,48 +1,41 @@
 # 정호여행사 JHT Booking System
 
-이 문서는 정호여행사 부킹엔진의 **시스템 아키텍처**와 **사용 설명서**를 한글로 정리한 README입니다.  
-GitHub 저장소 첫 화면에서 개발자, 내부 직원, 운영 담당자가 같은 기준으로 시스템 구조와 사용 방법을 확인하는 것을 목적으로 합니다.
+정호여행사 인바운드 여행 업무를 하나의 `workflow code`로 연결해 관리하는 Next.js + Supabase 기반 운영 시스템입니다.
 
-정호여행사 인바운드 단체 여행 업무를 하나의 코드 중심으로 관리하기 위한 부킹 엔진입니다.  
-해외 파트너 문의, 견적, 확정서, 예약, 공급사 운영, 인보이스, 미수금, 정산, 가이드 실비 지출 보고까지 같은 업무 흐름 안에서 연결하는 것을 목표로 합니다.
+이 문서는 GitHub 첫 화면에서 개발자, 내부 운영자, 회계 담당자, 파트너 포털 기획자가 같은 기준으로 시스템을 이해할 수 있도록 작성한 한글 시스템 아키텍처와 사용 설명서입니다.
 
-가장 중요한 도메인 규칙은 다음 두 대상을 절대 섞지 않는 것입니다.
+## 목차
 
-- `Overseas Agency`: 정호여행사에 견적을 요청하고 단체를 송객하며 대금을 지급하는 해외 파트너사입니다.
-- `Domestic Supplier`: 호텔, 차량, 식당, 관광지, 가이드, 기타 원가를 제공하는 국내 공급사입니다.
+1. 시스템 목표
+2. 핵심 업무 원칙
+3. 전체 시스템 아키텍처
+4. 업무 워크플로우 아키텍처
+5. 화면 및 사용자 영역
+6. 도메인 모듈 구조
+7. 데이터베이스 아키텍처
+8. 권한과 보안 경계
+9. 주요 업무 사용 흐름
+10. 로컬 개발과 검증 방법
+11. Supabase 연결 전 체크리스트
+12. 개발 원칙
 
-두 대상은 권한, 회계 흐름, 커뮤니케이션 방식, 노출 데이터가 다르므로 코드와 DB에서도 별도 테이블 패밀리로 관리합니다.
+## 1. 시스템 목표
 
-## 현재 구현 범위
+정호여행사의 기존 엑셀, 이메일, 노션, 단체현황표, 인보이스, 가이드 지출결의서 업무를 하나의 운영 시스템으로 통합합니다.
 
-- Next.js App Router 기반 내부 관리자와 해외 파트너 포털
-- Supabase Postgres, Auth, RLS, Storage를 전제로 한 DB 마이그레이션
-- 해외 파트너 가입 신청, 승인, 거절, freezing, mother ID와 서브 계정 관리 구조
-- 국가 코드/국가명 공통 관리와 환율 공통 관리
-- 국내 공급사 원가 마스터 수동 생성, 이미지 최대 10장 설계, Excel 템플릿/업로드/다운로드
-- 엑셀 견적서 방식의 견적 원가표 UI, 카테고리별 원가, 수량, PAX, 환율, 마진, 자동/수동 계산
-- 파트너 공개용 견적서, 일정 description, 이미지, 조건, 공개 금액 관리
-- 확정 견적서 이후 예약 단체 현황표, 월간 캘린더, 미완료 단체 리스트, 예약 체크리스트
-- 최종 확정서, 최종 오퍼레이션 스냅샷, 자동 인보이스 생성 구조
-- 인보이스 버전 관리, Excel 다운로드, 수금/미수금/정산 상태 관리
-- 가이드 실비 지출결의서, PMB 인센티브 파일 기반 실비 항목, 인보이스와 매출분석 연결
-- workflow code 중심의 포털 커뮤니케이션 원장
-- 로그인/Supabase 미연결 개발 단계에서 UI 확인이 가능한 preview/demo data 흐름
+핵심 목표는 다음과 같습니다.
 
-## 기술 스택
+- 해외 파트너사의 신규 견적 문의부터 변경 요청, 취소 요청, 예약, 인보이스, 정산, 가이드 실비까지 하나의 흐름으로 관리합니다.
+- 내부 직원은 견적 원가, 공급사 비용, 마진, 예약 진행 상태, 미수금, 실제 지출을 한 화면에서 추적할 수 있습니다.
+- 해외 파트너사는 내부 원가와 마진을 보지 못하고, 공개 견적서, 일정, 인보이스, 커뮤니케이션 내역만 확인합니다.
+- 모든 업무는 하나의 `workflow code`를 기준으로 연결합니다.
+- 기존 엑셀 견적서와 단체현황표 업무 방식을 최대한 유지하되, 자동 계산과 DB 검색, 버전 관리, 상태 추적을 추가합니다.
 
-- Framework: Next.js App Router
-- UI: React, TypeScript, CSS Modules가 아닌 전역 CSS 기반 운영 UI
-- Runtime: Node.js
-- Database/Auth/Storage: Supabase
-- Verification: Node test runner, TypeScript, custom schema/API/security verification scripts
-- Spreadsheet: 자체 XLSX 생성/파싱 유틸리티
+## 2. 핵심 업무 원칙
 
-## 핵심 설계 원칙
+### 2.1 하나의 Workflow Code
 
-### 1. 하나의 Workflow Code
-
-업무의 모든 단계는 같은 코드를 기준으로 연결합니다.
+정호여행사 업무는 견적 코드, 투어 코드, 예약 코드, 인보이스 코드가 따로 흩어지면 추적이 어려워집니다. 이 시스템은 아래 모든 업무를 같은 코드로 묶는 것을 기본 원칙으로 합니다.
 
 ```text
 new inquiry code
@@ -53,6 +46,7 @@ new inquiry code
 = invoice code
 = finance code
 = guide expense report no
+= workflow communication code
 ```
 
 예시:
@@ -61,52 +55,142 @@ new inquiry code
 Q-2026-TH-001
 ```
 
-이 코드를 통해 파트너 문의, 재견적 요청, 확정서, 예약 체크리스트, 인보이스, 미수금, 가이드 실비, 포털 메시지 이력을 한 화면에서 추적할 수 있도록 설계했습니다.
+이 코드를 기준으로 다음 데이터를 한 번에 추적합니다.
 
-### 2. 내부 원가와 파트너 공개 데이터 분리
+- 파트너사의 최초 신규 견적 문의
+- 파트너사의 재견적, 날짜 변경, 호텔 변경, 식사 변경, 관광지 변경, 취소 요청
+- 내부 견적 원가표와 공개 견적서
+- 최종 확정서
+- 예약 단체 현황표
+- 호텔 블럭, 호텔 리컨펌, 차량 예약, 가이드 배정, 기사 정보
+- 인보이스와 입금, 미수금, 정산 상태
+- 가이드 실제 지출결의서
+- 파트너와 내부 직원 간 포털 커뮤니케이션 이력
 
-파트너 포털에는 다음 정보만 노출합니다.
+### 2.2 Overseas Agency와 Domestic Supplier의 엄격한 분리
 
-- 공개 견적 금액
-- 공개 일정
-- 공개 이미지와 description
-- 파트너가 보아도 되는 요청/회신 이력
-- 공개 인보이스와 결제 요약
+이 시스템에서 `Overseas Agency`와 `Domestic Supplier`는 절대로 같은 개념으로 합치지 않습니다.
 
-다음 정보는 내부 전용입니다.
+| 구분 | 시스템명 | 의미 | 파트너 포털 노출 여부 |
+|---|---|---|---|
+| 해외 파트너 여행사 | `Overseas Agency` | 정호여행사에 견적을 요청하고 단체를 송객하는 해외 고객사 | 노출 |
+| 국내 공급사 | `Domestic Supplier` | 호텔, 차량, 식당, 관광지, 가이드, 기타 원가 제공자 | 내부 전용 |
+
+해외 파트너는 아래 정보를 볼 수 있습니다.
+
+- 공개 견적서
+- 공개 일정표
+- 공개 이미지와 설명
+- 최종 확정서
+- 인보이스
+- 예약 진행 요약
+- 파트너에게 공개된 커뮤니케이션 메시지
+
+해외 파트너는 아래 정보를 절대 볼 수 없습니다.
 
 - 국내 공급사 원가
-- 마진율
-- 내부 견적 원가표
-- 공급사 메시지
-- 내부 오퍼레이션 메모
-- 회계 정산 내부 기록
+- 내부 마진
+- 공급사별 실제 비용
+- 내부 운영 메모
+- 내부 정산과 수익 분석
+- 가이드 지출결의서 상세
 
-### 3. Excel 업무 방식 보존
+### 2.3 엑셀 업무 방식의 시스템화
 
-기존 업무에서 사용하던 견적서, 단체현황표, 인보이스, PMB 지출결의서의 구조를 화면과 데이터 모델에 반영합니다.
+기존 정호여행사 업무에는 여러 엑셀 기반 양식이 존재합니다.
 
-- 견적: 호텔, 차량, 식사, 관광지, 가이드, 기타 원가를 표 형태로 관리
-- 예약: 구글 캘린더형 단체 bar와 단체현황표 기반 상태 관리
-- 인보이스: 최종 견적서와 최종 오퍼레이션 정보를 기반으로 자동 생성
-- 가이드 지출: 실제 투어 후 실비 항목을 입력하고 인보이스 대비 매출 분석에 사용
+- 견적서 엑셀
+- 단체현황표
+- 인보이스 엑셀
+- 자금일보/미수현황
+- 가이드 지출결의서
 
-## 전체 아키텍처
+시스템은 이 엑셀의 사고방식을 다음처럼 DB와 화면으로 변환합니다.
+
+| 기존 엑셀 업무 | 시스템 구조 |
+|---|---|
+| 셀별 원가 입력 | `quote_items`와 공급사 원가 snapshot |
+| 수량, PAX, 환율, 마진 계산식 | 자동 계산 preset과 수동 override |
+| 호텔/차량/식사/관광지/기타 영역 구분 | Quote Items 카테고리 영역 |
+| 일정표 day별 입력 | `quote_itinerary_days`, final operation snapshot |
+| 단체현황표 | Reservation group calendar와 dashboard |
+| 인보이스 버전 | `invoices`, `invoice_versions`, invoice line items |
+| 미수금 관리 | finance receivable/settlement 상태 |
+| 가이드 실비 입력 | guide expense report와 finance expense 연결 |
+
+## 3. 전체 시스템 아키텍처
+
+### 3.1 시스템 컨텍스트
 
 ```mermaid
 flowchart LR
-  A["Overseas Agency Portal"] --> B["Inquiry / Revision / Cancellation"]
-  B --> C["Quote Case / Quote Version"]
-  C --> D["Public Quote"]
-  C --> E["Final Confirmation"]
-  E --> F["Reservation"]
-  F --> G["Operation Checklist"]
-  F --> H["Final Operation Snapshot"]
-  H --> I["Invoice"]
-  I --> J["Finance / Receivables / Settlement"]
-  F --> K["Guide Expense Report"]
+  A["해외 파트너사<br/>Overseas Agency"] --> P["Agency Portal<br/>문의, 견적 확인, 예약, 인보이스, 메시지"]
+  U["정호여행사 내부 직원"] --> I["Internal Admin<br/>견적, 예약, 공급사, 회계, 운영"]
+  G["가이드 / 운영 담당자"] --> E["Guide Expense Report<br/>실제 지출 입력"]
+
+  P --> API["Next.js App Router<br/>Pages + API Routes"]
+  I --> API
+  E --> API
+
+  API --> AUTH["Supabase Auth<br/>내부 역할 / 파트너 계정"]
+  API --> DB["Supabase PostgreSQL<br/>업무 데이터 + RLS"]
+  API --> ST["Supabase Storage<br/>이미지, 엑셀, 첨부파일"]
+
+  API --> XLSX["XLSX Export / Import<br/>견적, 인보이스, 공급사 원가"]
+  API --> AUTO["Automation APIs<br/>리마인더, Export worker, 실패 작업 재처리"]
+  API --> OUTBOX["Supplier Message Outbox<br/>공급사 메시지 승인/발송 대기"]
+  API --> GMAIL["Gmail Webhook / Review<br/>선택적 이메일 수집 구조"]
+
+  DB --> AUDIT["Audit Logs<br/>중요 작업 이력"]
+```
+
+### 3.2 애플리케이션 계층
+
+```mermaid
+flowchart TB
+  UI["UI Layer<br/>src/app, src/components"] --> API["API Layer<br/>src/app/api"]
+  API --> AUTH["Auth Boundary<br/>src/lib/api/auth.ts"]
+  API --> FEATURE["Feature Queries<br/>src/features/*/queries.ts"]
+  API --> DOMAIN["Domain Logic<br/>src/lib/domain"]
+  FEATURE --> DB["Supabase DB"]
+  DOMAIN --> DB
+  API --> AUDIT["Audit / API Logs"]
+  API --> EXPORT["XLSX / Storage Utilities"]
+```
+
+계층별 책임:
+
+| 계층 | 주요 위치 | 책임 |
+|---|---|---|
+| 화면 라우트 | `src/app/admin`, `src/app/agency` | 내부 관리자와 파트너 포털 화면 |
+| API 라우트 | `src/app/api` | 인증, 권한, 입력 검증, DB 변경, 감사 로그 |
+| 공통 컴포넌트 | `src/components` | 폼, 문서, 대시보드, 네비게이션, 다크모드 |
+| 도메인 조회 | `src/features` | 화면별 데이터 조회, 타입 변환, 데모 데이터 |
+| 순수 업무 로직 | `src/lib/domain` | 계산, 상태 전환, 자동 생성 규칙 |
+| Supabase | `supabase/migrations`, `supabase/seed.sql` | 실제 DB 구조, RLS, seed 데이터 |
+| 검증 | `tests`, `scripts` | 업무 규칙, schema boundary, route smoke 검증 |
+
+## 4. 업무 워크플로우 아키텍처
+
+### 4.1 문의부터 정산까지의 흐름
+
+```mermaid
+flowchart LR
+  A["1. Partner Inquiry<br/>신규 견적 문의"] --> B["2. Quote Case<br/>내부 견적 원가표"]
+  B --> C["3. Public Quote<br/>파트너 공개 견적서"]
+  C --> D{"Partner Decision"}
+  D -->|"Revision Request"| B
+  D -->|"Accepted / Confirmed"| E["4. Final Confirmation<br/>최종 확정서"]
+  D -->|"Cancellation"| X["Cancelled Workflow"]
+  E --> F["5. Reservation<br/>단체현황표 / 예약"]
+  F --> G["6. Operation Checklist<br/>호텔, 차량, 가이드, 기사"]
+  G --> H["7. Final Operation Snapshot<br/>최종 호텔/일정 확정"]
+  H --> I["8. Invoice<br/>인보이스 자동 생성"]
+  I --> J["9. Finance<br/>입금, 미수금, 정산"]
+  F --> K["10. Guide Expense Report<br/>가이드 실비 입력"]
   K --> J
-  B --> L["Workflow Communication Ledger"]
+  A --> L["Workflow Communication Ledger"]
+  B --> L
   C --> L
   E --> L
   F --> L
@@ -114,318 +198,90 @@ flowchart LR
   J --> L
 ```
 
-### 주요 레이어
+### 4.2 파트너 커뮤니케이션 원장
+
+이메일처럼 흩어진 대화를 포털 안에서 `workflow code`별 원장으로 관리합니다.
+
+```mermaid
+sequenceDiagram
+  participant Partner as 해외 파트너
+  participant Portal as Agency Portal
+  participant Admin as Internal Admin
+  participant DB as workflow_messages
+
+  Partner->>Portal: 재견적 / 변경 / 취소 / 인보이스 질문 작성
+  Portal->>DB: sender_agency_user_id와 메시지 저장
+  Admin->>DB: partner_visible 답변 또는 internal_only 메모 저장
+  DB-->>Portal: partner_visible 메시지만 노출
+  DB-->>Admin: 전체 메시지와 action item 노출
+```
+
+메시지 작성자 연결 방식:
+
+| 작성자 | 저장 ID | 표시 정보 |
+|---|---|---|
+| 내부 직원 | `sender_profile_id` | `profiles.display_name`, `profiles.email` |
+| 해외 파트너 사용자 | `sender_agency_user_id` | `agency_users.name`, `agency_users.email` |
+| 시스템 자동 메시지 | 별도 ID 없음 | `system` |
+
+### 4.3 예약 운영 체크리스트 흐름
+
+```mermaid
+flowchart TD
+  A["Accepted Quote Version"] --> B["Reservation 생성"]
+  B --> C["Operation Task 자동 생성"]
+  C --> D["호텔 블럭"]
+  C --> E["호텔 리컨펌 / 최종 확정"]
+  C --> F["차량 예약"]
+  C --> G["가이드 배정"]
+  C --> H["기사 정보"]
+  D --> I{"모든 필수 항목 완료?"}
+  E --> I
+  F --> I
+  G --> I
+  H --> I
+  I -->|"No"| R["Calendar Bar 빨강<br/>Incomplete groups 리스트"]
+  I -->|"Yes"| S["Confirmed / Ready"]
+  S --> T["Final Operation Snapshot"]
+  T --> U["Invoice 생성"]
+```
+
+### 4.4 인보이스 자동 생성 흐름
+
+```mermaid
+flowchart LR
+  A["최종 확정 견적서<br/>accepted quote version"] --> C["Invoice Builder"]
+  B["최종 운영 확정 정보<br/>hotel, room type, meals, itinerary"] --> C
+  C --> D["Invoice Lines"]
+  C --> E["Invoice Itinerary"]
+  C --> F["Bank / Payment Info"]
+  D --> G["Partner Invoice View"]
+  D --> H["Excel Download"]
+  D --> I["Finance Receivable"]
+```
+
+## 5. 화면 및 사용자 영역
+
+### 5.1 상단 메뉴 구조
+
+현재 상단 네비게이션은 핵심 메뉴를 우선 노출하고, 부가 기능은 `More` 안에 둡니다.
 
 ```text
-src/app
-  Next.js 화면과 API route
-
-src/components
-  관리자/파트너 공통 UI 컴포넌트
-
-src/features
-  도메인별 query, type, demo data, 업무 로직
-
-src/lib
-  Supabase client, auth, audit, domain utility, XLSX utility
-
-supabase/migrations
-  실제 DB 구조, RLS, 정책, 업무 테이블 정의
-
-tests
-  도메인 규칙, API 경계, schema boundary, XLSX, finance, workflow 검증
+Logo | Dashboard | Quotes | Reservations | Finance | More ▾ | Log in / Log out | EN/KOR | Dark
 ```
 
-## 주요 모듈 설명
-
-### 내부 관리자 대시보드
-
-경로: `/admin`
-
-파트너 문의, 확정 단체, 취소 단체, 전체 문의, 견적 건수, 총 PAX, 정산 완료, 미수금 단체, 미수금 금액을 한눈에 확인합니다.  
-국가별, 파트너별, 기간별, status별로 조회하는 구조이며, KPI 타일은 관련 페이지로 이동하는 네비게이션 역할도 합니다.
-
-### 해외 파트너 관리
-
-경로: `/admin/agencies`
-
-해외 파트너 가입 신청, 승인, 거절, freezing, mother ID, 서브 계정, 강제 탈퇴, 로그인 로그, 이메일 발송 이벤트를 관리합니다.
-
-파트너 가입 신청 화면:
-
-```text
-/agency/signup
-```
-
-### 국가/환율 공통 관리
-
-경로:
-
-```text
-/admin/exchange-rates
-/api/countries
-/api/exchange-rates
-```
-
-국가 코드와 국가명은 공통 마스터로 관리합니다.  
-파트너가 입력한 country name은 기본값으로 보존하되, 내부에서는 country code와 매핑하여 환율, 파트너사, 견적서에 연결합니다.
-
-### 국내 공급사 원가 마스터
-
-경로: `/admin/domestic-suppliers`
-
-관리 대상:
-
-- 호텔: 호텔명, 기본정보, 객실 타입, 기간별 객실가, 조식, 연회장, 부대시설, 이미지
-- 차량: 공급사, 차량 종류, From/To 지역 가격, 추가 시간 요금
-- 식사: 식당, 주소/지역, 메뉴별 가격, 할랄/Non Halal/Vegetarian 태그, 수용 인원, 영업시간, 이미지
-- 관광지: 운영시간, 티켓 타입, 성인/아동 가격, 카테고리 태그, 이미지
-- 가이드: 쇼핑투어/Non 쇼핑투어 비용, 인하우스/freelancer 태그
-- 기타 비용: 짐차, KTX, 항공권 등
-- 인센티브 연회장: 수용 인원, 메뉴, 메뉴 가격, 빔프로젝트/LED/PA System 등 체크박스형 부대시설
-
-Excel 기능:
-
-- 템플릿 다운로드
-- 전체 업로드
-- 전체 다운로드
-
-### 견적 관리
-
-경로: `/admin/quote-cases`
-
-엑셀 견적서 구조를 기준으로 원가표를 관리합니다.
-
-- 호텔, 차량, 식사, 관광지, 가이드, 기타 영역 구분
-- day별 quote item과 itinerary day 연결
-- 수량, PAX, 원가, 환율, 마진 자동 계산
-- 개별 아이템별 환율/마진과 전체 일괄 환율/마진
-- 키워드 기반 국내 공급사 아이템 검색
-- 공개 견적서용 일정 description, 호텔/메뉴/관광지 이미지 연결
-- terms & conditions 포함
-
-파트너 공개 견적:
-
-```text
-/agency/quote-cases
-/agency/quote-cases/:shareId
-```
-
-### 예약 관리
-
-경로: `/admin/reservations`
-
-정호여행사의 단체현황표 업무를 기준으로 다시 설계한 예약 관리 화면입니다.
-
-- 월간 group calendar
-- 여행사명 + 단체명으로 보이는 bar
-- 호텔 블럭, 호텔 리컨펌/최종확정, 차량예약, 가이드 배정, 기사 정보 누락 시 빨간색 미완료 bar
-- 연도/월 선택
-- 액션 리스트 20/50/100개 보기
-- 미완료 단체 전용 리스트
-- 월별, 주별, 연별, 국가별, 파트너별 summary dashboard
-
-미완료 단체:
-
-```text
-/admin/reservations/incomplete
-```
-
-예약 상세:
-
-```text
-/admin/reservations/:reservationId
-/admin/reservations/:reservationId/operation-checklist
-```
-
-### 최종 확정서
-
-경로: `/admin/confirmations`
-
-최종 견적이 확정된 뒤 파트너에게 전달할 확정서를 관리합니다.
-
-- 리스트 수 필터
-- 기간 필터
-- 국가별 필터
-- 에이전트별 필터
-- status summary dashboard
-- 가로 리스트형 단체 카드
-- 최종 확정서 생성/열기
-
-### 인보이스와 회계
-
-경로:
-
-```text
-/admin/finance/invoices
-/admin/finance/invoices/:invoiceId
-/agency/invoices
-/agency/invoices/:invoiceId
-```
-
-인보이스는 최종 확정 견적서와 내부 오퍼레이터가 확정한 최종 호텔/일정 정보를 기반으로 생성합니다.
-
-포함 정보:
-
-- day별 호텔명과 룸타입
-- day별 일정
-- 식사 메뉴
-- 관광지
-- 특이사항
-- 항공 정보
-- 은행/결제 정보
-- 인보이스 버전
-- deposit, 잔금, 수금 완료, 미수금 상태
-
-Excel 다운로드:
-
-```text
-/api/finance/invoices/:id/export-xlsx
-```
-
-### 가이드 실비 지출결의서
-
-경로:
-
-```text
-/admin/guide-expenses
-/admin/guide-expenses/:reservationId
-```
-
-투어 종료 후 가이드가 실제 사용 비용을 입력하는 화면입니다.  
-PMB 인센티브 파일 구조를 참고하여 숙박비, 식음료비, 입장료, 기타 현금, 가이드 비용, 쇼핑 수수료를 관리합니다.
-
-가이드 리포트의 `Report No`는 별도 번호가 아니라 workflow code와 같은 값을 사용합니다.  
-따라서 인보이스 최종 금액과 실제 지출을 같은 코드 아래에서 비교할 수 있습니다.
-
-### Workflow Communication Ledger
-
-경로:
-
-```text
-/admin/workflows
-/admin/workflows/:workflowCode
-/agency/workflows
-/agency/workflows/:workflowCode
-```
-
-이메일에 흩어져 있던 파트너 문의와 회신을 포털 내부에서 관리하기 위한 커뮤니케이션 원장입니다.
-
-가능한 메시지 종류:
-
-- 신규 문의
-- 재견적 요청
-- 호텔 변경
-- 식사 변경
-- 차량 변경
-- 관광지 변경
-- 취소 요청
-- 인보이스 질문
-- 회계 follow-up
-- 오퍼레이션 업데이트
-
-내부 사용자는 메시지를 `partner_visible` 또는 `internal_only`로 저장할 수 있습니다.  
-파트너 사용자는 `partner_visible` 메시지만 조회할 수 있습니다.
-
-## Supabase DB 구조 요약
-
-주요 테이블 패밀리:
-
-```text
-agency_*
-  해외 파트너, 파트너 사용자, 가입 신청, 문의, 포털 요청
-
-domestic_supplier_*
-  국내 공급사, 상품, 가격, 원가 마스터
-
-quote_*
-  견적 건, 견적 버전, 일정, 원가 아이템, 공개 견적 블록
-
-reservations
-  확정 단체, 단체현황표, 룸링, 오퍼레이션 체크리스트
-
-invoices / payments / settlements
-  인보이스, 입금, 미수금, 정산
-
-guide_expense_reports / guide_expense_lines
-  가이드 실비 지출결의서
-
-workflow_threads / workflow_messages / workflow_action_items
-  workflow code 중심 커뮤니케이션 원장
-
-country_references / exchange_rates
-  국가 코드, 국가명, 환율 공통 관리
-```
-
-RLS 기본 방향:
-
-- 내부 사용자는 역할에 따라 관리 화면 접근
-- 해외 파트너는 자기 agency account에 연결된 공개 데이터만 조회
-- 국내 공급사 원가, 마진, 내부 메모, 공급사 메시지, 정산 내부 정보는 파트너에게 비노출
-
-## 로컬 개발 방법
-
-권장 로컬 경로:
-
-```text
-C:\Users\Issac\Documents\Codex\JHT_Booking_Sys
-```
-
-설치:
-
-```bash
-npm install
-```
-
-개발 서버:
-
-```bash
-npm run dev -- -p 3100
-```
-
-브라우저:
-
-```text
-http://localhost:3100/admin
-```
-
-검증:
-
-```bash
-npm run test
-npm run typecheck
-npm run build
-```
-
-전체 v1 검증:
-
-```bash
-npm run verify:v1
-```
-
-개별 검증 스크립트:
-
-```bash
-npm run verify:env
-npm run verify:schema
-npm run verify:api-guards
-npm run verify:api-body-order
-npm run verify:api-responses
-npm run verify:api-contract
-npm run verify:repo-safety
-npm run verify:security-config
-npm run verify:page-smoke
-npm run verify:app-route-smoke
-```
-
-## 사용 설명서
-
-이 장은 실제 업무자가 시스템을 어떤 순서로 사용하는지 설명합니다.  
-현재 개발 단계에서는 Supabase 로그인/권한이 완전히 연결되지 않은 화면도 preview/demo data로 확인할 수 있습니다.
-
-### 역할별 기본 메뉴
-
-#### 내부 관리자
+`More` 메뉴:
+
+- 국내 공급사
+- 환율 관리
+- Workflows
+- Confirmations
+- Guide Expenses
+- 해외 파트너 포털
+- Users
+- Audit
+
+### 5.2 내부 관리자 영역
 
 주요 경로:
 
@@ -433,6 +289,7 @@ npm run verify:app-route-smoke
 /admin
 /admin/quote-cases
 /admin/reservations
+/admin/reservations/incomplete
 /admin/confirmations
 /admin/finance/invoices
 /admin/finance/settlements
@@ -441,11 +298,23 @@ npm run verify:app-route-smoke
 /admin/agencies
 /admin/guide-expenses
 /admin/workflows
+/admin/audit
 ```
 
-내부 관리자는 파트너 가입 승인, 국내 공급사 원가 관리, 견적 작성, 예약 운영, 확정서 작성, 인보이스 발행, 정산, 가이드 실비, 포털 커뮤니케이션을 관리합니다.
+주요 기능:
 
-#### 해외 파트너
+- 전체 대시보드
+- 파트너 문의, 확정, 취소, 미수금, 정산 상태 조회
+- 견적 원가표 작성
+- 공급사 원가 DB 관리
+- 예약 단체 달력 및 incomplete follow-up
+- 최종 확정서 작성
+- 인보이스 작성과 엑셀 다운로드
+- 가이드 실제 지출 입력
+- 파트너 커뮤니케이션 원장
+- 감사 로그와 API 로그 확인
+
+### 5.3 해외 파트너 포털
 
 주요 경로:
 
@@ -460,9 +329,18 @@ npm run verify:app-route-smoke
 /agency/workflows
 ```
 
-해외 파트너는 신규 견적 문의, 재견적 요청, 예약 요청, 취소 문의, 공개 견적 확인, 예약 현황 확인, 인보이스 확인, JHT와의 포털 메시지 송수신을 수행합니다.
+주요 기능:
 
-#### 회계 담당자
+- 파트너 가입 신청
+- 신규 견적 문의
+- 견적 변경 요청
+- 취소 문의
+- 공개 견적서 확인
+- 예약 리스트 확인
+- 인보이스 확인
+- 하나의 workflow code 기준으로 메시지와 회신 확인
+
+### 5.4 회계 담당 영역
 
 주요 경로:
 
@@ -472,9 +350,15 @@ npm run verify:app-route-smoke
 /admin/guide-expenses
 ```
 
-회계 담당자는 발행된 인보이스, 입금 내역, 미수금, 실제 비용, 쇼핑 수수료, 최종 정산 상태를 확인합니다.
+주요 기능:
 
-#### 오퍼레이션 담당자
+- 최종 인보이스 확인
+- Deposit, 잔금, 미수금 상태 관리
+- 자금일보/미수현황과 연결되는 receivable 상태 관리
+- 가이드 실비와 인보이스 매출 비교
+- 실제 수익 분석
+
+### 5.5 운영 담당 영역
 
 주요 경로:
 
@@ -485,114 +369,436 @@ npm run verify:app-route-smoke
 /admin/confirmations/:reservationId
 ```
 
-오퍼레이션 담당자는 확정 단체의 호텔 블럭, 호텔 리컨펌, 차량 예약, 가이드 배정, 기사 정보, 룸링 리스트, 최종 일정 내용을 관리합니다.
+주요 기능:
 
-### 1. 파트너 가입
+- 월별 group calendar
+- 단체별 예약 상태 bar
+- 미완료 단체 리스트
+- 호텔 블럭과 최종 리컨펌
+- 차량 예약과 기사 정보
+- 가이드 배정
+- 최종 운영 일정 확정
 
-1. 파트너사가 `/agency/signup`에서 가입 신청
-2. 내부 관리자가 `/admin/agencies`에서 신청 확인
-3. 승인 또는 거절
-4. 승인 시 mother ID와 서브 계정 관리
-5. freezing 또는 탈퇴 시 계정 상태 변경과 이메일 발송 이벤트 기록
+## 6. 도메인 모듈 구조
 
-### 2. 신규 문의
+| 모듈 | 책임 | 주요 화면/API | 주요 DB |
+|---|---|---|---|
+| Agency | 해외 파트너 회사, 사용자, 가입 신청, 문의 | `/admin/agencies`, `/agency/signup`, `/api/agency/*` | `agency_accounts`, `agency_users`, `agency_signup_applications`, `agency_inquiries` |
+| Domestic Supplier | 국내 공급사와 원가 마스터 | `/admin/domestic-suppliers`, `/api/domestic-suppliers/*` | `domestic_suppliers`, `supplier_products`, `supplier_prices`, `supplier_media` |
+| Countries / FX | 국가 코드, 국가명, 기본 통화, 환율 | `/admin/exchange-rates`, `/api/countries`, `/api/exchange-rates` | `country_references`, `exchange_rates` |
+| Quotation | 견적 케이스, 버전, 원가표, 공개 견적 | `/admin/quote-cases`, `/agency/quote-cases` | `quote_cases`, `quote_versions`, `quote_items`, `quote_itinerary_days` |
+| Reservation | 확정 단체 관리, 단체현황표, 달력 | `/admin/reservations`, `/agency/reservations` | `reservations`, `reservation_status_history`, `room_assignments` |
+| Operations | 예약 후 운영 체크리스트와 task | `/admin/operations/tasks`, operation checklist | `operation_tasks`, `operation_reminder_logs` |
+| Confirmations | 최종 확정서 | `/admin/confirmations` | `final_operation_snapshots`, reservation 연결 데이터 |
+| Finance | 인보이스, 입금, 미수금, 정산 | `/admin/finance/*`, `/agency/invoices` | `invoices`, `invoice_lines`, `payments`, `settlements` |
+| Guide Expenses | 가이드 실제 지출결의서 | `/admin/guide-expenses` | `guide_expense_reports`, `guide_expense_report_lines`, `expenses` |
+| Workflow | 포털 커뮤니케이션 원장 | `/admin/workflows`, `/agency/workflows` | `workflow_threads`, `workflow_messages`, `workflow_action_items` |
+| Automation | 엑셀 export, 리마인더, Gmail review, 실패 작업 | `/admin/automation/*`, `/api/automation/*` | `quote_exports`, `email_threads`, `api_logs` |
+| Audit | 중요 변경 이력 | `/admin/audit` | `audit_logs`, `api_logs` |
 
-1. 파트너가 `/agency/inquiries/new`에서 신규 견적 문의 생성
-2. 필수값: 투어 타이틀, PAX, 기간, 박 수
-3. 선택값: 도착일, 출발일, 항공편, 상세 일정 텍스트
+## 7. 데이터베이스 아키텍처
+
+### 7.1 도메인별 DB 맵
+
+```mermaid
+erDiagram
+  agency_accounts ||--o{ agency_users : has
+  agency_accounts ||--o{ agency_inquiries : submits
+  agency_inquiries ||--o| quote_cases : creates
+  quote_cases ||--o{ quote_versions : has
+  quote_versions ||--o{ quote_items : contains
+  quote_versions ||--o{ quote_itinerary_days : schedules
+  quote_cases ||--o| reservations : confirms
+  reservations ||--o{ operation_tasks : generates
+  reservations ||--o{ room_assignments : manages
+  reservations ||--o{ invoices : bills
+  invoices ||--o{ payments : receives
+  reservations ||--o{ guide_expense_reports : records
+  guide_expense_reports ||--o{ guide_expense_report_lines : contains
+  reservations ||--o{ settlements : settles
+  workflow_threads ||--o{ workflow_messages : records
+  workflow_threads ||--o{ workflow_action_items : tracks
+  domestic_suppliers ||--o{ supplier_products : provides
+  supplier_products ||--o{ supplier_prices : prices
+  supplier_products ||--o{ supplier_media : images
+  country_references ||--o{ exchange_rates : defaults
+```
+
+### 7.2 핵심 테이블 설명
+
+#### Agency 계열
+
+| 테이블 | 목적 |
+|---|---|
+| `agency_accounts` | 해외 파트너 회사 |
+| `agency_users` | 파트너 포털 사용자, mother ID와 sub account 구조 |
+| `agency_signup_applications` | 파트너 가입 신청 |
+| `agency_contacts` | 파트너 회사 연락처 |
+| `agency_inquiries` | 신규 문의, 재견적, 변경, 취소 요청 |
+| `agency_login_events` | 파트너 로그인 기록 |
+| `agency_account_email_events` | 가입 승인, freezing 등 이메일 이벤트 |
+
+#### Domestic Supplier 계열
+
+| 테이블 | 목적 |
+|---|---|
+| `domestic_suppliers` | 호텔, 차량, 식당, 관광지, 가이드, 기타 공급사 |
+| `supplier_contacts` | 공급사 담당자 |
+| `supplier_products` | 객실, 차량 타입, 메뉴, 입장권, 가이드 서비스 |
+| `supplier_prices` | 기간, 요일, 인원 조건별 원가 |
+| `supplier_media` | 공급사 및 상품 이미지, 최대 10장 정책 |
+
+#### Quote 계열
+
+| 테이블 | 목적 |
+|---|---|
+| `quote_cases` | 견적 건 |
+| `quote_versions` | 견적 버전 |
+| `quote_items` | 원가표 항목과 snapshot |
+| `quote_itinerary_days` | day별 일정 |
+| `quote_presentation_blocks` | 파트너용 이미지, 설명, 조건 |
+| `route_segments` | 일정 이동 구간 |
+| `quote_exports` | 엑셀 export queue |
+
+#### Reservation / Operation 계열
+
+| 테이블 | 목적 |
+|---|---|
+| `reservations` | 확정 단체 |
+| `reservation_status_history` | 예약 상태 변경 이력 |
+| `operation_tasks` | 호텔, 차량, 가이드 등 운영 task |
+| `rooming_lists` | 파트너 업로드 룸리스트 |
+| `passengers` | 승객 정보 |
+| `room_assignments` | 객실 배정 |
+| `supplier_message_outbox` | 공급사 메시지 draft, approval, send queue |
+
+#### Finance 계열
+
+| 테이블 | 목적 |
+|---|---|
+| `invoices` | 인보이스 헤더와 상태 |
+| `invoice_lines` | 인보이스 항목 |
+| `payments` | 입금 기록 |
+| `expenses` | 실제 비용 |
+| `extra_revenues` | 추가 매출 |
+| `shopping_commissions` | 쇼핑/면세 수수료 |
+| `settlements` | 정산 결과 |
+| `partner_receivable_ledger` | 파트너 미수금 ledger |
+
+#### Workflow Communication 계열
+
+| 테이블 | 목적 |
+|---|---|
+| `workflow_threads` | workflow code별 커뮤니케이션 원장 |
+| `workflow_messages` | 파트너와 내부 직원 메시지 |
+| `workflow_action_items` | 메시지에서 파생된 follow-up 업무 |
+
+작성자 연결:
+
+- 내부 직원: `workflow_messages.sender_profile_id -> profiles.id`
+- 파트너 사용자: `workflow_messages.sender_agency_user_id -> agency_users.id`
+
+### 7.3 국가와 환율 공통 관리
+
+국가명과 국가 코드는 환율과 파트너 입력 데이터를 연결하는 공통 마스터입니다.
+
+```mermaid
+flowchart LR
+  A["Partner typed country name"] --> B["country_references"]
+  C["Default country code"] --> B
+  D["Default currency"] --> B
+  B --> E["exchange_rates"]
+  B --> F["agency_accounts"]
+  B --> G["quote_cases"]
+  E --> H["Quote calculation"]
+  E --> I["Invoice / Settlement"]
+```
+
+핵심 원칙:
+
+- 파트너가 입력한 국가명은 원본값으로 보존합니다.
+- 내부에서는 `country_code`, `country_name`, `default_currency`로 표준화합니다.
+- 견적, 인보이스, 정산의 환율은 공통 환율 관리 기준을 사용합니다.
+- 견적별로 국가별 환율을 추가하고 선택할 수 있어야 합니다.
+
+## 8. 권한과 보안 경계
+
+### 8.1 사용자 역할
+
+| 역할 | 설명 | 접근 가능 영역 |
+|---|---|---|
+| Admin | 전체 관리자 | 모든 내부 화면 |
+| Sales | 견적과 파트너 문의 담당 | Agency, Quote, Workflow |
+| Operations | 예약과 행사 운영 담당 | Reservation, Operation, Confirmation |
+| Hotel Booking | 호텔 예약 담당 | Hotel 관련 task, supplier message |
+| Vehicle Booking | 차량 예약 담당 | Vehicle 관련 task |
+| Guide Assignment | 가이드 배정 담당 | Guide 관련 task |
+| Content Booking | 식사, 관광지, 콘텐츠 예약 담당 | Meal, Attraction task |
+| Finance | 인보이스, 입금, 정산 담당 | Finance, settlement, guide expense |
+| Agency User | 해외 파트너 사용자 | 자기 회사의 공개 데이터 |
+
+### 8.2 접근 경계
+
+```mermaid
+flowchart TB
+  Internal["Internal User"] --> Role["user_roles"]
+  Role --> AdminData["Internal Data<br/>cost, margin, supplier, finance"]
+  AgencyUser["Agency User"] --> AgencyRow["agency_users.agency_account_id"]
+  AgencyRow --> PublicData["Agency-safe Data<br/>public quote, reservation summary, invoice"]
+  PublicData -. "cannot access" .-> AdminData
+```
+
+보안 원칙:
+
+- 모든 비즈니스 테이블은 Supabase RLS 적용을 전제로 합니다.
+- 내부 사용자는 역할 기반으로 접근합니다.
+- 파트너 사용자는 자기 `agency_account_id`에 연결된 데이터만 조회합니다.
+- 공급사 원가와 마진은 파트너 포털 API에서 조회하지 않습니다.
+- finance 데이터는 `admin` 또는 `finance` 역할 중심으로 제한합니다.
+- high-risk action은 audit log를 남깁니다.
+
+### 8.3 Preview / Demo Mode
+
+현재 개발 및 테스트 단계에서는 일부 페이지가 로그인 없이 preview/demo data를 보여줄 수 있습니다.
+
+목적:
+
+- Supabase 계정 세팅 전에도 UI 확인 가능
+- 실제 워크플로우 화면 구조 확인
+- 사용자 피드백을 빠르게 반영
+
+운영 전 전환 필요 사항:
+
+- preview data를 실제 Supabase 데이터 조회로 교체
+- 로그인과 RLS 경계 완전 적용
+- 데모 seed와 테스트용 ID 제거 또는 운영용 seed로 분리
+
+## 9. 주요 업무 사용 흐름
+
+### 9.1 파트너 가입 신청
+
+1. 파트너가 `/agency/signup`에서 가입 신청
+2. 회사명, 연락처, 이메일, 국가 선택 입력
+3. 내부 관리자가 `/admin/agencies`에서 신청 확인
+4. 승인 또는 거절 처리
+5. 승인 시 agency account와 mother ID 생성
+6. mother ID는 sub account 생성, 비밀번호 변경, freezing, 강제 탈퇴 관리
+7. 상태 변경 이벤트는 이메일 이벤트 로그로 기록
+
+### 9.2 신규 견적 문의
+
+1. 파트너가 `/agency/inquiries/new`에서 신규 문의 작성
+2. 필수값:
+   - 투어 타이틀
+   - PAX
+   - 기간 또는 도착/출발일
+   - 박 수
+3. 선택값:
+   - 항공편명
+   - 일정 텍스트
+   - 호텔 등급
+   - 식사, 관광지, 특이사항
 4. 시스템이 tour/workflow code 생성
-5. 내부 관리자가 견적 건으로 전환
+5. 내부 관리자가 quote case로 전환
 
-### 3. 견적 작성
+### 9.3 견적 작성
 
-1. `/admin/quote-cases`에서 견적 건 열기
-2. 공급사 원가를 키워드로 검색
-3. 호텔/차량/식사/관광지/가이드/기타 항목 입력
-4. 환율과 마진 적용
-5. itinerary day와 quote item 동기화
-6. 파트너 공개용 견적서 생성
-7. 파트너가 재견적, 수정, 취소 요청 가능
+1. 내부 직원이 `/admin/quote-cases`에서 견적 건 열기
+2. 호텔, 차량, 식사, 관광지, 가이드, 기타 카테고리별 원가 입력
+3. 공급사 마스터에서 키워드로 아이템 검색
+4. 수량, PAX, 환율, 마진 자동 계산
+5. 필요 시 수동 금액 override
+6. day별 itinerary와 quote item 연결
+7. 파트너 공개 견적서 생성
+8. 파트너가 확인 후 accepted, revision request, cancellation request 중 선택
 
-### 4. 확정서와 예약 전환
+### 9.4 최종 확정서
 
-1. 최종 견적 status를 accepted/confirmed 상태로 변경
-2. 확정서 페이지에서 최종 일정과 조건 확인
-3. 예약으로 전환
-4. group calendar와 operation checklist에 노출
+1. 파트너가 견적을 accepted/confirmed 처리
+2. 내부 직원이 `/admin/confirmations`에서 최종 확정서 작성
+3. 최종 호텔명, 룸타입, 일정, 메뉴, 특이사항을 확정
+4. 최종 확정서는 reservation과 invoice 자동 생성의 기준 데이터가 됨
 
-### 5. 예약 운영
+### 9.5 예약 관리
 
-1. 호텔 블럭
-2. 호텔 리컨펌/최종확정
-3. 차량 예약
-4. 가이드 배정
-5. 기사 정보 입력
-6. 룸링 리스트 관리
-7. 미완료 단체는 빨간 bar와 incomplete list에서 follow-up
+1. 확정 견적에서 reservation 생성
+2. `/admin/reservations`에서 group calendar 확인
+3. 각 단체는 여행사명 + 단체명 bar로 표시
+4. 필수 예약 항목이 빠지면 빨간색 incomplete bar로 표시
+5. incomplete groups를 클릭하면 리스트형 follow-up 페이지로 이동
+6. 각 단체 상세에서 호텔, 차량, 가이드, 기사, 룸리스트 관리
 
-### 6. 인보이스
+### 9.6 인보이스
 
-1. 최종 견적과 최종 오퍼레이션 스냅샷 기반 인보이스 자동 생성
-2. 필요 시 버전 생성
-3. Excel 다운로드
-4. 파트너 포털에서 공개 인보이스 확인
-5. 회계 담당자가 deposit, 잔금, 수금 완료, 미수금 상태 관리
+1. 최종 견적서와 final operation snapshot 기반으로 인보이스 자동 생성
+2. 호텔, 일정, 식사, 관광지, 특이사항을 인보이스에 포함
+3. 파트너에게 공개되는 인보이스 화면 제공
+4. 내부에서는 인보이스 버전과 payment 상태 관리
+5. Excel 다운로드 지원
+6. Deposit, 잔금, 미수금, 수금 완료 상태를 finance dashboard와 연결
 
-### 7. 가이드 실비
+### 9.7 가이드 지출결의서
 
-1. 투어 종료 후 `/admin/guide-expenses/:reservationId`에서 지출결의서 작성
-2. 숙박, 식음료, 입장료, 기타 현금, 가이드, 쇼핑 수수료 입력
-3. 제출 시 정산/실비 분석 데이터로 연결
-4. 인보이스 금액 대비 실제 비용과 수익성 확인
+1. 투어 종료 후 가이드 또는 내부 담당자가 `/admin/guide-expenses/:reservationId` 작성
+2. 숙박비, 식음료비, 입장료, 기타 현금, 가이드 비용, 쇼핑 수수료 입력
+3. report no는 workflow code와 동일하게 관리
+4. 제출된 지출 라인은 finance expenses로 연결
+5. 인보이스 매출과 실제 비용을 비교해 수익 분석
 
-### 8. 포털 커뮤니케이션
+### 9.8 파트너 커뮤니케이션
 
-1. 모든 문의와 회신은 workflow code 아래 저장
-2. 파트너 요청은 action item으로 전환 가능
-3. 내부 메모는 `internal_only`로 저장
-4. 파트너 공개 답변은 `partner_visible`로 저장
-5. 견적, 예약, 인보이스, 정산 단계 전체 history 확인
+1. `/admin/workflows/:workflowCode` 또는 `/agency/workflows/:workflowCode`에서 메시지 확인
+2. 파트너는 변경 요청, 취소 요청, 인보이스 질문을 작성
+3. 내부 직원은 partner visible 답변 또는 internal only 메모 작성
+4. 메시지에서 action item 생성 가능
+5. 작성자 이름, 이메일, 실제 profile/agency user ID가 연결됨
 
-## 실제 Supabase 연결 전 체크리스트
+## 10. 로컬 개발과 검증 방법
 
-1. `.env.local`에 Supabase URL과 anon/service role key 설정
-2. Supabase migration 적용
-3. RLS 정책 확인
-4. Storage bucket 생성
-5. 이미지 업로드 bucket 정책 확인
-6. Notion CSV와 기존 Excel/CSV 데이터 정제
-7. 국가/환율 공통 마스터 선등록
-8. 국내 공급사 원가 마스터 업로드
-9. 해외 파트너 계정 승인 플로우 테스트
-10. 내부 관리자, 회계, 오퍼레이션 역할별 접근 테스트
-11. 파트너 포털에서 원가/마진이 보이지 않는지 확인
-12. `npm run verify:v1` 실행
+### 10.1 저장소 위치
 
-## 현재 검증 상태
+권장 로컬 경로:
 
-최근 로컬 검증 기준:
+```text
+C:\Users\Issac\Documents\Codex\JHT_Booking_Sys
+```
+
+GitHub:
+
+```text
+https://github.com/sksmsrkk-glitch/JHT_Booking_Sys
+```
+
+### 10.2 설치
+
+```bash
+npm install
+```
+
+### 10.3 개발 서버 실행
+
+```bash
+npm run dev -- -p 3100
+```
+
+브라우저:
+
+```text
+http://localhost:3100/admin
+```
+
+### 10.4 기본 검증
 
 ```bash
 npm run test
 npm run typecheck
 ```
 
-현재 테스트 범위에는 다음이 포함됩니다.
+필요 시:
 
-- 해외 파트너와 국내 공급사 경계
-- 견적 원가 스냅샷과 마진 계산
-- 예약 작업 생성과 오퍼레이션 잠금
-- 인보이스 자동 생성
-- 가이드 지출결의서 요약과 정산 연결
-- workflow communication ledger
-- 국가/환율 공통 관리
-- agency onboarding governance
-- API 에러 응답과 고객 안전 query
+```bash
+npm run build
+```
 
-## 주의 사항
+주의:
 
-- 현재 개발 단계에서는 일부 페이지가 로그인 없이 preview/demo data를 보여줍니다. 실제 Supabase 연결 후에는 Auth/RLS 기준으로 접근을 제한해야 합니다.
-- 파트너 포털에는 원가, 마진, 내부 공급사 정보가 노출되면 안 됩니다.
-- 인보이스, 확정서, 정산, 가이드 실비는 모두 workflow code로 연결해야 합니다.
-- Notion/Excel 데이터를 Supabase에 넣기 전에는 국가 코드, 파트너명, 통화, 날짜 형식, 공급사 카테고리를 먼저 정규화해야 합니다.
-- 운영 전에는 `npm run verify:v1`과 실제 계정 기반 화면 QA를 반드시 수행해야 합니다.
+- `npm run build`는 `.next`를 재생성하므로, 개발 서버가 켜져 있을 때 실행하면 브라우저가 잠시 깨진 CSS나 오래된 chunk를 볼 수 있습니다.
+- 빌드가 필요하면 개발 서버를 멈춘 뒤 build를 실행하고 다시 dev server를 시작하는 방식이 안전합니다.
+
+### 10.5 전체 검증 스크립트
+
+```bash
+npm run verify:v1
+```
+
+개별 검증:
+
+```bash
+npm run verify:env
+npm run verify:schema
+npm run verify:api-guards
+npm run verify:api-body-order
+npm run verify:api-responses
+npm run verify:api-contract
+npm run verify:repo-safety
+npm run verify:security-config
+npm run verify:page-smoke
+npm run verify:app-route-smoke
+```
+
+## 11. Supabase 연결 전 체크리스트
+
+1. `.env.local`에 Supabase URL과 anon key 설정
+2. service role key는 서버 전용으로만 사용
+3. Supabase migration 전체 적용
+4. RLS policy 적용 확인
+5. Storage bucket 생성
+6. 이미지 업로드 권한 정책 확인
+7. country reference와 exchange rate 기본값 등록
+8. Notion CSV와 기존 Excel 데이터를 import 가능한 형태로 정제
+9. Domestic Supplier 원가 마스터 업로드
+10. 해외 파트너 계정 승인 프로세스 테스트
+11. 내부 관리자 role 테스트
+12. 파트너 포털에서 원가와 마진이 노출되지 않는지 확인
+13. 인보이스, payment, settlement 권한 확인
+14. workflow message 작성자 ID 연결 확인
+15. `npm run verify:v1` 실행
+
+## 12. 개발 원칙
+
+### 12.1 코드 변경 원칙
+
+- 기존 도메인 경계를 유지합니다.
+- `Overseas Agency`와 `Domestic Supplier`를 generic partner로 합치지 않습니다.
+- 견적 item은 반드시 원가 snapshot을 보존합니다.
+- 이미 발송된 견적은 기존 금액이 바뀌지 않도록 새 version으로 변경합니다.
+- 파트너 공개 화면에서는 내부 원가, 마진, supplier cost를 조회하지 않습니다.
+- reservation status 변경은 history를 남깁니다.
+- finance 변경은 audit log를 남깁니다.
+- workflow message는 workflow code 기준으로 연결합니다.
+
+### 12.2 UI 원칙
+
+- 내부 운영 화면은 화려한 랜딩 페이지가 아니라 업무 밀도가 높은 dashboard 중심으로 만듭니다.
+- 예약 화면은 단체현황표와 구글 캘린더의 장점을 섞어 설계합니다.
+- 견적 화면은 기존 엑셀 견적서에 익숙한 사용자가 바로 이해할 수 있게 호텔, 차량, 식사, 관광지, 기타 영역을 명확히 나눕니다.
+- 입력 폼은 너무 큰 박스와 폰트를 피하고, 한 화면에서 가능한 많은 업무 정보를 스캔할 수 있게 만듭니다.
+- 불필요한 JSON textarea는 점진적으로 표, 카드, 폼 UI로 대체합니다.
+
+### 12.3 데이터 이관 원칙
+
+- Notion과 Excel에서 가져온 데이터는 바로 운영 테이블에 넣지 않고 staging/validation 단계를 거칩니다.
+- 국가명, 통화, 공급사 카테고리, 날짜 형식은 import 전에 표준화합니다.
+- 원본 입력값은 가능한 보존하되, 내부 표준 코드와 매핑합니다.
+- import 결과는 audit 가능한 batch 단위로 관리합니다.
+
+## 현재 구현 요약
+
+현재 저장소에는 다음 주요 기능의 1차 구현이 포함되어 있습니다.
+
+- 내부 관리자 dashboard
+- 파트너 가입 신청과 내부 승인 구조
+- 국가 코드, 국가명, 기본 통화, 환율 공통 관리
+- Domestic Supplier 원가 마스터와 Excel import/export 구조
+- 엑셀형 견적 원가표와 공개 견적서 구조
+- Reservation group calendar와 incomplete groups 관리
+- 최종 확정서 관리
+- 최종 견적서와 최종 운영 정보를 기반으로 한 인보이스 자동 생성 구조
+- 인보이스 Excel 다운로드
+- finance receivable, payment, settlement 구조
+- PMB 지출결의서 기반 guide expense report
+- workflow code 중심 포털 커뮤니케이션 원장
+- message sender를 실제 내부 profile 또는 agency user와 연결하는 구조
+- 다국어 메뉴 EN/KOR와 dark mode
+- schema boundary, domain, page smoke 검증 스크립트
+
+## 관련 문서
+
+- [시스템 블루프린트](docs/system-blueprint.md)
+- [아키텍처 플랜](docs/architecture.md)
+- [API 계약](docs/api-contract.md)
+- [엑셀 견적 시스템 분석](docs/excel-quote-system.md)
+- [예약 단체현황표 설계](docs/reservation-group-status-board.md)
+- [회계/미수금 대시보드](docs/accounting-receivables-dashboard.md)
+- [환율 공통 관리](docs/exchange-rate-management.md)
+- [런칭 런북](docs/launch-runbook.md)
