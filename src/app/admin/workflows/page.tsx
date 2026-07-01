@@ -1,6 +1,7 @@
 import type { Route } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { filterWorkflowSummaries, getWorkflowDateKey, normalizeWorkflowFilters, type WorkflowFilters } from "@/features/workflow/filters";
 import type { WorkflowThreadSummary } from "@/features/workflow/types";
 import { getPageAuthorization } from "@/lib/api/page-session";
 import { normalizeLocale } from "@/lib/i18n";
@@ -15,20 +16,12 @@ type SearchParams = Promise<{
   group?: string;
 }>;
 
-type WorkflowFilters = {
-  from?: string;
-  to?: string;
-  partner?: string;
-  tourCode?: string;
-  group?: string;
-};
-
 export default async function AdminWorkflowsPage({ searchParams }: { searchParams: SearchParams }) {
   const cookieStore = await cookies();
   const locale = normalizeLocale(cookieStore.get("jht_locale")?.value);
   const filters = normalizeWorkflowFilters(await searchParams);
   const loadState = await loadWorkflows();
-  const workflows = filterWorkflows(loadState.workflows, filters);
+  const workflows = filterWorkflowSummaries(loadState.workflows, filters);
 
   return (
     <>
@@ -179,28 +172,6 @@ async function loadWorkflows(): Promise<{ workflows: WorkflowThreadSummary[]; pr
   return { workflows: payload.data ?? [], previewMode: Boolean(!authorization || payload.data?.[0]?.preview) };
 }
 
-function normalizeWorkflowFilters(params: Awaited<SearchParams>): WorkflowFilters {
-  return {
-    from: normalizeDate(params.from),
-    to: normalizeDate(params.to),
-    partner: normalizeOptional(params.partner),
-    tourCode: normalizeOptional(params.tourCode),
-    group: normalizeOptional(params.group)
-  };
-}
-
-function filterWorkflows(workflows: WorkflowThreadSummary[], filters: WorkflowFilters) {
-  return workflows.filter((workflow) => {
-    const workflowDate = getDateKey(workflow.lastMessageAt ?? workflow.createdAt);
-    if (filters.from && workflowDate && workflowDate < filters.from) return false;
-    if (filters.to && workflowDate && workflowDate > filters.to) return false;
-    if (filters.partner && !includesSearch(workflow.agencyName, filters.partner)) return false;
-    if (filters.tourCode && !includesSearch(workflow.workflowCode, filters.tourCode)) return false;
-    if (filters.group && !includesSearch(workflow.title, filters.group)) return false;
-    return true;
-  });
-}
-
 function buildInternalApiUrl(path: string, headerStore: Headers) {
   const protocol = headerStore.get("x-forwarded-proto") ?? "http";
   const host = headerStore.get("host") ?? "localhost:3000";
@@ -212,31 +183,9 @@ function formatLabel(value: string) {
 }
 
 function formatDate(value: string) {
-  const key = getDateKey(value);
+  const key = getWorkflowDateKey(value);
   if (key) return key;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString();
-}
-
-function getDateKey(value: string | null) {
-  if (!value) return null;
-  const direct = value.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
-  if (direct) return direct;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
-}
-
-function normalizeOptional(value: string | undefined) {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : undefined;
-}
-
-function normalizeDate(value: string | undefined) {
-  const trimmed = normalizeOptional(value);
-  return trimmed && /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : undefined;
-}
-
-function includesSearch(value: string | null | undefined, search: string) {
-  return (value ?? "").toLowerCase().includes(search.toLowerCase());
 }

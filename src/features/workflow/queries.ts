@@ -1,3 +1,4 @@
+import { filterWorkflowSummaries, hasWorkflowFilters, type WorkflowFilters } from "./filters";
 import type { WorkflowActionItem, WorkflowMessage, WorkflowThreadDetail, WorkflowThreadSummary } from "./types";
 
 /*
@@ -67,20 +68,24 @@ export async function getWorkflowThreadByCode(
 
 export async function listWorkflowThreads(
   supabase: SupabaseClientLike,
-  options: { agencyAccountId?: string; limit?: number } = {}
+  options: { agencyAccountId?: string; filters?: WorkflowFilters; limit?: number } = {}
 ): Promise<WorkflowThreadSummary[]> {
+  const filters = options.filters ?? {};
+  const limit = options.limit ?? (hasWorkflowFilters(filters) ? 500 : 100);
   let query = supabase
     .from("workflow_threads")
     .select("id, workflow_code, title, status, agency_account_id, agency_inquiry_id, quote_case_id, reservation_id, current_invoice_id, last_message_at, created_at, agency_accounts(name)")
     .order("last_message_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
-    .limit(options.limit ?? 100);
+    .limit(limit);
 
   if (options.agencyAccountId) query = query.eq("agency_account_id", options.agencyAccountId);
+  if (filters.tourCode) query = query.ilike("workflow_code", `%${escapeLikePattern(filters.tourCode)}%`);
+  if (filters.group) query = query.ilike("title", `%${escapeLikePattern(filters.group)}%`);
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return (data ?? []).map(mapWorkflowThread);
+  return filterWorkflowSummaries((data ?? []).map(mapWorkflowThread), filters);
 }
 
 export async function ensureWorkflowThread(
@@ -253,4 +258,8 @@ function mapWorkflowActionItem(row: any): WorkflowActionItem {
     resolvedAt: row.resolved_at ?? null,
     createdAt: row.created_at
   };
+}
+
+function escapeLikePattern(value: string) {
+  return value.replace(/[\\%_]/g, (match) => `\\${match}`);
 }
