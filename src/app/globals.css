@@ -2679,6 +2679,7 @@ tbody tr:last-child td {
 }
 
 .workflow-filter-shell {
+  --workflow-control-height: 48px;
   background: #ffffff;
   border: 1px solid #d6deea;
   border-radius: 8px;
@@ -2701,6 +2702,20 @@ tbody tr:last-child td {
   font-size: 12px;
   font-weight: 800;
   gap: 5px;
+}
+
+.workflow-filter-bar input,
+.workflow-filter-bar select,
+.workflow-filter-actions .button-primary,
+.workflow-filter-actions .button-secondary {
+  box-sizing: border-box;
+  height: var(--workflow-control-height);
+  min-height: var(--workflow-control-height);
+}
+
+.workflow-filter-bar input,
+.workflow-filter-bar select {
+  line-height: var(--workflow-control-height);
 }
 
 .workflow-filter-actions {
