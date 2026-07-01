@@ -827,6 +827,11 @@ select:disabled {
   padding: 14px 16px;
 }
 
+.exchange-rate-filter-note {
+  grid-column: 1 / -1;
+  margin: -2px 0 0;
+}
+
 .exchange-rate-page input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
 .exchange-rate-page select,
 .exchange-rate-page textarea,

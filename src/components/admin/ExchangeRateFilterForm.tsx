@@ -43,7 +43,6 @@ export function ExchangeRateFilterForm({
             </option>
           ))}
         </select>
-        <span className="subtext">Country Code + Country Name + Default Currency 공통관리</span>
       </label>
       <label>
         기준 통화
@@ -67,6 +66,7 @@ export function ExchangeRateFilterForm({
       <button className="button-primary" type="submit">
         필터
       </button>
+      <p className="subtext exchange-rate-filter-note">Country Code + Country Name + Default Currency 공통관리</p>
     </form>
   );
 }
