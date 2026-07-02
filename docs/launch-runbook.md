@@ -47,6 +47,17 @@ If Supabase CLI is unavailable, apply the SQL files in this order through the Su
 4. `supabase/migrations/202606270002_quote_fare_options.sql`
 5. `supabase/migrations/202606270003_quote_presentation_blocks.sql`
 6. `supabase/migrations/202606270004_supplier_media_attachments.sql`
+7. `supabase/migrations/202606280001_partner_receivable_ledger.sql`
+8. `supabase/migrations/202606280002_exchange_rates.sql`
+9. `supabase/migrations/202606290001_agency_inquiry_tour_workflow.sql`
+10. `supabase/migrations/202606290002_invoice_versioning.sql`
+11. `supabase/migrations/202606290003_reservation_final_operation_invoice.sql`
+12. `supabase/migrations/202606290004_guide_expense_reports.sql`
+13. `supabase/migrations/202606300001_agency_onboarding_governance.sql`
+14. `supabase/migrations/202606300002_country_reference_exchange_rates.sql`
+15. `supabase/migrations/202606300003_workflow_portal_communication.sql`
+16. `supabase/migrations/202607010001_workflow_message_actor_links.sql`
+17. `supabase/migrations/202607020001_data_api_role_grants.sql`
 
 After migration, open `/admin/readiness` with an internal admin account and confirm database smoke checks are ready.
 
@@ -80,6 +91,21 @@ If a staging demo is needed, rotate or replace these rows before external users 
 - `JHT-2026-DEMO-001`
 - `RSV-2026-DEMO-001`
 - `INV-2026-DEMO-001`
+
+For hosted Supabase projects, do not rely on raw SQL inserts into `auth.users` for login-ready demo accounts. Hosted Auth expects its own identity records and internal state. After migrations and optional demo business rows are loaded, create hosted demo Auth users with:
+
+```bash
+npm run seed:hosted-demo-auth
+```
+
+The script uses the server-side Supabase secret key from `.env.local`, creates real Auth users through the Supabase Admin API, then links them to `profiles`, `user_roles`, and `agency_users`.
+
+Current local hosted-demo credentials:
+
+- Internal admin: `jht-admin@junghotravel.local` / `JhtDemo!2026`
+- Agency demo: `agency-demo@worldtravellers.example` / `AgencyDemo!2026`
+
+Rotate or remove these demo accounts before any external or production use.
 
 ## 4. Environment Values
 

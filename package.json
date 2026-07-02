@@ -21,12 +21,13 @@
     "verify:launch-runbook": "node scripts/verify-launch-runbook.mjs",
     "verify:page-smoke": "node scripts/verify-page-smoke.mjs",
     "verify:app-route-smoke": "node scripts/verify-app-route-smoke.mjs",
+    "seed:hosted-demo-auth": "node scripts/seed-hosted-demo-auth.mjs",
     "smoke:runtime": "node scripts/runtime-smoke.mjs",
     "verify": "npm run test && npm run typecheck",
     "verify:v1": "npm run verify:env && npm run verify:schema && npm run verify:seed && npm run verify:api-guards && npm run verify:api-body-order && npm run verify:api-responses && npm run verify:api-contract && npm run verify:repo-safety && npm run verify:security-config && npm run verify:launch-runbook && npm run verify:page-smoke && npm run verify:app-route-smoke && npm run test && npm run typecheck && npm run build && npm run smoke:runtime"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.4",
+    "@supabase/supabase-js": "^2.110.0",
     "next": "^15.3.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
