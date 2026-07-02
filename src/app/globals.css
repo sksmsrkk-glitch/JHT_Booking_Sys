@@ -3,49 +3,99 @@
 }
 
 :root {
-  --bg: #f7f8fa;
-  --surface: #ffffff;
-  --surface-strong: #ffffff;
-  --surface-muted: #f8fafc;
-  --text: #1f2933;
-  --text-muted: #52606d;
-  --text-soft: #627d98;
-  --heading: #243b53;
-  --border: #d9dee7;
-  --border-strong: #cbd5e1;
-  --input-border: #bcccdc;
-  --primary: #0f5b99;
+  /* JHT 전체 화면에서 공통으로 쓰는 UI 리프레시 토큰입니다. 기존 변수는 아래에서 새 토큰에 연결해 기존 화면 구조를 유지합니다. */
+  --jht-bg: #f2f4f6;
+  --jht-bg-soft: #f9fafb;
+  --jht-surface: #ffffff;
+  --jht-surface-subtle: #f9fafb;
+  --jht-line: #e5e8eb;
+  --jht-line-soft: #f2f4f6;
+  --jht-line-strong: #d1d6db;
+  --jht-text-primary: #191f28;
+  --jht-text-secondary: #4e5968;
+  --jht-text-tertiary: #8b95a1;
+  --jht-text-disabled: #b0b8c1;
+  --jht-primary: #3182f6;
+  --jht-primary-hover: #2272eb;
+  --jht-primary-active: #1b64da;
+  --jht-primary-weak: #e8f3ff;
+  --jht-success: #03b26c;
+  --jht-success-weak: #f0faf6;
+  --jht-warning: #fe9800;
+  --jht-warning-weak: #fff6e5;
+  --jht-danger: #f04452;
+  --jht-danger-weak: #ffeeee;
+  --jht-radius-sm: 10px;
+  --jht-radius-md: 14px;
+  --jht-radius-lg: 18px;
+  --jht-radius-xl: 24px;
+  --jht-radius-pill: 999px;
+  --jht-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --jht-shadow-floating: 0 8px 24px rgba(25, 31, 40, 0.08);
+  --bg: var(--jht-bg);
+  --surface: var(--jht-surface);
+  --surface-strong: var(--jht-surface);
+  --surface-muted: var(--jht-surface-subtle);
+  --text: var(--jht-text-primary);
+  --text-muted: var(--jht-text-secondary);
+  --text-soft: var(--jht-text-tertiary);
+  --heading: var(--jht-text-primary);
+  --border: var(--jht-line);
+  --border-strong: var(--jht-line-strong);
+  --input-border: var(--jht-line);
+  --primary: var(--jht-primary);
   --primary-contrast: #ffffff;
-  --warning-bg: #fff7e6;
-  --warning-text: #8a4b00;
-  --danger-bg: #fff1f2;
-  --danger-border: #fecdd3;
-  --danger-text: #be123c;
-  --notice-blue-bg: #f7fbff;
-  --notice-blue-border: #c7ddf4;
+  --warning-bg: var(--jht-warning-weak);
+  --warning-text: #a15c00;
+  --danger-bg: var(--jht-danger-weak);
+  --danger-border: #ffd0d5;
+  --danger-text: var(--jht-danger);
+  --notice-blue-bg: var(--jht-primary-weak);
+  --notice-blue-border: #c9e2ff;
   color-scheme: light;
 }
 
 html.dark {
-  --bg: #0f172a;
-  --surface: #111827;
-  --surface-strong: #172033;
-  --surface-muted: #1f2937;
-  --text: #e5e7eb;
-  --text-muted: #cbd5e1;
-  --text-soft: #94a3b8;
-  --heading: #f8fafc;
-  --border: #334155;
-  --border-strong: #475569;
-  --input-border: #475569;
-  --primary: #4ea3e8;
-  --primary-contrast: #06121f;
-  --warning-bg: #33250d;
+  --jht-bg: #111827;
+  --jht-bg-soft: #172033;
+  --jht-surface: #182230;
+  --jht-surface-subtle: #202b3a;
+  --jht-line: #2f3b4c;
+  --jht-line-soft: #243040;
+  --jht-line-strong: #425064;
+  --jht-text-primary: #f8fafc;
+  --jht-text-secondary: #cbd5e1;
+  --jht-text-tertiary: #94a3b8;
+  --jht-text-disabled: #64748b;
+  --jht-primary: #5aa2ff;
+  --jht-primary-hover: #7bb6ff;
+  --jht-primary-active: #3d8df5;
+  --jht-primary-weak: #102b4f;
+  --jht-success: #4ade80;
+  --jht-success-weak: #133324;
+  --jht-warning: #fbbf24;
+  --jht-warning-weak: #35260c;
+  --jht-danger: #fb7185;
+  --jht-danger-weak: #3a1620;
+  --bg: var(--jht-bg);
+  --surface: var(--jht-surface);
+  --surface-strong: var(--jht-bg-soft);
+  --surface-muted: var(--jht-surface-subtle);
+  --text: var(--jht-text-primary);
+  --text-muted: var(--jht-text-secondary);
+  --text-soft: var(--jht-text-tertiary);
+  --heading: var(--jht-text-primary);
+  --border: var(--jht-line);
+  --border-strong: var(--jht-line-strong);
+  --input-border: var(--jht-line-strong);
+  --primary: var(--jht-primary);
+  --primary-contrast: #08111f;
+  --warning-bg: var(--jht-warning-weak);
   --warning-text: #f8d48a;
-  --danger-bg: #3a1020;
-  --danger-border: #7f1d1d;
-  --danger-text: #fda4af;
-  --notice-blue-bg: #102235;
+  --danger-bg: var(--jht-danger-weak);
+  --danger-border: #7f1d2d;
+  --danger-text: var(--jht-danger);
+  --notice-blue-bg: var(--jht-primary-weak);
   --notice-blue-border: #254b72;
   color-scheme: dark;
 }
@@ -54,7 +104,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: Pretendard, Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
 a {
@@ -3760,6 +3810,828 @@ html.dark .danger-metric {
   color: var(--danger-text);
 }
 
+/* 기능/라우트/데이터 로직은 건드리지 않고, 전역 시각 레이어만 정돈하는 JHT UI 리프레시 블록입니다. */
+body {
+  letter-spacing: 0;
+}
+
+a,
+button,
+input,
+select,
+textarea,
+summary {
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s ease;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--jht-primary) 24%, transparent);
+  outline: none;
+}
+
+.topbar {
+  border-color: var(--jht-line);
+  box-shadow: var(--jht-shadow-card);
+  gap: 18px;
+  min-height: 76px;
+  padding: 10px 28px;
+}
+
+.brand {
+  flex-basis: 100px;
+  height: 56px;
+  min-width: 100px;
+}
+
+.brand img {
+  max-height: 50px;
+  max-width: 92px;
+  width: 92px;
+}
+
+.primary-nav > a,
+.nav-more-trigger,
+.auth-nav-link {
+  border-radius: var(--jht-radius-pill);
+  color: var(--jht-text-secondary);
+  font-size: 14px;
+  font-weight: 700;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 14px;
+}
+
+/* 상단 메뉴는 link와 More(label) 구조가 달라 높이가 어긋나기 쉬우므로 동일한 40px flex box로 고정합니다. */
+.primary-nav {
+  align-items: center;
+}
+
+.primary-nav > a,
+.nav-more,
+.nav-more-trigger {
+  align-items: center;
+  box-sizing: border-box;
+  display: inline-flex;
+  justify-content: center;
+}
+
+.nav-more {
+  height: 40px;
+}
+
+.nav-more-toggle {
+  height: 0;
+  margin: 0;
+  width: 0;
+}
+
+.primary-nav > a:hover,
+.nav-more-trigger:hover,
+.nav-more-toggle:checked + .nav-more-trigger,
+.auth-nav-link:hover {
+  background: var(--jht-primary-weak);
+  color: var(--jht-primary);
+}
+
+.nav-more-menu {
+  border-color: var(--jht-line);
+  border-radius: var(--jht-radius-lg);
+  box-shadow: var(--jht-shadow-floating);
+  gap: 2px;
+  min-width: 248px;
+  padding: 8px;
+}
+
+.nav-more-menu a {
+  border-radius: var(--jht-radius-md);
+  color: var(--jht-text-secondary);
+  font-size: 14px;
+  min-height: 40px;
+  padding: 11px 12px;
+}
+
+.nav-more-menu a:hover {
+  background: var(--jht-surface-subtle);
+  color: var(--jht-text-primary);
+}
+
+.auth-nav-link {
+  border-color: var(--jht-line);
+  display: inline-flex;
+  align-items: center;
+}
+
+.theme-toggle,
+.language-switcher button {
+  border-color: var(--jht-line);
+}
+
+.theme-toggle {
+  background: var(--jht-surface-subtle);
+  padding: 3px;
+}
+
+.theme-toggle button,
+.language-switcher button {
+  font-size: 12px;
+  min-height: 34px;
+}
+
+.theme-toggle button.active,
+.language-switcher button.active {
+  background: var(--jht-primary);
+  border-color: var(--jht-primary);
+  color: #ffffff;
+}
+
+.main {
+  max-width: 1240px;
+  padding: 30px 28px 64px;
+}
+
+.page-header {
+  margin-bottom: 22px;
+}
+
+.page-header h1 {
+  color: var(--jht-text-primary);
+  font-size: clamp(26px, 2.4vw, 30px);
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.page-header p {
+  color: var(--jht-text-secondary);
+  font-size: 15px;
+}
+
+.eyebrow {
+  color: var(--jht-text-tertiary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.route-card,
+.panel,
+.action-band,
+.toolbar,
+.auth-card,
+.panel-section,
+.admin-dashboard-shell,
+.dashboard-data-card,
+.table-shell,
+.summary-panel,
+.reservation-month-calendar,
+.metric-card,
+.empty-state,
+.notice,
+.confirmation-document,
+.confirmation-section,
+.invoice-document,
+.invoice-itinerary-day,
+.presentation-card,
+.quote-day-card,
+.quote-terms,
+.final-quote,
+.workflow-chain article,
+.workflow-context-panel,
+.workflow-message-panel,
+.workflow-action-panel,
+.workflow-filter-shell,
+.workflow-list-shell,
+.workflow-list-card,
+.operation-check-card,
+.summary-card,
+.confirmation-kpi-tile,
+.confirmation-status-tile,
+.confirmation-list-row,
+.exchange-rate-card-panel {
+  background: var(--jht-surface);
+  border: 1px solid var(--jht-line);
+  border-radius: var(--jht-radius-lg);
+  box-shadow: var(--jht-shadow-card);
+  color: var(--jht-text-primary);
+}
+
+.route-card,
+.panel,
+.auth-card,
+.panel-section,
+.admin-dashboard-shell,
+.dashboard-data-card,
+.metric-card,
+.confirmation-document,
+.invoice-document,
+.workflow-context-panel,
+.workflow-message-panel,
+.workflow-action-panel,
+.exchange-rate-card-panel {
+  padding: 20px;
+}
+
+.route-card:hover,
+.dashboard-kpi-card.is-clickable:hover,
+.metric-card-link:hover,
+.workflow-list-card:hover,
+.workflow-list-row:hover,
+.confirmation-list-row:hover {
+  border-color: color-mix(in srgb, var(--jht-primary) 38%, var(--jht-line));
+  box-shadow: var(--jht-shadow-floating);
+  transform: translateY(-1px);
+}
+
+.button-primary,
+.button-secondary,
+.compact-button {
+  border-radius: var(--jht-radius-md);
+  font-size: 14px;
+  font-weight: 800;
+  min-height: 44px;
+  padding: 0 16px;
+}
+
+.main button:not(.button-primary):not(.button-secondary) {
+  align-items: center;
+  background: var(--jht-surface-subtle);
+  border: 1px solid var(--jht-line);
+  border-radius: var(--jht-radius-md);
+  color: var(--jht-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+
+.confirmation-filter-bar input[type="submit"],
+.confirmation-filter-bar input[type="button"],
+.exchange-rate-filter-toolbar input[type="submit"],
+.exchange-rate-filter-toolbar input[type="button"],
+.toolbar input[type="submit"],
+.toolbar input[type="button"] {
+  align-items: center;
+  border-radius: var(--jht-radius-md);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+}
+
+.toolbar button:not(.button-secondary),
+.confirmation-filter-bar button:not(.button-secondary),
+.confirmation-filter-bar input[type="submit"],
+.confirmation-filter-bar input[type="button"],
+.exchange-rate-filter-toolbar button:not(.button-secondary),
+.exchange-rate-filter-toolbar input[type="submit"],
+.exchange-rate-filter-toolbar input[type="button"],
+.toolbar input[type="submit"],
+.toolbar input[type="button"] {
+  background: var(--jht-primary);
+  border-color: var(--jht-primary);
+  color: #ffffff;
+}
+
+.main .toolbar button:not(.button-secondary),
+.main .confirmation-filter-bar button:not(.button-secondary),
+.main .exchange-rate-filter-toolbar button:not(.button-secondary) {
+  background: var(--jht-primary);
+  border-color: var(--jht-primary);
+  color: #ffffff;
+}
+
+.main button:not(.button-primary):not(.button-secondary):hover {
+  background: var(--jht-line-soft);
+}
+
+.toolbar button:not(.button-secondary):hover,
+.confirmation-filter-bar button:not(.button-secondary):hover,
+.confirmation-filter-bar input[type="submit"]:hover,
+.confirmation-filter-bar input[type="button"]:hover,
+.exchange-rate-filter-toolbar button:not(.button-secondary):hover,
+.exchange-rate-filter-toolbar input[type="submit"]:hover,
+.exchange-rate-filter-toolbar input[type="button"]:hover,
+.toolbar input[type="submit"]:hover,
+.toolbar input[type="button"]:hover {
+  background: var(--jht-primary-hover);
+  border-color: var(--jht-primary-hover);
+}
+
+.main .toolbar button:not(.button-secondary):hover,
+.main .confirmation-filter-bar button:not(.button-secondary):hover,
+.main .exchange-rate-filter-toolbar button:not(.button-secondary):hover {
+  background: var(--jht-primary-hover);
+  border-color: var(--jht-primary-hover);
+}
+
+.button-primary {
+  background: var(--jht-primary);
+  border-color: var(--jht-primary);
+  color: #ffffff;
+}
+
+.button-primary:hover {
+  background: var(--jht-primary-hover);
+  border-color: var(--jht-primary-hover);
+}
+
+.button-primary:active {
+  background: var(--jht-primary-active);
+  border-color: var(--jht-primary-active);
+}
+
+.button-secondary {
+  background: var(--jht-primary-weak);
+  border-color: transparent;
+  color: var(--jht-primary);
+}
+
+.button-secondary:hover,
+.workflow-list-open:hover {
+  background: color-mix(in srgb, var(--jht-primary-weak) 72%, #ffffff);
+  color: var(--jht-primary-hover);
+}
+
+.mini-button,
+.compact-button {
+  min-height: 36px;
+}
+
+input,
+select,
+textarea {
+  background: var(--jht-surface);
+  border-color: var(--jht-line);
+  border-radius: var(--jht-radius-md);
+  color: var(--jht-text-primary);
+  font-size: 14px;
+}
+
+input,
+select {
+  min-height: 46px;
+  padding: 0 14px;
+}
+
+textarea {
+  padding: 13px 14px;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--jht-line-strong);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--jht-primary);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--jht-text-tertiary);
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background: var(--jht-surface-subtle);
+  color: var(--jht-text-disabled);
+}
+
+.toolbar label,
+.form-preview label,
+.auth-card label,
+.form-grid label,
+.stacked-form label,
+.full-width-field,
+.compact-form label,
+.workflow-filter-bar label,
+.workflow-composer label,
+.guide-expense-form label,
+.confirmation-filter-bar label,
+.calendar-month-form label,
+.list-control-form label {
+  color: var(--jht-text-secondary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+  color: var(--jht-text-primary);
+}
+
+table th {
+  background: var(--jht-surface-subtle);
+  color: var(--jht-text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+table td,
+table th {
+  border-color: var(--jht-line-soft);
+  padding: 12px 14px;
+}
+
+tbody tr:hover td {
+  background: var(--jht-surface-subtle);
+}
+
+.strong-link,
+.row-details summary,
+.workflow-list-card h2,
+.confirmation-row-main > .strong-link {
+  color: #0b63ce;
+}
+
+.status-dot,
+.badge,
+.confirmation-country-pill,
+.summary-panel-heading span,
+.quote-category-chips span,
+.missing-action-list span {
+  border-radius: var(--jht-radius-pill);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 5px 10px;
+}
+
+.status-dot,
+.status-normal,
+.status-scaffolded,
+.status-inactive,
+.status-draft,
+.status-pending,
+.status-waiting_internal {
+  background: var(--jht-line-soft);
+  color: var(--jht-text-secondary);
+}
+
+.status-active,
+.status-live,
+.status-ready,
+.status-next,
+.status-confirmed,
+.status-reserved,
+.status-selected {
+  background: var(--jht-primary-weak);
+  color: var(--jht-primary);
+}
+
+.status-completed,
+.status-success,
+.status-paid,
+.status-available {
+  background: var(--jht-success-weak);
+  color: var(--jht-success);
+}
+
+.status-warning,
+.status-soon,
+.status-unpaid,
+.status-needAction {
+  background: var(--jht-warning-weak);
+  color: var(--jht-warning);
+}
+
+.status-overdue,
+.status-high,
+.status-failed,
+.status-canceled,
+.status-cancelled,
+.status-error,
+.status-unavailable,
+.status-archived {
+  background: var(--jht-danger-weak);
+  color: var(--jht-danger);
+}
+
+.notice,
+.empty-state {
+  border-radius: var(--jht-radius-lg);
+  margin-top: 16px;
+  padding: 20px;
+}
+
+.notice.warning,
+.warning {
+  background: var(--jht-warning-weak);
+  border-color: #ffe2a8;
+  color: #9a5b00;
+}
+
+.notice.danger,
+.danger-metric {
+  background: var(--jht-danger-weak);
+  border-color: #ffd0d5;
+  color: var(--jht-danger);
+}
+
+.json-preview,
+.compact-json {
+  background: var(--jht-surface-subtle);
+  border-color: var(--jht-line);
+  border-radius: var(--jht-radius-md);
+}
+
+.dashboard-kpi-card {
+  background: var(--jht-surface);
+  border-color: var(--jht-line);
+  border-radius: var(--jht-radius-lg);
+  min-height: 118px;
+  padding: 18px;
+}
+
+.dashboard-kpi-card span,
+.metric-card span,
+.confirmation-kpi-tile span,
+.confirmation-status-tile small {
+  color: var(--jht-text-secondary);
+}
+
+.dashboard-kpi-card strong,
+.metric-card strong,
+.confirmation-kpi-tile strong,
+.confirmation-status-tile p {
+  color: var(--jht-text-primary);
+}
+
+.dashboard-kpi-card.tone-good {
+  background: var(--jht-success-weak);
+  border-color: #b8efd8;
+}
+
+.dashboard-kpi-card.tone-danger,
+.danger-metric {
+  background: var(--jht-danger-weak);
+  border-color: #ffd0d5;
+}
+
+.dashboard-view-tabs a {
+  background: var(--jht-surface);
+  border-color: var(--jht-line);
+  border-radius: var(--jht-radius-pill);
+  color: var(--jht-text-secondary);
+}
+
+.dashboard-view-tabs a.active {
+  background: var(--jht-primary);
+  border-color: var(--jht-primary);
+  color: #ffffff;
+}
+
+.workflow-filter-shell {
+  --workflow-control-height: 48px;
+  gap: 12px;
+  padding: 16px;
+}
+
+.workflow-filter-bar {
+  align-items: end;
+}
+
+.workflow-filter-bar input,
+.workflow-filter-bar select,
+.workflow-filter-actions .button-primary,
+.workflow-filter-actions .button-secondary {
+  height: var(--workflow-control-height);
+  min-height: var(--workflow-control-height);
+}
+
+.workflow-list-shell {
+  overflow: hidden;
+}
+
+.workflow-list-header {
+  background: var(--jht-surface-subtle);
+  border-color: var(--jht-line);
+  color: var(--jht-text-secondary);
+  font-size: 11px;
+  padding: 11px 16px;
+}
+
+.workflow-list-row {
+  border-color: var(--jht-line-soft);
+  min-height: 58px;
+  padding: 11px 16px;
+}
+
+.workflow-list-row strong {
+  color: var(--jht-text-primary);
+  font-size: 13px;
+}
+
+.workflow-list-row small {
+  color: var(--jht-text-tertiary);
+}
+
+.workflow-list-open {
+  background: var(--jht-primary-weak);
+  border: 0;
+  border-radius: var(--jht-radius-md);
+  color: var(--jht-primary);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 9px 10px;
+}
+
+.workflow-ledger {
+  gap: 16px;
+}
+
+.workflow-message,
+.workflow-action-card {
+  border-color: var(--jht-line);
+  border-radius: var(--jht-radius-lg);
+}
+
+.workflow-message.agency {
+  background: var(--jht-surface-subtle);
+}
+
+.workflow-message.internal,
+.workflow-action-card {
+  background: color-mix(in srgb, var(--jht-success-weak) 55%, var(--jht-surface));
+}
+
+.workflow-composer {
+  border-color: var(--jht-line);
+}
+
+.exchange-rate-page {
+  --exchange-control-height: 48px;
+  gap: 18px;
+}
+
+.exchange-rate-filter-toolbar,
+.confirmation-filter-bar {
+  border-color: var(--jht-line);
+  border-radius: var(--jht-radius-lg);
+  box-shadow: var(--jht-shadow-card);
+  padding: 16px;
+}
+
+.exchange-rate-page input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+.exchange-rate-page select,
+.exchange-rate-page textarea,
+.exchange-rate-filter-toolbar .button-primary,
+.exchange-form-submit-cell .button-primary {
+  height: var(--exchange-control-height);
+  min-height: var(--exchange-control-height);
+}
+
+.exchange-rate-create-grid,
+.exchange-country-master-grid {
+  gap: 12px;
+}
+
+.exchange-rate-create-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.exchange-rate-create-grid > label:not(.exchange-rate-country-field):not(.exchange-rate-source-field):not(.exchange-rate-notes-field) {
+  grid-column: span 3;
+}
+
+.exchange-rate-source-field,
+.exchange-rate-notes-field,
+.exchange-form-submit-cell {
+  grid-column: span 2;
+}
+
+.confirmation-kpi-tile {
+  border-left-width: 0;
+  min-height: 100px;
+}
+
+.confirmation-status-tile {
+  padding: 16px;
+}
+
+.confirmation-list {
+  gap: 10px;
+}
+
+.confirmation-list-row {
+  min-height: 76px;
+  padding: 14px 16px;
+}
+
+.confirmation-row-main > .strong-link {
+  font-size: 15px;
+}
+
+.guide-expense-metrics .metric-card {
+  min-height: 94px;
+}
+
+.guide-expense-metrics .metric-card strong {
+  font-size: 22px;
+}
+
+.incomplete-strip {
+  background: var(--jht-warning-weak);
+  border-color: #ffe2a8;
+  border-radius: var(--jht-radius-lg);
+}
+
+.incomplete-pill {
+  background: var(--jht-danger);
+}
+
+.incomplete-pill.muted-pill {
+  background: var(--jht-warning-weak);
+  border-color: #ffe2a8;
+  color: #9a5b00;
+}
+
+html.dark .button-secondary {
+  background: var(--jht-primary-weak);
+  color: var(--jht-primary-hover);
+}
+
+html.dark .nav-more-menu,
+html.dark .route-card,
+html.dark .panel,
+html.dark .action-band,
+html.dark .toolbar,
+html.dark .auth-card,
+html.dark .panel-section,
+html.dark .admin-dashboard-shell,
+html.dark .dashboard-kpi-card,
+html.dark .dashboard-data-card,
+html.dark .table-shell,
+html.dark .summary-panel,
+html.dark .reservation-month-calendar,
+html.dark .metric-card,
+html.dark .empty-state,
+html.dark .notice,
+html.dark .confirmation-document,
+html.dark .confirmation-section,
+html.dark .invoice-document,
+html.dark .invoice-itinerary-day,
+html.dark .presentation-card,
+html.dark .quote-day-card,
+html.dark .quote-terms,
+html.dark .final-quote,
+html.dark .workflow-context-panel,
+html.dark .workflow-message-panel,
+html.dark .workflow-action-panel,
+html.dark .workflow-filter-shell,
+html.dark .workflow-list-shell,
+html.dark .workflow-list-card,
+html.dark .operation-check-card,
+html.dark .summary-card,
+html.dark .confirmation-kpi-tile,
+html.dark .confirmation-status-tile,
+html.dark .confirmation-list-row,
+html.dark .exchange-rate-card-panel {
+  background: var(--jht-surface);
+  border-color: var(--jht-line);
+  color: var(--jht-text-primary);
+}
+
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background: var(--jht-surface-subtle);
+  border-color: var(--jht-line-strong);
+  color: var(--jht-text-primary);
+}
+
+html.dark table th,
+html.dark .workflow-list-header {
+  background: var(--jht-surface-subtle);
+  color: var(--jht-text-secondary);
+}
+
+html.dark tbody tr:hover td,
+html.dark .workflow-list-row:hover,
+html.dark .nav-more-menu a:hover {
+  background: var(--jht-surface-subtle);
+}
+
 @media print {
   body {
     background: #ffffff;
@@ -3866,6 +4738,11 @@ html.dark .danger-metric {
   .exchange-rate-country-field,
   .exchange-rate-source-field,
   .exchange-rate-notes-field {
+    grid-column: auto;
+  }
+
+  .exchange-rate-create-grid > label,
+  .exchange-form-submit-cell {
     grid-column: auto;
   }
 
