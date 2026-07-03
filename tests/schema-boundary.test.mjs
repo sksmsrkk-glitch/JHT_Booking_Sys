@@ -63,7 +63,11 @@ const workflowMessageActorLinksMigration = readFileSync(
   new URL("../supabase/migrations/202607010001_workflow_message_actor_links.sql", import.meta.url),
   "utf8"
 );
-const schema = `${initialSchema}\n${gmailCandidatesMigration}\n${quoteExcelModelMigration}\n${quoteFareOptionsMigration}\n${quotePresentationBlocksMigration}\n${supplierMediaAttachmentsMigration}\n${partnerReceivableLedgerMigration}\n${exchangeRatesMigration}\n${agencyInquiryTourWorkflowMigration}\n${invoiceVersioningMigration}\n${finalOperationInvoiceMigration}\n${guideExpenseReportsMigration}\n${agencyOnboardingGovernanceMigration}\n${countryReferenceExchangeRatesMigration}\n${workflowPortalCommunicationMigration}\n${workflowMessageActorLinksMigration}`;
+const securityHardeningMigration = readFileSync(
+  new URL("../supabase/migrations/202607030001_security_hardening.sql", import.meta.url),
+  "utf8"
+);
+const schema = `${initialSchema}\n${gmailCandidatesMigration}\n${quoteExcelModelMigration}\n${quoteFareOptionsMigration}\n${quotePresentationBlocksMigration}\n${supplierMediaAttachmentsMigration}\n${partnerReceivableLedgerMigration}\n${exchangeRatesMigration}\n${agencyInquiryTourWorkflowMigration}\n${invoiceVersioningMigration}\n${finalOperationInvoiceMigration}\n${guideExpenseReportsMigration}\n${agencyOnboardingGovernanceMigration}\n${countryReferenceExchangeRatesMigration}\n${workflowPortalCommunicationMigration}\n${workflowMessageActorLinksMigration}\n${securityHardeningMigration}`;
 const agencyPortalQueries = readFileSync(new URL("../src/features/agency-portal/queries.ts", import.meta.url), "utf8");
 const apiHttp = readFileSync(new URL("../src/lib/api/http.ts", import.meta.url), "utf8");
 const seedSql = readFileSync(new URL("../supabase/seed.sql", import.meta.url), "utf8");
@@ -277,6 +281,79 @@ test("country references are shared between exchange rates and partner signup", 
   assert.match(schema, /from exchange_rates/);
   assert.match(schema, /create policy "country references public active select"/);
   assert.match(schema, /create policy "country references internal all"/);
+});
+
+test("data api role grants are minimized after security hardening", () => {
+  assert.match(securityHardeningMigration, /revoke all privileges on all tables in schema public from anon/);
+  assert.match(securityHardeningMigration, /revoke all privileges on all tables in schema public from authenticated/);
+  assert.match(securityHardeningMigration, /grant select, insert, update, delete on all tables in schema public to authenticated/);
+  assert.match(securityHardeningMigration, /grant select on country_references to anon/);
+  assert.match(securityHardeningMigration, /grant insert on agency_signup_applications to anon/);
+  assert.match(securityHardeningMigration, /alter default privileges in schema public revoke all on tables from anon/);
+});
+
+test("agency users cannot change protected account fields", () => {
+  assert.match(securityHardeningMigration, /create or replace function guard_agency_user_update/);
+  assert.match(securityHardeningMigration, /new\.agency_account_id is distinct from old\.agency_account_id/);
+  assert.match(securityHardeningMigration, /new\.is_account_admin is distinct from old\.is_account_admin/);
+  assert.match(securityHardeningMigration, /create trigger agency_users_guard_update/);
+});
+
+test("agency signup applications only accept pending unreviewed rows", () => {
+  assert.match(securityHardeningMigration, /status = 'pending'/);
+  assert.match(securityHardeningMigration, /reviewed_by is null/);
+  assert.match(securityHardeningMigration, /created_agency_account_id is null/);
+});
+
+test("reservation status changes always write history at the database layer", () => {
+  assert.match(securityHardeningMigration, /create or replace function log_reservation_status_change/);
+  assert.match(securityHardeningMigration, /create trigger reservations_log_status_change/);
+  assert.match(securityHardeningMigration, /create or replace function update_reservation_status/);
+});
+
+test("quote snapshots are immutable once the version leaves draft", () => {
+  assert.match(securityHardeningMigration, /create or replace function guard_quote_item_mutation/);
+  assert.match(securityHardeningMigration, /create trigger quote_items_immutable/);
+  assert.match(securityHardeningMigration, /create or replace function guard_quote_version_amounts/);
+  assert.match(securityHardeningMigration, /create trigger quote_versions_amounts_immutable/);
+});
+
+test("invoice issuance is finance gated and drafts are hidden from agencies", () => {
+  assert.match(securityHardeningMigration, /with check \(has_finance_role\(\) or \(has_internal_role\(\) and status = 'draft'\)\)/);
+  assert.match(securityHardeningMigration, /status <> 'draft' and can_access_reservation\(reservation_id\)/);
+});
+
+test("duplicate-prone workflows gained database-level protection", () => {
+  assert.match(securityHardeningMigration, /reservations_active_quote_case_uidx/);
+  assert.match(securityHardeningMigration, /operation_tasks_generated_task_uidx/);
+  assert.match(securityHardeningMigration, /alter table payments alter column idempotency_key set not null/);
+  assert.match(securityHardeningMigration, /invoice_line_items_invoice_line_no_key/);
+  assert.match(securityHardeningMigration, /exchange_rates_rate_key_uidx/);
+  assert.match(securityHardeningMigration, /agency_receivable_ledger_import_uidx/);
+});
+
+test("financial history survives reservation deletes", () => {
+  for (const table of ["invoices", "payments", "expenses", "extra_revenues", "shopping_commissions", "settlements", "guide_expense_reports"]) {
+    assert.match(
+      securityHardeningMigration,
+      new RegExp(`alter table ${table} add constraint [a-z_]+\\n?\\s*foreign key \\([a-z_]+\\) references [a-z_]+\\(id\\) on delete restrict`)
+    );
+  }
+});
+
+test("receivable ledger dropped generic partner naming", () => {
+  assert.match(securityHardeningMigration, /rename to agency_receivable_ledger/);
+  assert.match(securityHardeningMigration, /rename column partner_name to counterparty_agency_name/);
+});
+
+test("bootstrap uses a one-shot system flag", () => {
+  assert.match(securityHardeningMigration, /create table if not exists system_flags/);
+  assert.match(securityHardeningMigration, /alter table system_flags enable row level security/);
+});
+
+test("demo seed refuses hosted database connections", () => {
+  assert.match(seedSql, /pg_stat_ssl/);
+  assert.match(seedSql, /JHT demo seed refused/);
 });
 
 test("api error responses do not expose internal server messages", () => {

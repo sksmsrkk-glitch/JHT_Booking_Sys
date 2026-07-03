@@ -1,6 +1,21 @@
 -- Local v1 demo seed for Jungho Travel operations.
 -- This file is safe to run repeatedly in local Supabase because rows use stable IDs.
 
+-- Hosted guard: this seed creates demo auth users with a repo-known password.
+-- Hosted Supabase connections use SSL, so we refuse to run there by default.
+-- Local docker connections are plain TCP and pass this check unchanged.
+do $$
+declare
+  v_ssl boolean;
+begin
+  select coalesce(s.ssl, false) into v_ssl
+  from pg_stat_ssl s
+  where s.pid = pg_backend_pid();
+  if v_ssl and coalesce(current_setting('app.jht_allow_demo_seed', true), '') <> 'on' then
+    raise exception 'JHT demo seed refused on an SSL (hosted) connection. Set app.jht_allow_demo_seed to on for this session only if you really intend to load demo users.';
+  end if;
+end $$;
+
 insert into auth.users (
   id,
   instance_id,
@@ -1299,8 +1314,8 @@ values (
   '00000000-0000-4000-8000-000000009952',
   '00000000-0000-4000-8000-000000009951',
   1,
-  '{"name_ko":"Demo Supplier","category":"hotel"}'::jsonb,
-  '{"name_ko":"Demo Supplier","category":"hotel"}'::jsonb,
+  '{"company_id":"00000000-0000-4000-8000-000000001001","name_ko":"Demo Supplier","category":"hotel"}'::jsonb,
+  '{"company_id":"00000000-0000-4000-8000-000000001001","name_ko":"Demo Supplier","category":"hotel"}'::jsonb,
   'valid'
 )
 on conflict (id) do update set
