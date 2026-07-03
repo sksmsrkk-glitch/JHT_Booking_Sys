@@ -30,6 +30,7 @@ export async function POST(request: Request) {
       checkedCount: messages?.length ?? 0,
       sentCount: results.filter((result) => result.status === "sent").length,
       failedCount: results.filter((result) => result.status === "failed").length,
+      skippedCount: results.filter((result) => result.status === "skipped").length,
       results
     };
 
@@ -54,11 +55,27 @@ async function processMessage(supabase: any, message: any) {
       env: process.env
     });
 
-    const { error: sendingError } = await supabase
+    // 원자적 클레임: queued 상태일 때만 sending으로 전환하고, 다른 워커가 이미
+    // 가져갔으면(0행) 건너뜁니다. 이것으로 cron 중복 실행 시 이중 발송을 막습니다.
+    const { data: claimed, error: sendingError } = await supabase
       .from("supplier_message_outbox")
       .update(attempt.sendingUpdate)
-      .eq("id", message.id);
+      .eq("id", message.id)
+      .eq("status", "queued")
+      .select("id")
+      .maybeSingle();
     if (sendingError) throw new Error(sendingError.message);
+    if (!claimed) {
+      return { id: message.id, status: "skipped", reason: "already claimed by another worker" };
+    }
+
+    // 실제 이메일/Kakao 발신 연동이 아직 없으므로, live 모드에서 "sent"로 기록하는 것은
+    // 거짓 성공입니다. 프로바이더가 연동되기 전까지 live 발송은 명시적으로 실패시킵니다.
+    if (!attempt.dryRun && process.env.SUPPLIER_MESSAGE_ALLOW_UNIMPLEMENTED_LIVE !== "on") {
+      throw new Error(
+        "Live supplier delivery is not implemented: no email/Kakao provider is wired. Keep SUPPLIER_MESSAGE_DELIVERY_MODE=dry_run until a provider is integrated."
+      );
+    }
 
     await insertEvent(supabase, message.id, attempt.sendingEvent);
 

@@ -62,6 +62,22 @@ export async function POST(request: Request) {
       revisionNo: body.revisionNo ?? 1
     });
 
+    // 같은 멱등키에 이미 승인/발송 단계로 넘어간 메시지가 있으면 덮어쓰지 않습니다.
+    // (revisionNo를 올리지 않고 재초안하면 sent 메시지가 draft로 되돌아가 재발송되던 결함 차단)
+    const { data: existing, error: existingError } = await supabase
+      .from("supplier_message_outbox")
+      .select("id, status")
+      .eq("idempotency_key", draft.idempotency_key)
+      .maybeSingle();
+
+    if (existingError) throw new HttpError(500, existingError.message);
+    if (existing && !["draft", "failed"].includes(existing.status)) {
+      throw new HttpError(
+        409,
+        `A supplier message with this key is already ${existing.status}. Increase the revision number to draft a new one.`
+      );
+    }
+
     const { data, error } = await supabase
       .from("supplier_message_outbox")
       .upsert(

@@ -20,7 +20,9 @@ export const SUPPLIER_MESSAGE_STATUSES = [
   "cancelled"
 ];
 
-export const SUPPLIER_MESSAGE_CHANNELS = ["email", "kakao_alimtalk", "kakao_friendtalk", "internal"];
+// 공급자 아웃박스 발신 채널은 도메인 검증기(buildSupplierMessageDraft)와 일치해야 합니다.
+// "internal"은 도메인에서 허용되지 않으므로 여기서도 제외합니다(선택 시 500 방지).
+export const SUPPLIER_MESSAGE_CHANNELS = ["email", "kakao_alimtalk", "kakao_friendtalk"];
 
 export const SUPPLIER_MESSAGE_TYPES = [
   "booking_request",

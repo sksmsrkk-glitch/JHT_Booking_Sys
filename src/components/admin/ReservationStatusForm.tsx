@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { RESERVATION_STATUSES } from "@/features/reservation/queries";
+import { HIGH_RISK_RESERVATION_STATUSES } from "@/lib/domain/reservations.mjs";
+import { submitJson } from "@/lib/client/api";
 
 export function ReservationStatusForm({
   reservationId,
@@ -15,17 +17,19 @@ export function ReservationStatusForm({
   const [message, setMessage] = useState("");
   const [isBusy, setIsBusy] = useState(false);
 
+  const isHighRisk = HIGH_RISK_RESERVATION_STATUSES.includes(status);
+
   async function updateStatus() {
+    // 확정/취소 같은 고위험 전이는 사유가 필수입니다(서버도 동일하게 강제).
+    if (isHighRisk && !reason.trim()) {
+      setMessage("A reason is required to confirm or cancel a reservation.");
+      return;
+    }
     setIsBusy(true);
     setMessage("");
-    const response = await fetch(`/api/reservations/${reservationId}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status, reason })
-    });
-    const payload = await response.json();
-    if (!response.ok) {
-      setMessage(payload.error ?? "Status update failed");
+    const result = await submitJson(`/api/reservations/${reservationId}`, { status, reason }, { method: "PATCH" });
+    if (!result.ok) {
+      setMessage(result.error ?? "Status update failed");
       setIsBusy(false);
       return;
     }
@@ -46,11 +50,12 @@ export function ReservationStatusForm({
           </select>
         </label>
         <label>
-          Reason
+          Reason{isHighRisk ? " (required)" : ""}
           <input
             disabled={isBusy}
             onChange={(event) => setReason(event.target.value)}
-            placeholder="Optional status note"
+            placeholder={isHighRisk ? "Why is this reservation being confirmed/cancelled?" : "Optional status note"}
+            required={isHighRisk}
             value={reason}
           />
         </label>

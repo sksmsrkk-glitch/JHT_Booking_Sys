@@ -84,21 +84,39 @@ async function importBatch({
     actorProfileId
   });
 
+  // 원자적 클레임: approved 상태일 때만 imported로 전환합니다. 동시 요청/재시도가
+  // 프로덕션 테이블에 행을 두 번 넣지 못하게, insert 전에 먼저 상태를 선점합니다.
+  const { data: claimedBatch, error: claimError } = await supabase
+    .from("migration_batches")
+    .update({ status: statusUpdate.status })
+    .eq("id", batch.id)
+    .eq("status", "approved")
+    .select("id, source_name, target_table, status, updated_at")
+    .maybeSingle();
+
+  if (claimError) throw new HttpError(500, claimError.message);
+  if (!claimedBatch) {
+    throw new HttpError(409, "Migration batch is not in approved state (already imported or concurrently changed)");
+  }
+
   const { data: importedRows, error: importError } = await supabase
     .from(batch.target_table)
     .insert(importRows)
     .select("id");
 
-  if (importError) throw new HttpError(500, importError.message);
+  if (importError) {
+    // 삽입 실패 시 배치를 failed로 되돌리고 사유를 기록해, imported로 잘못 남지 않게 합니다.
+    await supabase.from("migration_batches").update({ status: "failed" }).eq("id", batch.id);
+    await supabase.from("migration_errors").insert({
+      migration_batch_id: batch.id,
+      staging_row_id: null,
+      error_code: "import_failed",
+      error_message: importError.message
+    });
+    throw new HttpError(500, importError.message);
+  }
 
-  const { data: updatedBatch, error: updateError } = await supabase
-    .from("migration_batches")
-    .update({ status: statusUpdate.status })
-    .eq("id", batch.id)
-    .select("id, source_name, target_table, status, updated_at")
-    .single();
-
-  if (updateError) throw new HttpError(500, updateError.message);
+  const updatedBatch = claimedBatch;
 
   await writeAuditLog(supabase, {
     actorProfileId: statusUpdate.audit.actorProfileId,

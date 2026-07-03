@@ -9,10 +9,12 @@ export function NotionCsvStagingForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // await 이후에는 event.currentTarget이 null이 될 수 있으므로 먼저 참조를 잡아둡니다.
+    const formElement = event.currentTarget;
     setIsSubmitting(true);
     setMessage("");
 
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     const rowsText = String(form.get("rows") ?? "");
     let rows: unknown;
     try {
@@ -23,26 +25,31 @@ export function NotionCsvStagingForm() {
       return;
     }
 
-    const response = await fetch("/api/migrations/notion-csv", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        sourceName: form.get("sourceName"),
-        targetTable: form.get("targetTable"),
-        rows
-      })
-    });
-    const result = await response.json();
+    try {
+      const response = await fetch("/api/migrations/notion-csv", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          sourceName: form.get("sourceName"),
+          targetTable: form.get("targetTable"),
+          rows
+        })
+      });
+      const result = await response.json().catch(() => ({}));
 
-    if (!response.ok) {
-      setMessage(result.error ?? "Staging failed");
+      if (!response.ok) {
+        setMessage(result.error ?? "Staging failed");
+        setIsSubmitting(false);
+        return;
+      }
+
+      setMessage(`Staged ${result.data?.rowCount ?? 0} rows.`);
+      formElement.reset();
+      window.location.reload();
+    } catch {
+      setMessage("Network error while staging rows. Please retry.");
       setIsSubmitting(false);
-      return;
     }
-
-    setMessage(`Staged ${result.data?.rowCount ?? 0} rows.`);
-    event.currentTarget.reset();
-    window.location.reload();
   }
 
   return (

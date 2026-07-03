@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { submitJson } from "@/lib/client/api";
 
 export function PaymentCreateForm({
   invoiceId,
@@ -21,22 +22,18 @@ export function PaymentCreateForm({
     setMessage("");
     const amount = Number(formData.get("amount") ?? 0);
     const referenceNo = String(formData.get("referenceNo") ?? "").trim();
+    const status = String(formData.get("status") ?? "pending");
     const payload = {
       amount,
       currency,
-      status: String(formData.get("status") ?? "confirmed"),
+      status,
       method: String(formData.get("method") ?? "").trim(),
       referenceNo,
-      idempotencyKey: `${invoiceId}:${referenceNo || "manual"}:${amount}`
+      idempotencyKey: `${invoiceId}:${referenceNo || "manual"}:${status}:${amount}`
     };
 
-    const response = await fetch(`/api/finance/invoices/${invoiceId}/payments`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    const result = await response.json();
-    if (!response.ok) {
+    const result = await submitJson(`/api/finance/invoices/${invoiceId}/payments`, payload);
+    if (!result.ok) {
       setMessage(result.error ?? "Payment creation failed");
       setIsBusy(false);
       return;
@@ -62,9 +59,9 @@ export function PaymentCreateForm({
         </label>
         <label>
           Status
-          <select defaultValue="confirmed" disabled={Boolean(disabledReason)} name="status">
-            <option value="confirmed">Confirmed</option>
+          <select defaultValue="pending" disabled={Boolean(disabledReason)} name="status">
             <option value="pending">Pending</option>
+            <option value="confirmed">Confirmed</option>
             <option value="failed">Failed</option>
             <option value="refunded">Refunded</option>
           </select>
