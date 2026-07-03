@@ -25,15 +25,12 @@ export async function POST(request: Request, context: RouteContext) {
         version_no: nextVersionNo,
         status: "draft",
         margin_mode: sourceVersion?.margin_mode ?? "auto_rate",
-        default_margin_rate: Number(sourceVersion?.default_margin_rate ?? 0),
         currency: sourceVersion?.currency ?? quoteCase.currency ?? "KRW",
         exchange_rate_to_krw: Number(sourceVersion?.exchange_rate_to_krw ?? 1),
         agency_visible_summary: sourceVersion?.agency_visible_summary ?? {},
         public_fare_options: sourceVersion?.public_fare_options ?? [],
         excel_source_summary: sourceVersion?.excel_source_summary ?? {},
         public_total_amount: Number(sourceVersion?.public_total_amount ?? 0),
-        internal_total_cost_krw: Number(sourceVersion?.internal_total_cost_krw ?? 0),
-        internal_total_margin_krw: Number(sourceVersion?.internal_total_margin_krw ?? 0),
         terms_and_conditions: sourceVersion?.terms_and_conditions ?? null,
         created_by: internalUser.profileId
       })
@@ -41,6 +38,17 @@ export async function POST(request: Request, context: RouteContext) {
       .single();
 
     if (versionError) throw new HttpError(500, versionError.message);
+
+    // 내부 원가/마진/기본 마진율은 별도 internal-only 테이블에 복사합니다.
+    const sourceInternals = sourceVersion ? await getVersionInternals(supabase, sourceVersion.id) : null;
+    const { error: internalsError } = await supabase.from("quote_version_internals").insert({
+      quote_version_id: version.id,
+      internal_total_cost_krw: Number(sourceInternals?.internal_total_cost_krw ?? 0),
+      internal_total_margin_krw: Number(sourceInternals?.internal_total_margin_krw ?? 0),
+      default_margin_rate: Number(sourceInternals?.default_margin_rate ?? 0)
+    });
+
+    if (internalsError) throw new HttpError(500, internalsError.message);
 
     const copied = sourceVersion
       ? await copyVersionChildren(supabase, sourceVersion.id, version.id)
@@ -65,6 +73,17 @@ export async function POST(request: Request, context: RouteContext) {
   } catch (error) {
     return fail(error);
   }
+}
+
+async function getVersionInternals(supabase: any, quoteVersionId: string) {
+  const { data, error } = await supabase
+    .from("quote_version_internals")
+    .select("internal_total_cost_krw, internal_total_margin_krw, default_margin_rate")
+    .eq("quote_version_id", quoteVersionId)
+    .maybeSingle();
+
+  if (error) throw new HttpError(500, error.message);
+  return data;
 }
 
 async function getQuoteCase(supabase: any, quoteCaseId: string) {
@@ -96,7 +115,7 @@ async function resolveVersionPlan(supabase: any, quoteCaseId: string, rawCopyFro
   const { data: latestVersion, error: latestError } = await supabase
     .from("quote_versions")
     .select(
-      "id, quote_case_id, version_no, margin_mode, default_margin_rate, currency, exchange_rate_to_krw, agency_visible_summary, public_fare_options, excel_source_summary, public_total_amount, internal_total_cost_krw, internal_total_margin_krw, terms_and_conditions"
+      "id, quote_case_id, version_no, margin_mode, currency, exchange_rate_to_krw, agency_visible_summary, public_fare_options, excel_source_summary, public_total_amount, terms_and_conditions"
     )
     .eq("quote_case_id", quoteCaseId)
     .order("version_no", { ascending: false })
@@ -112,7 +131,7 @@ async function resolveVersionPlan(supabase: any, quoteCaseId: string, rawCopyFro
   const { data: sourceVersion, error: sourceError } = await supabase
     .from("quote_versions")
     .select(
-      "id, quote_case_id, version_no, margin_mode, default_margin_rate, currency, exchange_rate_to_krw, agency_visible_summary, public_fare_options, excel_source_summary, public_total_amount, internal_total_cost_krw, internal_total_margin_krw, terms_and_conditions"
+      "id, quote_case_id, version_no, margin_mode, currency, exchange_rate_to_krw, agency_visible_summary, public_fare_options, excel_source_summary, public_total_amount, terms_and_conditions"
     )
     .eq("id", copyFromVersionId)
     .maybeSingle();

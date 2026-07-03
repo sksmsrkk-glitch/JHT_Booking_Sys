@@ -1,3 +1,5 @@
+import { convertKrwToQuoteCurrency } from "../../lib/domain/currency.mjs";
+
 /*
  * 최종 견적서 + 오퍼레이터 확정 내용을 인보이스 초안으로 변환하는 모듈입니다.
  *
@@ -61,11 +63,14 @@ export function buildInvoiceFromFinalQuote({
   versionNo: number;
 }) {
   const currency = quoteVersion.currency ?? quoteCase.currency ?? "KRW";
-  // 견적 항목별 판매가를 인보이스 라인으로 변환합니다.
+  // 내부 금액은 KRW로 저장되므로, 발행 시점에 견적 통화로 변환합니다(결정: KRW 내부저장 + 발행 시 변환).
+  // exchange_rate_to_krw = 견적 통화 1단위당 KRW. KRW 견적(rate=1)은 값이 그대로 유지됩니다.
+  const exchangeRateToKrw = Number(quoteVersion.exchange_rate_to_krw ?? 1);
+  // 견적 항목별 판매가(KRW)를 견적 통화 라인으로 변환합니다.
   // 화면에 보이는 인보이스 금액은 public total보다 라인아이템 합계를 우선합니다.
-  const lineItems = quoteItems.map((item, index) => buildLineItem(item, index + 1, currency));
+  const lineItems = quoteItems.map((item, index) => buildLineItem(item, index + 1, currency, exchangeRateToKrw));
   const lineItemTotal = roundMoney(lineItems.reduce((sum, item) => sum + item.total_amount, 0));
-  const publicTotal = roundMoney(Number(quoteVersion.public_total_amount ?? 0));
+  const publicTotal = convertKrwToQuoteCurrency(Number(quoteVersion.public_total_amount ?? 0), exchangeRateToKrw, currency);
   const totalAmount = lineItemTotal > 0 ? lineItemTotal : publicTotal;
   // 하나의 단체는 문의부터 가이드 지출결의서까지 같은 업무 코드로 추적해야 하므로,
   // 인보이스 번호도 같은 tourCode를 접두어로 사용합니다.
@@ -112,8 +117,9 @@ export function buildInvoiceFromFinalQuote({
   };
 }
 
-function buildLineItem(item: QuoteItemRow, lineNo: number, fallbackCurrency: string) {
-  const total = roundMoney(Number(item.total_sell_amount ?? 0));
+function buildLineItem(item: QuoteItemRow, lineNo: number, fallbackCurrency: string, exchangeRateToKrw: number) {
+  // total_sell_amount는 KRW이므로 견적 통화로 변환한 뒤 라인에 기록합니다.
+  const total = convertKrwToQuoteCurrency(Number(item.total_sell_amount ?? 0), exchangeRateToKrw, fallbackCurrency);
   const quantity = Number(item.quantity ?? 1) || 1;
   return {
     line_no: lineNo,

@@ -59,6 +59,7 @@ import {
 } from "../src/lib/domain/reservations.mjs";
 import { computeSettlementTotals, selectActiveInvoices, roundMoney } from "../src/lib/domain/settlement.mjs";
 import { resolveInvoicePaymentState, validatePaymentInput } from "../src/lib/domain/payments.mjs";
+import { convertKrwToQuoteCurrency } from "../src/lib/domain/currency.mjs";
 import { buildCompanyCreateRow } from "../src/lib/domain/company.mjs";
 import { buildInternalProfileRow, buildInternalUserRoleRows, normalizeRoles } from "../src/lib/domain/internal-users.mjs";
 import {
@@ -1172,4 +1173,43 @@ test("invoice payment state flips to paid and flags overpayment", () => {
   const over = resolveInvoicePaymentState({ invoiceTotal: 1000, currentStatus: "issued", payments: [{ status: "confirmed", amount: 1200 }] });
   assert.equal(over.nextStatus, "paid");
   assert.equal(over.isOverpaid, true);
+});
+
+
+test("currency conversion divides KRW by the quote-currency rate and is a no-op for KRW", () => {
+  // rate = 견적 통화 1단위당 KRW. 1 MYR = 300 KRW 이면 30000 KRW = 100 MYR.
+  assert.equal(convertKrwToQuoteCurrency(30000, 300, "MYR"), 100);
+  assert.equal(convertKrwToQuoteCurrency(1300, 1, "MYR"), 1300);
+  assert.equal(convertKrwToQuoteCurrency(5740000, 1, "KRW"), 5740000);
+  // KRW 대상은 rate와 무관하게 그대로 유지합니다.
+  assert.equal(convertKrwToQuoteCurrency(5740000, 999, "KRW"), 5740000);
+  assert.throws(() => convertKrwToQuoteCurrency(1000, 0, "MYR"), /positive number/);
+});
+
+test("auto invoice converts KRW quote amounts into the quote currency at issuance", () => {
+  const result = buildInvoiceFromFinalQuote({
+    reservation: { id: "r1", reservation_code: "RSV-1", tour_start_date: "2026-03-24" },
+    quoteCase: { id: "c1", case_code: "Q-1", tour_name: "T", currency: "MYR" },
+    quoteVersion: {
+      id: "v1",
+      version_no: 1,
+      status: "accepted",
+      currency: "MYR",
+      exchange_rate_to_krw: 300,
+      public_total_amount: 390000,
+      accepted_at: "2026-06-29T10:00:00Z"
+    },
+    quoteItems: [
+      { id: "i1", item_category: "room", snapshot_item_name: "Hotel", pricing_unit: "per_room", quantity: 2, total_sell_amount: 300000 },
+      { id: "i2", item_category: "meal", snapshot_item_name: "Meals", pricing_unit: "per_person", quantity: 20, total_sell_amount: 90000 }
+    ],
+    itineraryDays: [],
+    finalSnapshot: null,
+    versionNo: 1
+  });
+  // 300000 KRW / 300 = 1000 MYR, 90000 / 300 = 300 MYR => total 1300 MYR
+  assert.equal(result.invoice.currency, "MYR");
+  assert.equal(result.invoice.total_amount, 1300);
+  assert.equal(result.lineItems[0].total_amount, 1000);
+  assert.equal(result.lineItems[1].total_amount, 300);
 });

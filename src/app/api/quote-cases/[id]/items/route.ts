@@ -102,15 +102,27 @@ async function recalculateVersionTotals(supabase: any, quoteVersionId: string) {
     internalTotalMarginKrw: roundMoney(totals.sell - totals.cost)
   };
 
+  // public_total_amount는 KRW 기준 판매가 합계로 유지합니다(내부 저장은 KRW).
+  // 견적 통화 변환은 인보이스 발행 시점에서 수행합니다.
   const { error: updateError } = await supabase
     .from("quote_versions")
-    .update({
-      public_total_amount: nextTotals.publicTotalAmount,
-      internal_total_cost_krw: nextTotals.internalTotalCostKrw,
-      internal_total_margin_krw: nextTotals.internalTotalMarginKrw
-    })
+    .update({ public_total_amount: nextTotals.publicTotalAmount })
     .eq("id", quoteVersionId);
 
   if (updateError) throw new HttpError(500, updateError.message);
+
+  // 내부 원가/마진은 agency에 노출되지 않도록 quote_version_internals(internal-only)에 저장합니다.
+  const { error: internalsError } = await supabase
+    .from("quote_version_internals")
+    .upsert(
+      {
+        quote_version_id: quoteVersionId,
+        internal_total_cost_krw: nextTotals.internalTotalCostKrw,
+        internal_total_margin_krw: nextTotals.internalTotalMarginKrw
+      },
+      { onConflict: "quote_version_id" }
+    );
+
+  if (internalsError) throw new HttpError(500, internalsError.message);
   return nextTotals;
 }

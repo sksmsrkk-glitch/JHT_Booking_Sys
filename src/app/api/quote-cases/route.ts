@@ -70,15 +70,12 @@ export async function POST(request: Request) {
         version_no: 1,
         status: "draft",
         margin_mode: optionalString(body.marginMode) ?? "auto_rate",
-        default_margin_rate: optionalNumber(body.defaultMarginRate) ?? 0,
         currency: optionalString(body.currency) ?? "KRW",
         exchange_rate_to_krw: optionalNumber(body.exchangeRateToKrw) ?? 1,
         agency_visible_summary: body.agencyVisibleSummary ?? {},
         public_fare_options: Array.isArray(body.publicFareOptions) ? body.publicFareOptions : [],
         excel_source_summary: normalizeObject(body.excelSourceSummary),
         public_total_amount: roundMoney(totals.sell),
-        internal_total_cost_krw: roundMoney(totals.cost),
-        internal_total_margin_krw: roundMoney(totals.margin),
         terms_and_conditions: optionalString(body.termsAndConditions),
         created_by: internalUser.profileId
       })
@@ -86,6 +83,16 @@ export async function POST(request: Request) {
       .single();
 
     if (versionError) throw new HttpError(500, versionError.message);
+
+    // 내부 원가/마진/기본 마진율은 agency 비노출 테이블에 저장합니다.
+    const { error: internalsError } = await supabase.from("quote_version_internals").insert({
+      quote_version_id: version.id,
+      internal_total_cost_krw: roundMoney(totals.cost),
+      internal_total_margin_krw: roundMoney(totals.margin),
+      default_margin_rate: optionalNumber(body.defaultMarginRate) ?? 0
+    });
+
+    if (internalsError) throw new HttpError(500, internalsError.message);
 
     const exchangeRateSnapshots = body.exchangeRates
       ? requireArray<Record<string, unknown>>(body.exchangeRates, "exchangeRates")

@@ -509,13 +509,10 @@ insert into quote_versions (
   version_no,
   status,
   margin_mode,
-  default_margin_rate,
   currency,
   exchange_rate_to_krw,
   agency_visible_summary,
   public_total_amount,
-  internal_total_cost_krw,
-  internal_total_margin_krw,
   terms_and_conditions,
   created_by,
   sent_at,
@@ -527,13 +524,10 @@ values (
   1,
   'accepted',
   'auto_rate',
-  0.2,
   'KRW',
   1,
   '{"highlights":["Seoul arrival","Busan hotel","Seafood dinner"],"pax":20}'::jsonb,
   5740000,
-  4790000,
-  950000,
   'Demo terms: rates are sample only and subject to supplier confirmation.',
   '00000000-0000-4000-8000-000000002001',
   '2026-06-26 09:00:00+00',
@@ -543,11 +537,27 @@ on conflict (id) do update set
   status = excluded.status,
   agency_visible_summary = excluded.agency_visible_summary,
   public_total_amount = excluded.public_total_amount,
-  internal_total_cost_krw = excluded.internal_total_cost_krw,
-  internal_total_margin_krw = excluded.internal_total_margin_krw,
   terms_and_conditions = excluded.terms_and_conditions,
   sent_at = excluded.sent_at,
   accepted_at = excluded.accepted_at;
+
+-- 내부 원가/마진/기본 마진율은 agency 비노출 테이블에 별도로 넣습니다.
+insert into quote_version_internals (
+  quote_version_id,
+  internal_total_cost_krw,
+  internal_total_margin_krw,
+  default_margin_rate
+)
+values (
+  '00000000-0000-4000-8000-000000008101',
+  4790000,
+  950000,
+  0.2
+)
+on conflict (quote_version_id) do update set
+  internal_total_cost_krw = excluded.internal_total_cost_krw,
+  internal_total_margin_krw = excluded.internal_total_margin_krw,
+  default_margin_rate = excluded.default_margin_rate;
 
 insert into quote_itinerary_days (
   id,

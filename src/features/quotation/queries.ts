@@ -78,7 +78,7 @@ export async function getQuoteCaseDetail(
   const { data: versions, error: versionError } = await supabase
     .from("quote_versions")
     .select(
-      "id, version_no, status, margin_mode, default_margin_rate, currency, exchange_rate_to_krw, agency_visible_summary, public_fare_options, excel_source_summary, public_total_amount, internal_total_cost_krw, internal_total_margin_krw, terms_and_conditions, sent_at, accepted_at, created_at, quote_itinerary_days(id, day_no, service_date, title, public_description, internal_notes, route_segments(id, seq, origin_label, destination_label, travel_minutes, distance_meters, provider, manual_override)), quote_items(id, item_category, snapshot_item_name, snapshot_supplier_name, snapshot_cost_currency, snapshot_unit_cost_amount, exchange_rate_to_krw, pricing_unit, quantity, pax_count, margin_mode, margin_rate, manual_margin_amount, total_cost_krw, total_sell_amount, partner_visible_notes, internal_notes, service_section, calculation_mode, excel_cell_ref, excel_formula, manual_override, supplier_cost_breakdown, public_breakdown), quote_presentation_blocks(id, quote_itinerary_day_id, source_supplier_media_id, block_type, display_context, title, description, image_storage_path, image_url, alt_text, sort_order, is_public, metadata), quote_exports(id, export_type, storage_path, status, error_message, created_at)"
+      "id, version_no, status, margin_mode, currency, exchange_rate_to_krw, agency_visible_summary, public_fare_options, excel_source_summary, public_total_amount, terms_and_conditions, sent_at, accepted_at, created_at, quote_version_internals(internal_total_cost_krw, internal_total_margin_krw, default_margin_rate), quote_itinerary_days(id, day_no, service_date, title, public_description, internal_notes, route_segments(id, seq, origin_label, destination_label, travel_minutes, distance_meters, provider, manual_override)), quote_items(id, item_category, snapshot_item_name, snapshot_supplier_name, snapshot_cost_currency, snapshot_unit_cost_amount, exchange_rate_to_krw, pricing_unit, quantity, pax_count, margin_mode, margin_rate, manual_margin_amount, total_cost_krw, total_sell_amount, partner_visible_notes, internal_notes, service_section, calculation_mode, excel_cell_ref, excel_formula, manual_override, supplier_cost_breakdown, public_breakdown), quote_presentation_blocks(id, quote_itinerary_day_id, source_supplier_media_id, block_type, display_context, title, description, image_storage_path, image_url, alt_text, sort_order, is_public, metadata), quote_exports(id, export_type, storage_path, status, error_message, created_at)"
     )
     .eq("quote_case_id", quoteCaseId)
     .order("version_no", { ascending: false });
@@ -127,6 +127,13 @@ function mapQuoteCaseListItem(row: any): QuoteCaseListItem {
   };
 }
 
+function resolveInternals(row: any): { internal_total_cost_krw?: number; internal_total_margin_krw?: number; default_margin_rate?: number } {
+  // PostgREST 1:1 임베드는 객체 또는 단일 요소 배열로 올 수 있어 둘 다 처리합니다.
+  const internals = row.quote_version_internals;
+  if (Array.isArray(internals)) return internals[0] ?? {};
+  return internals ?? {};
+}
+
 function mapQuoteVersionDetail(row: any): QuoteVersionDetail {
   const presentationBlocks = (row.quote_presentation_blocks ?? []).map(mapQuotePresentationBlockDetail);
 
@@ -135,15 +142,15 @@ function mapQuoteVersionDetail(row: any): QuoteVersionDetail {
     versionNo: row.version_no,
     status: row.status,
     marginMode: row.margin_mode,
-    defaultMarginRate: Number(row.default_margin_rate ?? 0),
+    defaultMarginRate: Number(resolveInternals(row).default_margin_rate ?? 0),
     currency: row.currency,
     exchangeRateToKrw: Number(row.exchange_rate_to_krw ?? 1),
     agencyVisibleSummary: row.agency_visible_summary ?? {},
     publicFareOptions: Array.isArray(row.public_fare_options) ? row.public_fare_options : [],
     excelSourceSummary: row.excel_source_summary ?? {},
     publicTotalAmount: Number(row.public_total_amount ?? 0),
-    internalTotalCostKrw: Number(row.internal_total_cost_krw ?? 0),
-    internalTotalMarginKrw: Number(row.internal_total_margin_krw ?? 0),
+    internalTotalCostKrw: Number(resolveInternals(row).internal_total_cost_krw ?? 0),
+    internalTotalMarginKrw: Number(resolveInternals(row).internal_total_margin_krw ?? 0),
     termsAndConditions: row.terms_and_conditions ?? null,
     sentAt: row.sent_at ?? null,
     acceptedAt: row.accepted_at ?? null,

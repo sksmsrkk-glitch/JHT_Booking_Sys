@@ -63,24 +63,29 @@ Verification at each commit: `npm run test` (78 pass), `npm run typecheck`,
 - UI still uses generic "Partner / 파트너" labels; the mandated terms are
   "Overseas Agency / 해외 에이전시".
 
-## BLOCKED on business decisions (Phase 4)
+## Phase 4 — DONE (decisions received, implemented in commit 5)
 
-Two Critical findings need a decision before implementation, because they change data
-meaning, not just code:
+Both Phase 4 decisions were answered by the user and implemented:
 
-1. **Currency model.** Is `quote_versions.public_total_amount` / `quote_items.total_sell_amount`
-   stored in KRW or in the quote's own `currency`? Today the math produces a KRW number
-   but the version can be labelled MYR, and `quote_exchange_rate_snapshots` are stored
-   but never used. The settlement route now *rejects* mixed-currency inputs (422) as a
-   stopgap; the real fix is to pick one storage convention and convert at one explicit
-   point using the snapshotted rate.
-2. **Margin column exposure.** `quote_versions` still carries `internal_total_cost_krw`
-   / `internal_total_margin_krw` / `default_margin_rate` on the same row agencies can
-   select. Phase 1 did not column-restrict these yet because internal users are also the
-   `authenticated` role, so a blanket column revoke would break internal screens. The
-   robust fix is to split internal amounts into a `quote_version_internals` table (or a
-   security-barrier view), which requires updating Codex's existing quote read/write
-   code in the same change.
+1. **Currency model — decided: KRW internal storage, convert at issuance.** All internal
+   amounts (`total_sell_amount`, `public_total_amount`, internal cost/margin) stay in
+   KRW. Conversion to the quote currency now happens at invoice issuance via
+   `src/lib/domain/currency.mjs` `convertKrwToQuoteCurrency(amountKrw, exchangeRateToKrw)`
+   using the version's rate, applied in `src/features/finance/auto-invoice.ts` (line
+   items + total). `exchange_rate_to_krw` semantics: 1 quote-currency unit = X KRW, so
+   KRW→quote divides by the rate; KRW quotes (rate 1) are unchanged. NOTE: agency-portal
+   display of `public_total_amount` (still KRW) should apply the same helper for a fully
+   consistent agency view — left as a follow-up because it is display-only.
+2. **Margin column exposure — decided: separate table.** Migration
+   `202607040001_quote_version_internals.sql` creates the internal-only
+   `quote_version_internals` table, backfills it, updates the Phase 1
+   `guard_quote_version_amounts` trigger to drop the moved columns, adds an immutability
+   trigger, and drops `internal_total_cost_krw` / `internal_total_margin_krw` /
+   `default_margin_rate` from `quote_versions`. App code updated:
+   `quote-cases/route.ts`, `quote-cases/[id]/versions/route.ts`,
+   `quote-cases/[id]/items/route.ts`, `features/quotation/queries.ts` (joins the new
+   table), and `seed.sql`. **This migration drops columns — apply and verify against a
+   real DB before deploy (see the MUST DO section).**
 
 ## New building blocks Codex should reuse (don't re-implement)
 
@@ -89,6 +94,9 @@ meaning, not just code:
 - `src/lib/domain/settlement.mjs` — `computeSettlementTotals`, `selectActiveInvoices`,
   `roundMoney`.
 - `src/lib/domain/payments.mjs` — `validatePaymentInput`, `resolveInvoicePaymentState`.
+- `src/lib/domain/currency.mjs` — `convertKrwToQuoteCurrency` (KRW→quote currency at issuance).
+- DB: `quote_version_internals` table holds internal cost/margin/default-margin-rate;
+  read it via join (internal only). Do NOT re-add these columns to `quote_versions`.
 - `src/lib/api/guards.ts` — `isDemoModeEnabled()`, timing-safe secret comparison.
 - `src/lib/client/api.ts` — `submitJson()` for all client mutations.
 - DB: `update_reservation_status(uuid, reservation_status, text)` RPC (records history

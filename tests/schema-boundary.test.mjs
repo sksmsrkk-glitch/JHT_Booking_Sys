@@ -67,7 +67,11 @@ const securityHardeningMigration = readFileSync(
   new URL("../supabase/migrations/202607030001_security_hardening.sql", import.meta.url),
   "utf8"
 );
-const schema = `${initialSchema}\n${gmailCandidatesMigration}\n${quoteExcelModelMigration}\n${quoteFareOptionsMigration}\n${quotePresentationBlocksMigration}\n${supplierMediaAttachmentsMigration}\n${partnerReceivableLedgerMigration}\n${exchangeRatesMigration}\n${agencyInquiryTourWorkflowMigration}\n${invoiceVersioningMigration}\n${finalOperationInvoiceMigration}\n${guideExpenseReportsMigration}\n${agencyOnboardingGovernanceMigration}\n${countryReferenceExchangeRatesMigration}\n${workflowPortalCommunicationMigration}\n${workflowMessageActorLinksMigration}\n${securityHardeningMigration}`;
+const quoteVersionInternalsMigration = readFileSync(
+  new URL("../supabase/migrations/202607040001_quote_version_internals.sql", import.meta.url),
+  "utf8"
+);
+const schema = `${initialSchema}\n${gmailCandidatesMigration}\n${quoteExcelModelMigration}\n${quoteFareOptionsMigration}\n${quotePresentationBlocksMigration}\n${supplierMediaAttachmentsMigration}\n${partnerReceivableLedgerMigration}\n${exchangeRatesMigration}\n${agencyInquiryTourWorkflowMigration}\n${invoiceVersioningMigration}\n${finalOperationInvoiceMigration}\n${guideExpenseReportsMigration}\n${agencyOnboardingGovernanceMigration}\n${countryReferenceExchangeRatesMigration}\n${workflowPortalCommunicationMigration}\n${workflowMessageActorLinksMigration}\n${securityHardeningMigration}\n${quoteVersionInternalsMigration}`;
 const agencyPortalQueries = readFileSync(new URL("../src/features/agency-portal/queries.ts", import.meta.url), "utf8");
 const apiHttp = readFileSync(new URL("../src/lib/api/http.ts", import.meta.url), "utf8");
 const seedSql = readFileSync(new URL("../supabase/seed.sql", import.meta.url), "utf8");
@@ -354,6 +358,18 @@ test("bootstrap uses a one-shot system flag", () => {
 test("demo seed refuses hosted database connections", () => {
   assert.match(seedSql, /pg_stat_ssl/);
   assert.match(seedSql, /JHT demo seed refused/);
+});
+
+test("internal quote margins are split into an internal-only table and dropped from quote_versions", () => {
+  assert.match(quoteVersionInternalsMigration, /create table if not exists quote_version_internals/);
+  assert.match(quoteVersionInternalsMigration, /create policy "quote version internals internal only"/);
+  assert.match(quoteVersionInternalsMigration, /alter table quote_versions drop column if exists internal_total_cost_krw/);
+  assert.match(quoteVersionInternalsMigration, /alter table quote_versions drop column if exists internal_total_margin_krw/);
+  assert.match(quoteVersionInternalsMigration, /alter table quote_versions drop column if exists default_margin_rate/);
+  // agency 정책이 이 테이블에 존재하면 안 됩니다(internal-only).
+  assert.doesNotMatch(quoteVersionInternalsMigration, /quote version internals agency/);
+  // 내부 값도 sent 이후 불변이어야 합니다.
+  assert.match(quoteVersionInternalsMigration, /create trigger quote_version_internals_immutable/);
 });
 
 test("api error responses do not expose internal server messages", () => {
