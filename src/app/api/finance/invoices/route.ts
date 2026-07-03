@@ -61,12 +61,23 @@ export async function POST(request: Request) {
       throw new HttpError(409, "Invoice total amount must be greater than zero");
     }
 
-    const status = optionalString(body.status) ?? "issued";
+    // 인보이스 발행은 고위험 액션이므로 기본값을 draft로 두고, issued는 명시적으로 요청해야 합니다.
+    const status = optionalString(body.status) ?? "draft";
     if (!["draft", "issued"].includes(status)) {
       throw new HttpError(400, "Invoice status must be draft or issued");
     }
     const versionNo = optionalNumber(body.versionNo) ?? Number(latestInvoice?.version_no ?? 0) + 1;
     const lineItems = normalizeLineItems(body.lineItems, optionalString(body.currency) ?? quoteVersion.currency ?? "KRW");
+    // 각 라인 합계가 수량 x 단가와 크게 어긋나면 오타로 보고 거부합니다(임의 금액 청구 방지).
+    for (const item of lineItems) {
+      const expected = roundMoney(item.quantity * item.unit_amount);
+      if (Math.abs(expected - item.total_amount) > 0.01) {
+        throw new HttpError(
+          400,
+          `Invoice line "${item.description}" total ${item.total_amount} does not match quantity x unit ${expected}`
+        );
+      }
+    }
     const computedLineTotal = lineItems.reduce((sum, item) => sum + item.total_amount, 0);
     const finalTotal = computedLineTotal > 0 ? computedLineTotal : roundMoney(totalAmount);
 
@@ -110,9 +121,10 @@ export async function POST(request: Request) {
 
     await writeAuditLog(supabase, {
       actorProfileId: financeUser.profileId,
-      action: "invoice.created",
+      action: status === "issued" ? "invoice.issued" : "invoice.created",
       entityTable: "invoices",
       entityId: invoice.id,
+      riskLevel: status === "issued" ? "high" : "normal",
       afterData: {
         invoice,
         lineItemCount: lineItems.length,

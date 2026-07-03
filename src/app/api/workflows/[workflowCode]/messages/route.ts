@@ -2,6 +2,7 @@ import { getDemoWorkflowByCode } from "@/features/workflow/demo-data";
 import { ensureWorkflowThread, getWorkflowThreadByCode, resolveWorkflowSeedByCode } from "@/features/workflow/queries";
 import { requireAgencyUser, requireInternalUser } from "@/lib/api/auth";
 import { writeAuditLog } from "@/lib/api/audit";
+import { isDemoModeEnabled } from "@/lib/api/guards";
 import { created, fail, HttpError, optionalString, readJson, requireString } from "@/lib/api/http";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
@@ -28,8 +29,8 @@ export async function POST(request: Request, context: RouteContext) {
     const { workflowCode } = await context.params;
 
     // 개발/시연 중에는 로그인 없이도 포털 커뮤니케이션 UI를 눌러볼 수 있게 preview 응답을 돌려줍니다.
-    // 실제 DB 저장 경로에서는 아래에서 반드시 내부 사용자 또는 파트너 사용자를 확인합니다.
-    if (!request.headers.get("authorization")) {
+    // 단, 명시적 데모 모드에서만 허용하고, 그 외에는 인증을 강제해 가짜 성공 응답을 막습니다.
+    if (!request.headers.get("authorization") && isDemoModeEnabled()) {
       const body = await readJson<Record<string, unknown>>(request);
       const text = requireString(body.body, "body");
       const messageType = normalizeSetValue(body.messageType, MESSAGE_TYPES, "general");

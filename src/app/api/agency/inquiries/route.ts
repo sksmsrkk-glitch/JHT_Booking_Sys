@@ -1,5 +1,6 @@
 import { writeAuditLog } from "@/lib/api/audit";
 import { requireAgencyUser } from "@/lib/api/auth";
+import { isDemoModeEnabled } from "@/lib/api/guards";
 import { created, fail, HttpError, ok, optionalPositiveInteger, optionalString, readJson, requireString } from "@/lib/api/http";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
@@ -46,8 +47,9 @@ export async function POST(request: Request) {
       buildTourCode(optionalString(body.countryCode) ?? "MY", optionalString(body.agencyName) ?? "Agency", submittedDate);
     const requestPayload = normalizeObject(body.requestPayload);
     const flightDetails = Array.isArray(requestPayload.flightDetails) ? requestPayload.flightDetails : [];
-    if (!request.headers.get("authorization")) {
-      return created({
+
+    const previewResponse = () =>
+      created({
         id: `preview-${tourCode.toLowerCase()}`,
         inquiry_type: inquiryType,
         title,
@@ -58,6 +60,12 @@ export async function POST(request: Request) {
         preview: true,
         message: "Development preview mode: agency login was bypassed and no database row was written."
       });
+
+    // preview 응답은 명시적 데모 모드에서만 허용합니다. 그 외에는 인증을 강제해
+    // 토큰 만료 사용자의 실제 문의가 조용히 유실되지 않게 합니다.
+    if (!request.headers.get("authorization")) {
+      if (isDemoModeEnabled()) return previewResponse();
+      throw new HttpError(401, "Authentication required");
     }
 
     const supabase = createRequestSupabaseClient(request);
@@ -65,17 +73,8 @@ export async function POST(request: Request) {
     try {
       agencyUser = await requireAgencyUser(supabase);
     } catch (authError) {
-      return created({
-        id: `preview-${tourCode.toLowerCase()}`,
-        inquiry_type: inquiryType,
-        title,
-        tour_code: tourCode,
-        tourCode,
-        status: "preview_submitted",
-        created_at: new Date().toISOString(),
-        preview: true,
-        message: "Development preview mode: agency login was bypassed and no database row was written."
-      });
+      if (isDemoModeEnabled()) return previewResponse();
+      throw authError;
     }
 
     const { data, error } = await supabase

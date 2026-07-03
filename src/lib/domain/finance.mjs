@@ -3,7 +3,8 @@
  *
  * 회계 담당자는 인보이스 총액, 입금 확인액, 확인 전 입금액, 미수금을
  * 대시보드에서 바로 봐야 합니다. 이 함수는 confirmed 입금만 실제 수금으로
- * 인정하고, pending/received/review 상태는 검토 중 금액으로 별도 집계합니다.
+ * 인정하고, pending 상태는 검토 중 금액으로 별도 집계합니다.
+ * (payment_status enum: pending/confirmed/failed/refunded)
  *
  * @param {{ totalAmount: number, payments?: Array<{ status: string, amount: number }> }} input
  */
@@ -13,7 +14,7 @@ export function summarizeInvoicePayments({ totalAmount, payments = [] }) {
     .filter((payment) => payment.status === "confirmed")
     .reduce((sum, payment) => sum + Number(payment.amount ?? 0), 0);
   const pendingPaymentTotal = payments
-    .filter((payment) => ["pending", "received", "review"].includes(payment.status))
+    .filter((payment) => payment.status === "pending")
     .reduce((sum, payment) => sum + Number(payment.amount ?? 0), 0);
 
   return {
@@ -21,6 +22,7 @@ export function summarizeInvoicePayments({ totalAmount, payments = [] }) {
     confirmedPaymentTotal,
     pendingPaymentTotal,
     remainingAmount: Math.max(total - confirmedPaymentTotal, 0),
+    isOverpaid: total > 0 && confirmedPaymentTotal > total,
     isPaid: confirmedPaymentTotal >= total && total > 0
   };
 }

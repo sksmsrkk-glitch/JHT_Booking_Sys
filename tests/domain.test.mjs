@@ -40,6 +40,11 @@ import {
 } from "../src/lib/domain/readiness.mjs";
 import { buildMigrationImportRows, buildMigrationStatusUpdate, validateMigrationRows } from "../src/lib/domain/migration.mjs";
 import {
+  buildNotionMarkdownImportPlan,
+  buildSupplierCostMasterFromNotionDocument,
+  parseNotionMarkdownDocument
+} from "../src/lib/domain/notion-markdown-import.mjs";
+import {
   assertBootstrapAllowed,
   buildInitialAdminBootstrapRows,
   buildInitialCompanyBootstrapRow
@@ -48,6 +53,12 @@ import {
   buildGmailThreadManualLinkUpdate,
   buildGmailThreadManualReviewUpdate
 } from "../src/lib/domain/gmail-review.mjs";
+import {
+  planReservationStatusChange,
+  RESERVATION_STATUSES as RESERVATION_STATUS_LIST
+} from "../src/lib/domain/reservations.mjs";
+import { computeSettlementTotals, selectActiveInvoices, roundMoney } from "../src/lib/domain/settlement.mjs";
+import { resolveInvoicePaymentState, validatePaymentInput } from "../src/lib/domain/payments.mjs";
 import { buildCompanyCreateRow } from "../src/lib/domain/company.mjs";
 import { buildInternalProfileRow, buildInternalUserRoleRows, normalizeRoles } from "../src/lib/domain/internal-users.mjs";
 import {
@@ -499,6 +510,9 @@ test("auto invoice builder uses accepted quote items and final operation itinera
   assert.equal(result.invoice.version_no, 3);
   assert.equal(result.invoice.currency, "MYR");
   assert.equal(result.invoice.total_amount, 1300);
+  // 운영 자동 생성 인보이스는 draft로 시작하고 발행은 재무가 별도로 승인합니다.
+  assert.equal(result.invoice.status, "draft");
+  assert.equal(result.invoice.issued_at, null);
   assert.equal(result.lineItems.length, 2);
   assert.equal(result.invoice.itinerary_snapshot[0].hotel, "Confirmed Seoul Hotel");
   assert.equal(result.invoice.itinerary_snapshot[0].roomType, "Twin");
@@ -703,8 +717,23 @@ test("notion csv migration validation catches target required fields", () => {
   const result = validateMigrationRows({
     targetTable: "domestic_suppliers",
     rows: [
-      { id: "row-1", rowNo: 1, rawPayload: { name_ko: "정호호텔", category: "hotel" } },
-      { id: "row-2", rowNo: 2, rawPayload: { category: "restaurant" } }
+      {
+        id: "row-1",
+        rowNo: 1,
+        rawPayload: {
+          company_id: "00000000-0000-4000-8000-000000001001",
+          name_ko: "정호호텔",
+          category: "hotel"
+        }
+      },
+      {
+        id: "row-2",
+        rowNo: 2,
+        rawPayload: {
+          company_id: "00000000-0000-4000-8000-000000001001",
+          category: "restaurant"
+        }
+      }
     ]
   });
 
@@ -772,12 +801,22 @@ test("notion csv migration imports only approved valid mapped rows", () => {
         id: "row-1",
         rowNo: 1,
         validationStatus: "valid",
-        mappedPayload: { name_ko: "Seoul Hotel", category: "hotel" }
+        mappedPayload: {
+          company_id: "00000000-0000-4000-8000-000000001001",
+          name_ko: "Seoul Hotel",
+          category: "hotel"
+        }
       }
     ]
   });
 
-  assert.deepEqual(rows, [{ name_ko: "Seoul Hotel", category: "hotel" }]);
+  assert.deepEqual(rows, [
+    {
+      company_id: "00000000-0000-4000-8000-000000001001",
+      name_ko: "Seoul Hotel",
+      category: "hotel"
+    }
+  ]);
   assert.throws(() =>
     buildMigrationImportRows({
       targetTable: "domestic_suppliers",
@@ -790,6 +829,49 @@ test("notion csv migration imports only approved valid mapped rows", () => {
       rows: [{ id: "row-3", rowNo: 3, validationStatus: "valid", mappedPayload: { category: "hotel" } }]
     })
   );
+});
+
+test("notion markdown export maps attraction content into supplier import records", () => {
+  const document = parseNotionMarkdownDocument({
+    sourcePath: "인사동 한옥마을 1b085c66428880ad9c00eb49112a8279.md",
+    baseDir: "C:/notion-export",
+    content: `# 인사동 한옥마을
+
+지역_광역: 서울
+컨텐츠 유형: 한식조리체험
+* 상호명 (EN): Insa-dong
+* 검색 대표 키워드: 인사동 (Insa-dong)
+* 사용 여부: 확인 필요
+* 파트너사 구분: Tour Site
+상품 목록: 인사동 (Insa-dong) >>> 투어 (Insadong Street) (https://app.notion.com/p/demo)
+상품 목록 (텍스트): [Ticket] 투어
+페이지 ID: 1b085c66428880ad9c00eb49112a8279
+
+주소: 서울 종로구 인사동
+관람료: 무료
+주차: 주차 안됩니다
+화장실: 남녀 분리 되어 있습니다
+
+인사동 안에는 김치체험 있습니다
+
+![20250306_154137.jpg](20250306_154137.jpg)
+[인사동.mp4](%EC%9D%B8%EC%82%AC%EB%8F%99.mp4)`
+  });
+  const record = buildSupplierCostMasterFromNotionDocument(document, {
+    companyId: "00000000-0000-4000-8000-000000001001"
+  });
+  const plan = buildNotionMarkdownImportPlan([record], { sourceName: "sample-notion-export" });
+
+  assert.equal(record.supplierRow.category, "attraction");
+  assert.equal(record.supplierRow.name_ko, "인사동 한옥마을");
+  assert.equal(record.supplierRow.name_en, "Insa-dong");
+  assert.equal(record.supplierRow.status, "inactive");
+  assert.equal(record.productRows[0].row.product_type, "ticket");
+  assert.equal(record.productRows[0].priceRows[0].row.cost_amount, 0);
+  assert.equal(record.mediaRows.length, 2);
+  assert.equal(plan.summary.supplierCount, 1);
+  assert.equal(plan.summary.productCount, 1);
+  assert.equal(plan.stagingPayloads.domesticSuppliers.rows[0].company_id, "00000000-0000-4000-8000-000000001001");
 });
 
 test("quote export request validates exportable version state and snapshot summary", () => {
@@ -1002,4 +1084,92 @@ test("api log sanitizer redacts secrets and truncates large payload values", () 
   assert.equal(sanitized.nested.safeCount, 3);
   assert.equal(sanitized.nested.longText.length, 503);
   assert.equal(sanitized.gmailMessageId, "gmail-1");
+});
+
+
+test("reservation status transitions enforce an allowed map and require a reason for high-risk moves", () => {
+  const plan = planReservationStatusChange({ currentStatus: "requested", nextStatus: "confirmed", reason: "Supplier confirmed" });
+  assert.equal(plan.nextStatus, "confirmed");
+  assert.equal(plan.isHighRisk, true);
+  assert.equal(plan.riskLevel, "high");
+  assert.equal(plan.reason, "Supplier confirmed");
+
+  const cancel = planReservationStatusChange({ currentStatus: "confirmed", nextStatus: "cancelled", reason: "Client withdrew" });
+  assert.equal(cancel.riskLevel, "high");
+
+  const advance = planReservationStatusChange({ currentStatus: "confirmed", nextStatus: "on_tour" });
+  assert.equal(advance.riskLevel, "normal");
+
+  assert.throws(() => planReservationStatusChange({ currentStatus: "cancelled", nextStatus: "confirmed", reason: "x" }), /cannot move from cancelled to confirmed/);
+  assert.throws(() => planReservationStatusChange({ currentStatus: "completed", nextStatus: "requested", reason: "x" }), /cannot move from completed to requested/);
+  assert.throws(() => planReservationStatusChange({ currentStatus: "requested", nextStatus: "confirmed" }), /reason is required/);
+  assert.throws(() => planReservationStatusChange({ currentStatus: "pending", nextStatus: "pending" }), /already pending/);
+  assert.deepEqual([...RESERVATION_STATUS_LIST].sort(), ["cancelled", "completed", "confirmed", "on_tour", "pending", "requested"]);
+});
+
+test("settlement recalculation counts only the latest invoice version per tour", () => {
+  const invoices = [
+    { id: "inv-1", tour_code: "JHT-2026-001", version_no: 1, total_amount: 10000000, currency: "KRW", status: "issued" },
+    { id: "inv-2", tour_code: "JHT-2026-001", version_no: 2, total_amount: 10500000, currency: "KRW", status: "issued" },
+    { id: "inv-3", tour_code: null, version_no: 1, total_amount: 500000, currency: "KRW", status: "issued" }
+  ];
+  const active = selectActiveInvoices(invoices);
+  assert.equal(active.length, 2);
+  assert.ok(active.some((row) => row.id === "inv-2"));
+  assert.ok(!active.some((row) => row.id === "inv-1"));
+
+  const totals = computeSettlementTotals({
+    invoices,
+    payments: [{ amount: 4000000, status: "confirmed" }],
+    expenses: [{ amount: 3000000, currency: "KRW" }],
+    extraRevenues: [{ amount: 200000, currency: "KRW" }],
+    commissions: [{ commission_amount: 100000, currency: "KRW" }]
+  });
+  // 10.5M (latest) + 0.5M standalone = 11M invoice, not 21.5M.
+  assert.equal(totals.total_invoice_amount, 11000000);
+  assert.equal(totals.total_payment_amount, 4000000);
+  assert.equal(totals.final_profit_amount, 11000000 + 200000 + 100000 - 3000000);
+});
+
+test("settlement recalculation rejects mixed currencies", () => {
+  assert.throws(
+    () =>
+      computeSettlementTotals({
+        invoices: [{ tour_code: null, total_amount: 1300, currency: "MYR", status: "issued" }],
+        expenses: [{ amount: 500000, currency: "KRW" }]
+      }),
+    /mix currencies/
+  );
+  assert.equal(roundMoney(10.005), 10.01);
+});
+
+test("payment input requires a matching currency and explicit idempotency key", () => {
+  const ok = validatePaymentInput({
+    invoiceCurrency: "MYR",
+    amount: 1300,
+    status: "confirmed",
+    currency: "MYR",
+    idempotencyKey: "wire-88",
+    referenceNo: "TT-88"
+  });
+  assert.equal(ok.amount, 1300);
+  assert.equal(ok.currency, "MYR");
+
+  assert.throws(() => validatePaymentInput({ invoiceCurrency: "MYR", amount: 1300, currency: "KRW", idempotencyKey: "k", referenceNo: "r" }), /does not match invoice currency/);
+  assert.throws(() => validatePaymentInput({ invoiceCurrency: "KRW", amount: 0, idempotencyKey: "k" }), /positive number/);
+  assert.throws(() => validatePaymentInput({ invoiceCurrency: "KRW", amount: 100 }), /idempotencyKey is required/);
+  assert.throws(() => validatePaymentInput({ invoiceCurrency: "KRW", amount: 100, status: "confirmed", idempotencyKey: "k" }), /referenceNo is required/);
+});
+
+test("invoice payment state flips to paid and flags overpayment", () => {
+  const partial = resolveInvoicePaymentState({ invoiceTotal: 1000, currentStatus: "issued", payments: [{ status: "confirmed", amount: 400 }] });
+  assert.equal(partial.nextStatus, "partially_paid");
+  assert.equal(partial.isOverpaid, false);
+
+  const paid = resolveInvoicePaymentState({ invoiceTotal: 1000, currentStatus: "issued", payments: [{ status: "confirmed", amount: 1000 }] });
+  assert.equal(paid.nextStatus, "paid");
+
+  const over = resolveInvoicePaymentState({ invoiceTotal: 1000, currentStatus: "issued", payments: [{ status: "confirmed", amount: 1200 }] });
+  assert.equal(over.nextStatus, "paid");
+  assert.equal(over.isOverpaid, true);
 });

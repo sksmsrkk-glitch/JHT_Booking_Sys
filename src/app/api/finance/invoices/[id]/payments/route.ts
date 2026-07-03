@@ -1,12 +1,11 @@
 import { requireFinanceUser } from "@/lib/api/auth";
 import { writeAuditLog } from "@/lib/api/audit";
-import { created, fail, HttpError, readJson, requireString } from "@/lib/api/http";
+import { created, fail, HttpError, ok, readJson } from "@/lib/api/http";
 import { assertFinanceEntryAllowed } from "@/lib/domain/finance.mjs";
+import { resolveInvoicePaymentState, validatePaymentInput } from "@/lib/domain/payments.mjs";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
-
-const PAYMENT_STATUSES = ["pending", "confirmed", "failed", "refunded"];
 
 export async function POST(request: Request, context: RouteContext) {
   try {
@@ -14,22 +13,6 @@ export async function POST(request: Request, context: RouteContext) {
     const body = await readJson<Record<string, unknown>>(request);
     const supabase = createRequestSupabaseClient(request);
     const financeUser = await requireFinanceUser(supabase);
-
-    const amount = Number(body.amount);
-    if (!Number.isFinite(amount) || amount < 0) {
-      throw new HttpError(400, "amount must be a non-negative number");
-    }
-
-    const status = typeof body.status === "string" && PAYMENT_STATUSES.includes(body.status) ? body.status : "confirmed";
-    const currency = typeof body.currency === "string" && body.currency.trim() ? body.currency.trim() : "KRW";
-    const referenceNo = typeof body.referenceNo === "string" && body.referenceNo.trim() ? body.referenceNo.trim() : null;
-    const method = typeof body.method === "string" && body.method.trim() ? body.method.trim() : null;
-    const receivedAt =
-      typeof body.receivedAt === "string" && body.receivedAt.trim() ? body.receivedAt.trim() : new Date().toISOString();
-    const idempotencyKey =
-      typeof body.idempotencyKey === "string" && body.idempotencyKey.trim()
-        ? body.idempotencyKey.trim()
-        : `${id}:${status}:${amount}:${referenceNo ?? receivedAt}`;
 
     const { data: invoice, error: invoiceError } = await supabase
       .from("invoices")
@@ -40,26 +23,65 @@ export async function POST(request: Request, context: RouteContext) {
     if (invoiceError) throw new HttpError(500, invoiceError.message);
     await assertInvoiceFinanceOpen(supabase, invoice.reservation_id);
 
+    // 멱등키 필수 + 통화 일치 + 양수 금액을 도메인에서 검증합니다.
+    let input;
+    try {
+      input = validatePaymentInput({
+        invoiceCurrency: invoice.currency,
+        amount: body.amount,
+        status: body.status,
+        currency: body.currency,
+        idempotencyKey: body.idempotencyKey,
+        referenceNo: body.referenceNo
+      });
+    } catch (validationError) {
+      throw new HttpError(400, validationError instanceof Error ? validationError.message : "Invalid payment input");
+    }
+
+    const method = typeof body.method === "string" && body.method.trim() ? body.method.trim() : null;
+    const receivedAt =
+      typeof body.receivedAt === "string" && body.receivedAt.trim() ? body.receivedAt.trim() : new Date().toISOString();
+
+    // 멱등키 재사용은 덮어쓰기가 아니라 replay로 처리합니다: 기존 결제를 그대로 돌려줍니다.
+    const { data: existingPayment, error: existingError } = await supabase
+      .from("payments")
+      .select("id, invoice_id, status, currency, amount, received_at, method, reference_no, idempotency_key, created_at")
+      .eq("idempotency_key", input.idempotencyKey)
+      .maybeSingle();
+
+    if (existingError) throw new HttpError(500, existingError.message);
+    if (existingPayment) {
+      return ok({ payment: existingPayment, replayed: true });
+    }
+
     const { data: payment, error: paymentError } = await supabase
       .from("payments")
-      .upsert(
-        {
-          invoice_id: id,
-          status,
-          currency,
-          amount,
-          received_at: receivedAt,
-          method,
-          reference_no: referenceNo ?? requireString(body.referenceNo ?? idempotencyKey, "referenceNo"),
-          idempotency_key: idempotencyKey,
-          created_by: financeUser.profileId
-        },
-        { onConflict: "idempotency_key" }
-      )
+      .insert({
+        invoice_id: id,
+        status: input.status,
+        currency: input.currency,
+        amount: input.amount,
+        received_at: receivedAt,
+        method,
+        reference_no: input.referenceNo,
+        idempotency_key: input.idempotencyKey,
+        created_by: financeUser.profileId
+      })
       .select("id, invoice_id, status, currency, amount, received_at, method, reference_no, idempotency_key, created_at")
       .single();
 
-    if (paymentError) throw new HttpError(500, paymentError.message);
+    if (paymentError) {
+      // 동시 요청이 같은 멱등키로 먼저 insert한 경우(23505) replay로 안전 처리합니다.
+      if (paymentError.code === "23505") {
+        const { data: raced } = await supabase
+          .from("payments")
+          .select("id, invoice_id, status, currency, amount, received_at, method, reference_no, idempotency_key, created_at")
+          .eq("idempotency_key", input.idempotencyKey)
+          .maybeSingle();
+        if (raced) return ok({ payment: raced, replayed: true });
+      }
+      throw new HttpError(500, paymentError.message);
+    }
 
     const { data: payments, error: paymentsError } = await supabase
       .from("payments")
@@ -68,16 +90,12 @@ export async function POST(request: Request, context: RouteContext) {
 
     if (paymentsError) throw new HttpError(500, paymentsError.message);
 
-    const confirmedTotal = (payments ?? [])
-      .filter((row: { status: string }) => row.status === "confirmed")
-      .reduce((sum: number, row: { amount: number | string }) => sum + Number(row.amount ?? 0), 0);
-    const invoiceTotal = Number(invoice.total_amount ?? 0);
-    const nextInvoiceStatus =
-      confirmedTotal >= invoiceTotal && invoiceTotal > 0
-        ? "paid"
-        : confirmedTotal > 0
-          ? "partially_paid"
-          : invoice.status;
+    const { confirmedTotal, nextStatus, isOverpaid } = resolveInvoicePaymentState({
+      invoiceTotal: invoice.total_amount,
+      currentStatus: invoice.status,
+      payments: payments ?? []
+    });
+    const nextInvoiceStatus = nextStatus;
 
     const { data: updatedInvoice, error: updateError } = await supabase
       .from("invoices")
@@ -95,11 +113,11 @@ export async function POST(request: Request, context: RouteContext) {
       entityId: payment.id,
       riskLevel: "high",
       beforeData: invoice,
-      afterData: { payment, invoice: updatedInvoice, confirmedTotal },
-      approvalData: { idempotencyKey }
+      afterData: { payment, invoice: updatedInvoice, confirmedTotal, isOverpaid },
+      approvalData: { idempotencyKey: input.idempotencyKey }
     });
 
-    return created({ payment, invoice: updatedInvoice, confirmedTotal });
+    return created({ payment, invoice: updatedInvoice, confirmedTotal, isOverpaid });
   } catch (error) {
     return fail(error);
   }

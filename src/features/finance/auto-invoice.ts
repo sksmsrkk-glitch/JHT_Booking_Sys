@@ -82,10 +82,12 @@ export function buildInvoiceFromFinalQuote({
       invoice_no: `${tourCode}-INV-v${versionNo}`,
       tour_code: tourCode,
       version_no: versionNo,
-      status: "issued",
+      // 운영 스냅샷에서 자동 생성되는 인보이스는 draft로 만들고, 발행(issued)은
+      // 재무 롤이 별도 단계에서 승인하도록 남깁니다(고위험 액션 승인 게이트).
+      status: "draft",
       currency,
       total_amount: totalAmount,
-      issued_at: new Date().toISOString(),
+      issued_at: null,
       due_date: defaultDueDate(reservation.tour_start_date),
       payment_deadline: defaultDueDate(reservation.tour_start_date),
       collection_timing: "after_booking_confirmation",

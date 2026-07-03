@@ -1,6 +1,7 @@
 import { requireFinanceUser } from "@/lib/api/auth";
 import { writeAuditLog } from "@/lib/api/audit";
 import { fail, HttpError, ok, readJson, requireUuid } from "@/lib/api/http";
+import { computeSettlementTotals } from "@/lib/domain/settlement.mjs";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
@@ -10,33 +11,7 @@ export async function POST(request: Request) {
     const supabase = createRequestSupabaseClient(request);
     const financeUser = await requireFinanceUser(supabase);
 
-    const [invoiceResult, paymentResult, expenseResult, revenueResult, commissionResult] = await Promise.all([
-      supabase.from("invoices").select("id, total_amount").eq("reservation_id", reservationId),
-      supabase
-        .from("payments")
-        .select("amount, invoices!inner(reservation_id)")
-        .eq("status", "confirmed")
-        .eq("invoices.reservation_id", reservationId),
-      supabase.from("expenses").select("amount").eq("reservation_id", reservationId),
-      supabase.from("extra_revenues").select("amount").eq("reservation_id", reservationId),
-      supabase.from("shopping_commissions").select("commission_amount").eq("reservation_id", reservationId)
-    ]);
-
-    for (const result of [invoiceResult, paymentResult, expenseResult, revenueResult, commissionResult]) {
-      if (result.error) throw new HttpError(500, result.error.message);
-    }
-
-    const totalInvoiceAmount = sumRows(invoiceResult.data ?? [], "total_amount");
-    const totalPaymentAmount = sumRows(paymentResult.data ?? [], "amount");
-    const totalExpenseAmount = sumRows(expenseResult.data ?? [], "amount");
-    const totalExtraRevenueAmount = sumRows(revenueResult.data ?? [], "amount");
-    const totalShoppingCommissionAmount = sumRows(commissionResult.data ?? [], "commission_amount");
-    const finalProfitAmount =
-      totalInvoiceAmount +
-      totalExtraRevenueAmount +
-      totalShoppingCommissionAmount -
-      totalExpenseAmount;
-
+    // 잠긴 정산은 재계산 전에 먼저 거릅니다.
     const { data: existing, error: existingError } = await supabase
       .from("settlements")
       .select("id, status")
@@ -48,18 +23,54 @@ export async function POST(request: Request) {
       throw new HttpError(409, `Settlement cannot be recalculated from status ${existing.status}`);
     }
 
+    const [invoiceResult, paymentResult, expenseResult, revenueResult, commissionResult] = await Promise.all([
+      supabase
+        .from("invoices")
+        .select("id, tour_code, version_no, total_amount, currency, status")
+        .eq("reservation_id", reservationId),
+      supabase
+        .from("payments")
+        .select("amount, status, invoices!inner(reservation_id)")
+        .eq("status", "confirmed")
+        .eq("invoices.reservation_id", reservationId),
+      supabase.from("expenses").select("amount, currency").eq("reservation_id", reservationId),
+      supabase.from("extra_revenues").select("amount, currency").eq("reservation_id", reservationId),
+      supabase.from("shopping_commissions").select("commission_amount, currency").eq("reservation_id", reservationId)
+    ]);
+
+    for (const result of [invoiceResult, paymentResult, expenseResult, revenueResult, commissionResult]) {
+      if (result.error) throw new HttpError(500, result.error.message);
+    }
+
+    // 재발행 인보이스 중복 합산과 통화 혼합을 도메인 함수에서 방어합니다.
+    let totals;
+    try {
+      totals = computeSettlementTotals({
+        invoices: invoiceResult.data ?? [],
+        payments: paymentResult.data ?? [],
+        expenses: expenseResult.data ?? [],
+        extraRevenues: revenueResult.data ?? [],
+        commissions: commissionResult.data ?? []
+      });
+    } catch (settlementError) {
+      throw new HttpError(422, settlementError instanceof Error ? settlementError.message : "Settlement inputs are inconsistent");
+    }
+
+    // review 상태를 draft로 되돌리지 않도록 기존 상태를 보존합니다.
+    const nextStatus = existing?.status === "review" ? "review" : "draft";
+
     const { data, error } = await supabase
       .from("settlements")
       .upsert(
         {
           reservation_id: reservationId,
-          status: "draft",
-          total_invoice_amount: totalInvoiceAmount,
-          total_payment_amount: totalPaymentAmount,
-          total_expense_amount: totalExpenseAmount,
-          total_extra_revenue_amount: totalExtraRevenueAmount,
-          total_shopping_commission_amount: totalShoppingCommissionAmount,
-          final_profit_amount: finalProfitAmount
+          status: nextStatus,
+          total_invoice_amount: totals.total_invoice_amount,
+          total_payment_amount: totals.total_payment_amount,
+          total_expense_amount: totals.total_expense_amount,
+          total_extra_revenue_amount: totals.total_extra_revenue_amount,
+          total_shopping_commission_amount: totals.total_shopping_commission_amount,
+          final_profit_amount: totals.final_profit_amount
         },
         { onConflict: "reservation_id" }
       )
@@ -81,8 +92,4 @@ export async function POST(request: Request) {
   } catch (error) {
     return fail(error);
   }
-}
-
-function sumRows(rows: any[], field: string) {
-  return rows.reduce((sum, row) => sum + Number(row[field] ?? 0), 0);
 }
