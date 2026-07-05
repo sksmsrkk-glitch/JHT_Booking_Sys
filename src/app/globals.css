@@ -3859,6 +3859,26 @@ summary:focus-visible {
   width: 92px;
 }
 
+/* 개발 서버의 stale CSS/HMR 상황에서도 로고 원본 1605px 이미지가 화면을 밀지 않도록 마지막 방어선을 둡니다. */
+.topbar .brand {
+  align-items: center !important;
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  height: 56px !important;
+  min-width: 100px !important;
+  overflow: hidden !important;
+  width: 100px !important;
+}
+
+.topbar .brand img {
+  display: block !important;
+  height: auto !important;
+  max-height: 52px !important;
+  max-width: 92px !important;
+  object-fit: contain !important;
+  width: 92px !important;
+}
+
 .primary-nav > a,
 .nav-more-trigger,
 .auth-nav-link {

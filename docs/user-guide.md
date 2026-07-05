@@ -223,6 +223,7 @@ Rules:
 
 - Gmail low-confidence matches go to manual review.
 - Notion CSV imports must validate before approval and import.
+- Notion page exports that contain Markdown and media should be converted first with `npm run convert:notion-md`; see `docs/notion-markdown-import.md`.
 - Failed supplier messages and quote exports can be retried from the failed jobs view.
 - API logs are sanitized and internal-only.
 - High-risk actions must leave audit evidence.

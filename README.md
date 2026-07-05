@@ -17,7 +17,8 @@
 9. 주요 업무 사용 흐름
 10. 로컬 개발과 검증 방법
 11. Supabase 연결 전 체크리스트
-12. 개발 원칙
+12. Notion 데이터 Supabase 이관 방법
+13. 개발 원칙
 
 ## 1. 시스템 목표
 
@@ -483,7 +484,7 @@ erDiagram
 | `extra_revenues` | 추가 매출 |
 | `shopping_commissions` | 쇼핑/면세 수수료 |
 | `settlements` | 정산 결과 |
-| `partner_receivable_ledger` | 파트너 미수금 ledger |
+| `agency_receivable_ledger` | 해외 에이전시 미수금 ledger |
 
 #### Workflow Communication 계열
 
@@ -504,7 +505,7 @@ erDiagram
 
 ```mermaid
 flowchart LR
-  A["Partner typed country name"] --> B["country_references"]
+  A["Overseas agency typed country name"] --> B["country_references"]
   C["Default country code"] --> B
   D["Default currency"] --> B
   B --> E["exchange_rates"]
@@ -744,9 +745,328 @@ npm run verify:app-route-smoke
 14. workflow message 작성자 ID 연결 확인
 15. `npm run verify:v1` 실행
 
-## 12. 개발 원칙
+## 12. Notion 데이터 Supabase 이관 방법
 
-### 12.1 코드 변경 원칙
+이 절차는 Notion에 있는 관광지, 차량, 식당, 호텔, 가이드, 기타 원가 데이터를 Supabase DB로 옮길 때 사용하는 운영 기준입니다. 핵심 원칙은 **원본 데이터를 바로 운영 테이블에 넣지 않고, 먼저 변환 → staging → validation → approval → import** 단계를 거치는 것입니다.
+
+### 12.1 전체 이관 흐름
+
+```mermaid
+flowchart LR
+  A["Notion 데이터<br/>CSV 또는 Markdown ZIP"] --> B["컬럼 정리 / 표준화"]
+  B --> C["Supabase import용 JSON rows"]
+  C --> D["/admin/migrations/notion-csv<br/>Staging"]
+  D --> E["Validate<br/>필수값 / 형식 검사"]
+  E --> F{"오류 있음?"}
+  F -->|"Yes"| B
+  F -->|"No"| G["Approve"]
+  G --> H["Import"]
+  H --> I["Domestic Supplier 원가 마스터"]
+  I --> J["견적 Quote Items 검색"]
+```
+
+### 12.2 Notion에서 데이터를 추출하는 방법
+
+1. Notion에서 이관할 데이터베이스를 엽니다.
+2. 우측 상단 `...` 메뉴를 누릅니다.
+3. `Export`를 선택합니다.
+4. 가능하면 `CSV` 형식으로 export합니다.
+5. 이미지, 상세 설명, 페이지 본문, 첨부파일까지 같이 내려받아야 하는 경우에는 `Markdown & CSV` 또는 `Markdown ZIP` export를 사용합니다.
+6. 다운로드한 파일은 원본 보존용 폴더에 그대로 보관합니다.
+
+권장 파일명:
+
+```text
+notion-attractions-2026-07-05.csv
+notion-restaurants-2026-07-05.csv
+notion-vehicles-2026-07-05.csv
+notion-hotels-2026-07-05.csv
+```
+
+### 12.3 이관 대상 테이블과 순서
+
+Domestic Supplier 원가 마스터는 부모-자식 관계가 있으므로 순서가 중요합니다.
+
+| 순서 | 대상 테이블 | 의미 | 먼저 필요한 값 |
+|---:|---|---|---|
+| 1 | `domestic_suppliers` | 공급사/장소/식당/차량사/호텔 기본 정보 | `company_id` |
+| 2 | `supplier_contacts` | 공급사 담당자 연락처 | `domestic_supplier_id` |
+| 3 | `supplier_products` | 객실, 차량 타입, 메뉴, 입장권, 가이드 서비스 | `domestic_supplier_id` |
+| 4 | `supplier_prices` | 상품별 가격, 기간, 통화, 과금 단위 | `supplier_product_id` |
+| 5 | `supplier_media` | 이미지/영상 Storage 경로 또는 URL | supplier 또는 product 연결 기준 |
+
+실무에서는 보통 아래 순서로 나눠서 import합니다.
+
+1. 관광지/식당/차량사/호텔을 `domestic_suppliers`로 먼저 넣습니다.
+2. Supabase에서 생성된 `domestic_suppliers.id`를 확인합니다.
+3. 메뉴, 입장권, 차량 타입, 객실 타입을 `supplier_products`에 넣습니다.
+4. Supabase에서 생성된 `supplier_products.id`를 확인합니다.
+5. 실제 가격표를 `supplier_prices`에 넣습니다.
+6. 이미지가 있으면 Supabase Storage에 먼저 올리고, 경로를 `supplier_media`에 넣습니다.
+
+### 12.4 필수 컬럼
+
+현재 migration validation 기준 필수값은 다음과 같습니다.
+
+| 테이블 | 필수값 |
+|---|---|
+| `domestic_suppliers` | `company_id`, `category`, `name_ko` |
+| `supplier_contacts` | `domestic_supplier_id`, `name` |
+| `supplier_products` | `domestic_supplier_id`, `product_type`, `name_ko`, `search_name` |
+| `supplier_prices` | `supplier_product_id`, `pricing_unit`, `currency`, `cost_amount` |
+| `supplier_media` | `media_type`, `storage_path` |
+
+Notion 컬럼명은 자유롭게 내려올 수 있지만, Supabase에 넣을 때는 위 필드명으로 변환되어야 합니다.
+
+### 12.5 카테고리 표준값
+
+Notion의 카테고리명은 시스템 표준값으로 맞춰야 합니다.
+
+| Notion 예시 | 시스템 표준값 |
+|---|---|
+| 호텔, Hotel | `hotel` |
+| 차량, 버스, Coach, Van | `vehicle` |
+| 식당, 식사, Restaurant, Meal | `restaurant` |
+| 관광지, Attraction, Ticket | `attraction` |
+| 가이드, Guide | `guide` |
+| 기타, KTX, 짐차, 항공권 | `other` |
+| 인센티브 연회장 | `incentive_banquet` |
+
+### 12.6 CSV를 import용 JSON rows로 정리하는 방법
+
+현재 `/admin/migrations/notion-csv` 화면은 raw CSV 파일을 직접 업로드하는 화면이 아니라, **CSV를 정리한 JSON rows**를 staging하는 화면입니다.
+
+예를 들어 Notion 관광지 CSV 한 줄이 아래와 같다면:
+
+| 관광지명 | 지역 | 주소 | 운영시간 | 입장료 | 태그 |
+|---|---|---|---|---:|---|
+| 경복궁 | 서울 | 서울 종로구 사직로 161 | 09:00-18:00 | 3000 | 역사,궁궐 |
+
+먼저 `domestic_suppliers`용 JSON으로 변환합니다.
+
+```json
+[
+  {
+    "company_id": "JHT_COMPANY_UUID",
+    "category": "attraction",
+    "name_ko": "경복궁",
+    "name_en": "Gyeongbokgung Palace",
+    "region_level1": "서울",
+    "region_level2": "종로",
+    "address": "서울 종로구 사직로 161",
+    "status": "active",
+    "metadata": {
+      "operationHours": "09:00-18:00",
+      "tags": ["역사", "궁궐"]
+    }
+  }
+]
+```
+
+그 다음 입장권은 `supplier_products`와 `supplier_prices`로 나눕니다.
+
+```json
+[
+  {
+    "domestic_supplier_id": "SUPPLIER_UUID",
+    "product_type": "ticket",
+    "name_ko": "성인 입장권",
+    "search_name": "경복궁 성인 입장권 palace adult ticket",
+    "status": "active",
+    "metadata": {
+      "ageType": "adult"
+    }
+  }
+]
+```
+
+```json
+[
+  {
+    "supplier_product_id": "PRODUCT_UUID",
+    "pricing_unit": "per_person",
+    "currency": "KRW",
+    "cost_amount": 3000,
+    "status": "active",
+    "metadata": {
+      "source": "notion-attractions-2026-07-05"
+    }
+  }
+]
+```
+
+식당은 메뉴별 가격이 다르므로 `supplier_products`에는 메뉴를, `supplier_prices`에는 메뉴별 가격을 넣습니다.
+
+```json
+[
+  {
+    "domestic_supplier_id": "RESTAURANT_SUPPLIER_UUID",
+    "product_type": "menu",
+    "name_ko": "불고기 정식",
+    "search_name": "불고기 정식 bulgogi set halal non halal",
+    "status": "active",
+    "metadata": {
+      "dietaryTags": ["non_halal"],
+      "capacity": 80
+    }
+  }
+]
+```
+
+차량은 차량 타입 또는 구간을 상품으로 만들고, 구간별 가격을 가격 row로 넣습니다.
+
+```json
+[
+  {
+    "domestic_supplier_id": "VEHICLE_SUPPLIER_UUID",
+    "product_type": "vehicle",
+    "name_ko": "45인승 대형버스 서울-인천공항",
+    "search_name": "45인승 버스 서울 인천공항 coach ICN Seoul",
+    "status": "active",
+    "metadata": {
+      "vehicleType": "45_seater_coach",
+      "from": "ICN",
+      "to": "Seoul"
+    }
+  }
+]
+```
+
+### 12.7 관리자 화면에서 staging하는 방법
+
+1. 개발 서버를 실행합니다.
+
+```bash
+npm run dev
+```
+
+2. 브라우저에서 아래 화면으로 이동합니다.
+
+```text
+http://localhost:3100/admin/migrations/notion-csv
+```
+
+3. `Source Name`에 원본 파일명을 입력합니다.
+
+```text
+notion-attractions-2026-07-05
+```
+
+4. `Target Table`에서 넣을 테이블을 선택합니다.
+
+```text
+domestic_suppliers
+supplier_products
+supplier_prices
+supplier_media
+```
+
+5. `Rows JSON`에 변환한 JSON array를 붙여넣습니다.
+6. `Stage Rows`를 클릭합니다.
+7. 생성된 batch에서 `Validate`를 실행합니다.
+8. 오류가 있으면 Notion 원본 또는 JSON을 수정한 뒤 다시 staging합니다.
+9. 오류가 없으면 `Approve`합니다.
+10. 최종 확인 후 `Import`합니다.
+
+주의:
+
+- 한 batch에는 하나의 target table만 넣습니다.
+- `domestic_suppliers`를 import한 뒤 생성된 UUID를 확인하고, 그 UUID로 `supplier_products`를 만들어야 합니다.
+- `supplier_products`를 import한 뒤 생성된 UUID를 확인하고, 그 UUID로 `supplier_prices`를 만들어야 합니다.
+- 운영 DB에 import하기 전에는 반드시 소량 샘플 3~5개로 먼저 테스트합니다.
+
+### 12.8 Markdown ZIP export를 변환하는 방법
+
+Notion에서 이미지와 본문이 포함된 ZIP으로 내려받은 경우에는 변환 스크립트를 사용합니다.
+
+```bash
+npm run convert:notion-md -- "C:\Users\Issac\Downloads\notion-export.zip" --out tmp/notion-md-import --company-id "JHT_COMPANY_UUID"
+```
+
+출력 파일:
+
+| 파일 | 용도 |
+|---|---|
+| `notion-md-supabase-import-plan.json` | 전체 변환 결과 |
+| `staging-domestic-suppliers.json` | `/admin/migrations/notion-csv`에 넣을 공급사 rows |
+| `supplier-products-relationship-rows.json` | 공급사 UUID 매핑 후 넣을 상품 rows |
+| `supplier-prices-relationship-rows.json` | 상품 UUID 매핑 후 넣을 가격 rows |
+| `supplier-media-relationship-rows.json` | Storage 업로드 후 넣을 media rows |
+| `manifest.json` | 변환 요약과 경고 |
+
+세부 문서는 [Notion Markdown Export 변환기](docs/notion-markdown-import.md)를 참고합니다.
+
+### 12.9 이미지와 파일 처리
+
+이미지는 DB row만 만든다고 끝나지 않습니다.
+
+1. 이미지 파일을 Supabase Storage bucket에 업로드합니다.
+2. 업로드된 path 또는 public/signed URL을 확인합니다.
+3. `supplier_media.storage_path`에 Storage path를 넣습니다.
+4. 외부 URL만 있는 경우에는 `image_url` 또는 `metadata.sourceUrl`에 보존합니다.
+5. 한 상품 또는 공급사 item당 이미지는 최대 10장만 연결합니다.
+
+권장 Storage path:
+
+```text
+supplier-media/attraction/gyeongbokgung/01-main.jpg
+supplier-media/restaurant/sample-restaurant/01-menu.jpg
+supplier-media/vehicle/coach-company/01-coach.jpg
+```
+
+### 12.10 import 전 검수 체크리스트
+
+1. `company_id`가 실제 JHT company UUID인지 확인합니다.
+2. `category`가 표준값인지 확인합니다.
+3. `name_ko`가 비어 있지 않은지 확인합니다.
+4. 검색에 필요한 키워드가 `search_name` 또는 `search_keywords`에 들어갔는지 확인합니다.
+5. 통화는 `KRW`, `USD`, `MYR`, `SGD`처럼 대문자 ISO 코드로 맞춥니다.
+6. 가격은 콤마 없는 숫자로 정리합니다.
+7. 운영시간, 수용인원, dietary tag, halal 여부 등은 `metadata`에 보존합니다.
+8. 중복 공급사가 있는지 확인합니다.
+9. 같은 식당의 여러 메뉴는 supplier를 중복 생성하지 말고 product로 분리합니다.
+10. 같은 관광지의 성인/아동 티켓은 supplier를 중복 생성하지 말고 ticket product와 price로 분리합니다.
+11. 차량은 공급사, 차량 타입, 구간, 추가 시간 요금을 분리합니다.
+12. 이미지가 실제 Storage에 업로드되어 있는지 확인합니다.
+13. `/admin/migrations/notion-csv`에서 validation error가 0인지 확인합니다.
+14. import 후 `/admin/domestic-suppliers`에서 키워드 검색이 되는지 확인합니다.
+15. 견적 화면 Quote Items에서 해당 아이템이 검색되는지 확인합니다.
+
+### 12.11 Supabase CLI와 DB 검증
+
+Supabase CLI는 프로젝트 dev dependency로 설치되어 있으므로 다음처럼 실행합니다.
+
+```bash
+npx supabase --version
+```
+
+호스팅 Supabase와 연결한 뒤 migration 상태를 확인합니다.
+
+```bash
+npx supabase login
+npx supabase link --project-ref srhjawulpqqdacwhnhyh
+npx supabase db push
+```
+
+운영 DB에 대량 import하기 전에는 아래 순서로 검증합니다.
+
+```bash
+npm run test
+npm run typecheck
+npm run verify:v1
+```
+
+DB 적용 후에는 반드시 다음 화면을 직접 확인합니다.
+
+1. `/admin/domestic-suppliers`
+2. `/admin/migrations/notion-csv`
+3. `/admin/quote-cases`
+4. `/admin/exchange-rates`
+5. `/admin/readiness`
+
+## 13. 개발 원칙
+
+### 13.1 코드 변경 원칙
 
 - 기존 도메인 경계를 유지합니다.
 - `Overseas Agency`와 `Domestic Supplier`를 generic partner로 합치지 않습니다.
@@ -757,7 +1077,7 @@ npm run verify:app-route-smoke
 - finance 변경은 audit log를 남깁니다.
 - workflow message는 workflow code 기준으로 연결합니다.
 
-### 12.2 UI 원칙
+### 13.2 UI 원칙
 
 - 내부 운영 화면은 화려한 랜딩 페이지가 아니라 업무 밀도가 높은 dashboard 중심으로 만듭니다.
 - 예약 화면은 단체현황표와 구글 캘린더의 장점을 섞어 설계합니다.
@@ -765,7 +1085,7 @@ npm run verify:app-route-smoke
 - 입력 폼은 너무 큰 박스와 폰트를 피하고, 한 화면에서 가능한 많은 업무 정보를 스캔할 수 있게 만듭니다.
 - 불필요한 JSON textarea는 점진적으로 표, 카드, 폼 UI로 대체합니다.
 
-### 12.3 데이터 이관 원칙
+### 13.3 데이터 이관 원칙
 
 - Notion과 Excel에서 가져온 데이터는 바로 운영 테이블에 넣지 않고 staging/validation 단계를 거칩니다.
 - 국가명, 통화, 공급사 카테고리, 날짜 형식은 import 전에 표준화합니다.
@@ -801,4 +1121,5 @@ npm run verify:app-route-smoke
 - [예약 단체현황표 설계](docs/reservation-group-status-board.md)
 - [회계/미수금 대시보드](docs/accounting-receivables-dashboard.md)
 - [환율 공통 관리](docs/exchange-rate-management.md)
+- [Notion Markdown Export 변환기](docs/notion-markdown-import.md)
 - [런칭 런북](docs/launch-runbook.md)

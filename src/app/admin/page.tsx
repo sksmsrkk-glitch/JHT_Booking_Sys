@@ -103,7 +103,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
       <div className="page-header">
         <div>
           <p className="eyebrow">JHT Internal</p>
-          <h1>{locale === "ko" ? "내부 관리자" : "Internal Admin"}</h1>
+          <h1>{locale === "ko" ? "운영 관리자" : "Operation Admin"}</h1>
           <p>
             {locale === "ko"
               ? "파트너 문의, 견적 상태, 예약 확정, 취소, 미수금, 정산 상태를 한눈에 확인합니다."

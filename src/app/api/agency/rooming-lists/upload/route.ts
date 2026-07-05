@@ -1,5 +1,6 @@
 import { requireAgencyUser } from "@/lib/api/auth";
 import { created, fail, HttpError, optionalPositiveInteger, readJson, requireArray, requireString, requireUuid } from "@/lib/api/http";
+import { normalizeRoomingPassengerRows } from "@/lib/domain/rooming-list.mjs";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
 type PassengerInput = {
@@ -25,6 +26,10 @@ export async function POST(request: Request) {
     const storagePath = optionalString(body.storagePath) ?? `agency-rooming/${reservationId}/rev-${revisionNo}/${originalFilename}`;
     const idempotencyKey = String(body.idempotencyKey ?? `${reservationId}:${revisionNo}:${originalFilename}`);
     const passengers = body.passengers ? requireArray<PassengerInput>(body.passengers, "passengers") : [];
+    const normalizedPassengers = normalizeRoomingPassengerRows(passengers);
+    if (normalizedPassengers.errors.length > 0) {
+      throw new HttpError(400, normalizedPassengers.errors.join("; "));
+    }
 
     const { data: roomingList, error: roomingError } = await supabase
       .from("rooming_lists")
@@ -45,12 +50,26 @@ export async function POST(request: Request) {
 
     if (roomingError) throw new HttpError(500, roomingError.message);
 
-    if (passengers.length > 0) {
-      const rows = passengers.map((passenger, index) => ({
+    if (normalizedPassengers.rows.length > 0) {
+      // 새로 파싱된 파일은 해당 예약의 최신 승객 원장으로 취급합니다.
+      // 먼저 업서트가 성공한 뒤, 새 파일에서 빠진 기존 승객만 정리해 데이터 손실 위험을 줄입니다.
+      const { data: existingPassengers, error: existingError } = await supabase
+        .from("passengers")
+        .select("id, passenger_no")
+        .eq("reservation_id", reservationId);
+
+      if (existingError) throw new HttpError(500, existingError.message);
+
+      const incomingPassengerNos = new Set(normalizedPassengers.passengerNos);
+      const stalePassengerIds = (existingPassengers ?? [])
+        .filter((passenger: { id: string; passenger_no: string | null }) => !incomingPassengerNos.has(String(passenger.passenger_no ?? "")))
+        .map((passenger: { id: string }) => passenger.id);
+
+      const rows = normalizedPassengers.rows.map((passenger) => ({
         reservation_id: reservationId,
         rooming_list_id: roomingList.id,
-        passenger_no: passenger.passengerNo ?? String(index + 1),
-        full_name: requireString(passenger.fullName, `passengers[${index}].fullName`),
+        passenger_no: passenger.passengerNo,
+        full_name: requireString(passenger.fullName, "passenger.fullName"),
         gender: passenger.gender ?? null,
         date_of_birth: passenger.dateOfBirth ?? null,
         dietary_requirements: passenger.dietaryRequirements ?? null,
@@ -64,6 +83,15 @@ export async function POST(request: Request) {
         .upsert(rows, { onConflict: "reservation_id,passenger_no" });
 
       if (passengerError) throw new HttpError(500, passengerError.message);
+
+      if (stalePassengerIds.length > 0) {
+        const { error: deleteError } = await supabase
+          .from("passengers")
+          .delete()
+          .in("id", stalePassengerIds);
+
+        if (deleteError) throw new HttpError(500, deleteError.message);
+      }
     }
 
     return created({ roomingList, passengerCount: passengers.length });

@@ -11,7 +11,8 @@ export const NOTION_CSV_TARGET_TABLES = [
   "domestic_suppliers",
   "supplier_contacts",
   "supplier_products",
-  "supplier_prices"
+  "supplier_prices",
+  "supplier_media"
 ];
 
 export async function listMigrationBatches(

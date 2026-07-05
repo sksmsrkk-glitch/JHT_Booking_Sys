@@ -18,7 +18,7 @@ import {
   buildSupplierMessageDraft
 } from "../src/lib/domain/supplier-messages.mjs";
 import { scoreGmailMatch } from "../src/lib/domain/gmail-match.mjs";
-import { parseRoomingListText } from "../src/lib/domain/rooming-list.mjs";
+import { normalizeRoomingPassengerRows, parseRoomingListText } from "../src/lib/domain/rooming-list.mjs";
 import {
   assertFinanceAdjustmentAllowed,
   assertFinanceEntryAllowed,
@@ -411,6 +411,29 @@ test("rooming list parser supports tab-delimited agency spreadsheets", () => {
   assert.equal(result.passengers[0].passengerNo, "1");
   assert.equal(result.passengers[0].gender, "M");
   assert.equal(result.passengers[0].dietaryRequirements, "No pork");
+});
+
+test("rooming list upload normalization rejects duplicate passenger numbers", () => {
+  const result = normalizeRoomingPassengerRows([
+    { passengerNo: "1", fullName: "Hong Gil Dong" },
+    { passengerNo: "1", fullName: "Kim Hana" }
+  ]);
+
+  assert.equal(result.rows.length, 2);
+  assert.match(result.errors.join("\n"), /duplicated: 1/);
+});
+
+test("rooming list upload normalization fills passenger numbers and requires names", () => {
+  const result = normalizeRoomingPassengerRows([
+    { fullName: "Hong Gil Dong" },
+    { fullName: "Kim Hana", metadata: { roomType: "Twin" } },
+    { passengerNo: "VIP-3", fullName: "" }
+  ]);
+
+  assert.equal(result.rows[0].passengerNo, "1");
+  assert.equal(result.rows[1].passengerNo, "2");
+  assert.deepEqual(result.rows[1].metadata, { roomType: "Twin" });
+  assert.match(result.errors.join("\n"), /passengers\[2\]\.fullName is required/);
 });
 
 test("invoice payment summary counts confirmed payments toward balance only", () => {

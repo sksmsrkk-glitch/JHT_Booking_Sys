@@ -33,7 +33,8 @@ Verification at each commit: `npm run test` (78 pass), `npm run typecheck`,
   - `alter table payments alter column idempotency_key set not null` backfills nulls
     with the row id first; confirm no null remains in your data.
   - The `partner_receivable_ledger -> agency_receivable_ledger` rename: no app code
-    referenced the old table, but `docs/` and `README.md` still mention it (see below).
+    referenced the old table. The Codex takeover updated the stale `docs/` and
+    `README.md` references.
 - **RLS runtime behavior was not executed.** The policies/triggers are written to the
   documented intent but were not exercised against a live Postgres with real JWTs.
   Smoke-test at least: an agency JWT cannot `update agency_users` protected columns;
@@ -48,18 +49,16 @@ Verification at each commit: `npm run test` (78 pass), `npm run typecheck`,
   moved to `submitJson()` too — mechanical, low-risk. A background task chip was filed.
 - Room assignment validation (capacity, duplicate passenger, check-in/out order) is
   still missing in `POST /api/reservations/:id/room-assignments`.
-- Rooming-list re-upload replace-set semantics: Phase 1 added the passenger
-  update/delete RLS policies that unblock it, but the upload route still upserts by
-  `(reservation_id, passenger_no)` and does not delete removed passengers. Finish the
-  route-side replace-set + duplicate `passengerNo` pre-check.
+- Rooming-list re-upload replace-set semantics were completed in the Codex takeover:
+  the upload route now rejects duplicate `passengerNo` values and removes passengers
+  omitted from the latest parsed upload.
 - Kakao->email fallback on high-risk send failure (`automation/supplier-messages/run`).
 - Reminder delivery: notifications are still only queued; no worker/UI reads them and
   escalation levels do not fan out to team leads/admins. The feature is inert until a
   dispatch path exists.
 - Provider-callback state-machine guard (only `sending -> sent/failed` should apply).
-- `docs/accounting-receivables-dashboard.md` and `README.md` still say
-  `partner_receivable_ledger` / `partner_name`; update to `agency_receivable_ledger` /
-  `counterparty_agency_name`.
+- `docs/accounting-receivables-dashboard.md` and `README.md` were updated in the Codex
+  takeover to use `agency_receivable_ledger` / `counterparty_agency_name`.
 - UI still uses generic "Partner / 파트너" labels; the mandated terms are
   "Overseas Agency / 해외 에이전시".
 
@@ -73,9 +72,9 @@ Both Phase 4 decisions were answered by the user and implemented:
    `src/lib/domain/currency.mjs` `convertKrwToQuoteCurrency(amountKrw, exchangeRateToKrw)`
    using the version's rate, applied in `src/features/finance/auto-invoice.ts` (line
    items + total). `exchange_rate_to_krw` semantics: 1 quote-currency unit = X KRW, so
-   KRW→quote divides by the rate; KRW quotes (rate 1) are unchanged. NOTE: agency-portal
-   display of `public_total_amount` (still KRW) should apply the same helper for a fully
-   consistent agency view — left as a follow-up because it is display-only.
+   KRW→quote divides by the rate; KRW quotes (rate 1) are unchanged. Agency-portal
+   list/detail displays now apply the same helper so public totals are shown in the
+   quoted currency while the stored amount remains KRW.
 2. **Margin column exposure — decided: separate table.** Migration
    `202607040001_quote_version_internals.sql` creates the internal-only
    `quote_version_internals` table, backfills it, updates the Phase 1

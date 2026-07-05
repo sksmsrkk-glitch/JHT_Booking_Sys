@@ -21,6 +21,7 @@
     "verify:launch-runbook": "node scripts/verify-launch-runbook.mjs",
     "verify:page-smoke": "node scripts/verify-page-smoke.mjs",
     "verify:app-route-smoke": "node scripts/verify-app-route-smoke.mjs",
+    "convert:notion-md": "node scripts/convert-notion-markdown-export.mjs",
     "seed:hosted-demo-auth": "node scripts/seed-hosted-demo-auth.mjs",
     "smoke:runtime": "node scripts/runtime-smoke.mjs",
     "verify": "npm run test && npm run typecheck",
@@ -39,6 +40,7 @@
     "@types/node": "^22.15.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "supabase": "^2.109.0",
     "typescript": "^5.8.3"
   }
 }

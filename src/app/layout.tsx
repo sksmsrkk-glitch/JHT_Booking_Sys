@@ -42,8 +42,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <div className="shell">
           <header className="topbar">
-            <Link className="brand" href="/">
-              <img alt="Jung Ho Travel logo" src="/jht-logo.png" />
+            <Link
+              className="brand"
+              href="/"
+              style={{ alignItems: "center", display: "inline-flex", height: 56, overflow: "hidden", width: 100 }}
+            >
+              <img
+                alt="Jung Ho Travel logo"
+                height={52}
+                src="/jht-logo.png"
+                style={{ display: "block", height: "auto", maxHeight: 52, maxWidth: 92, objectFit: "contain", width: 92 }}
+                width={92}
+              />
             </Link>
             <nav className="nav primary-nav" aria-label="Primary navigation">
               <Link href="/admin">{dashboardLabel}</Link>

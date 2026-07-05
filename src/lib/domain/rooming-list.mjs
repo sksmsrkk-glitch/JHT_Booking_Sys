@@ -69,11 +69,58 @@ export function parseRoomingListText(text, options = {}) {
   return { passengers, errors };
 }
 
+export function normalizeRoomingPassengerRows(passengers = []) {
+  const errors = [];
+  const seenPassengerNos = new Set();
+  const rows = [];
+
+  passengers.forEach((passenger, index) => {
+    const passengerNo = normalizeOptionalText(passenger?.passengerNo) ?? String(index + 1);
+    const fullName = normalizeOptionalText(passenger?.fullName);
+
+    if (seenPassengerNos.has(passengerNo)) {
+      errors.push(`passengers[${index}].passengerNo is duplicated: ${passengerNo}`);
+    }
+    seenPassengerNos.add(passengerNo);
+
+    if (!fullName) {
+      errors.push(`passengers[${index}].fullName is required`);
+    }
+
+    rows.push({
+      passengerNo,
+      fullName,
+      gender: normalizeOptionalText(passenger?.gender),
+      dateOfBirth: normalizeOptionalText(passenger?.dateOfBirth),
+      dietaryRequirements: normalizeOptionalText(passenger?.dietaryRequirements),
+      passportNo: normalizeOptionalText(passenger?.passportNo),
+      coachLabel: normalizeOptionalText(passenger?.coachLabel),
+      metadata: isPlainObject(passenger?.metadata) ? passenger.metadata : {}
+    });
+  });
+
+  return {
+    rows,
+    passengerNos: Array.from(seenPassengerNos),
+    errors
+  };
+}
+
 export function detectDelimiter(text) {
   const firstLine = String(text ?? "").split(/\r?\n/)[0] ?? "";
   const commaCount = countUnquoted(firstLine, ",");
   const tabCount = countUnquoted(firstLine, "\t");
   return tabCount > commaCount ? "\t" : ",";
+}
+
+function normalizeOptionalText(value) {
+  if (value === undefined || value === null) return null;
+  const trimmed = String(value).trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function parseDelimitedRows(text, delimiter) {

@@ -22,7 +22,7 @@ export async function GET(request: Request, context: RouteContext) {
 
     const { data: versions, error: versionError } = await supabase
       .from("quote_versions")
-      .select("id, version_no, status, currency, agency_visible_summary, public_fare_options, public_total_amount, terms_and_conditions, sent_at, accepted_at, quote_itinerary_days(id, day_no, service_date, title, meal_summary, public_description, route_segments(id, seq, origin_label, destination_label, travel_minutes, distance_meters, provider)), quote_presentation_blocks(id, quote_itinerary_day_id, block_type, display_context, title, description, image_storage_path, image_url, alt_text, sort_order, metadata)")
+      .select("id, version_no, status, currency, exchange_rate_to_krw, agency_visible_summary, public_fare_options, public_total_amount, terms_and_conditions, sent_at, accepted_at, quote_itinerary_days(id, day_no, service_date, title, meal_summary, public_description, route_segments(id, seq, origin_label, destination_label, travel_minutes, distance_meters, provider)), quote_presentation_blocks(id, quote_itinerary_day_id, block_type, display_context, title, description, image_storage_path, image_url, alt_text, sort_order, metadata)")
       .eq("quote_case_id", quoteCase.id)
       .in("status", ["sent", "accepted", "superseded"])
       .order("version_no", { ascending: false });

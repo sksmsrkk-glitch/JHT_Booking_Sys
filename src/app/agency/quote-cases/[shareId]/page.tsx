@@ -3,6 +3,7 @@ import Link from "next/link";
 import { QuoteRequestActions } from "@/components/agency/QuoteRequestActions";
 import type { AgencyQuoteDetail, AgencyQuotePresentationBlock } from "@/features/agency-portal/types";
 import { getPageAuthorization } from "@/lib/api/page-session";
+import { convertKrwToQuoteCurrency } from "@/lib/domain/currency.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -465,14 +466,21 @@ function mapQuoteDetail(row: any): AgencyQuoteDetail {
     })),
     versions: (row.versions ?? []).map((version: any) => {
       const presentationBlocks: AgencyQuotePresentationBlock[] = (version.quote_presentation_blocks ?? []).map(mapBlock);
+      const currency = version.currency ?? row.currency;
+      const publicTotalAmount = convertKrwToQuoteCurrency(
+        Number(version.public_total_amount ?? 0),
+        Number(version.exchange_rate_to_krw ?? 1),
+        currency
+      );
+
       return {
         id: version.id,
         versionNo: version.version_no,
         status: version.status,
-        currency: version.currency,
+        currency,
         agencyVisibleSummary: version.agency_visible_summary ?? {},
         publicFareOptions: Array.isArray(version.public_fare_options) ? version.public_fare_options : [],
-        publicTotalAmount: Number(version.public_total_amount ?? 0),
+        publicTotalAmount,
         termsAndConditions: version.terms_and_conditions ?? null,
         sentAt: version.sent_at ?? null,
         acceptedAt: version.accepted_at ?? null,

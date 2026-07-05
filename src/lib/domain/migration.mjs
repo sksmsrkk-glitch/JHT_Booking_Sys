@@ -3,10 +3,11 @@ export const MIGRATION_STATUSES = ["uploaded", "mapped", "validated", "approved"
 export const MIGRATION_REQUIRED_FIELDS = {
   agency_accounts: ["name"],
   agency_contacts: ["agency_account_id", "name"],
-  domestic_suppliers: ["name_ko"],
+  domestic_suppliers: ["company_id", "category", "name_ko"],
   supplier_contacts: ["domestic_supplier_id", "name"],
-  supplier_products: ["domestic_supplier_id", "category", "name_ko"],
-  supplier_prices: ["supplier_product_id", "unit", "currency", "cost_price"]
+  supplier_products: ["domestic_supplier_id", "product_type", "name_ko", "search_name"],
+  supplier_prices: ["supplier_product_id", "pricing_unit", "currency", "cost_amount"],
+  supplier_media: ["media_type", "storage_path"]
 };
 
 const MIGRATION_TRANSITIONS = {

@@ -10,6 +10,7 @@ import type {
   AgencyReservationStatusHistoryItem,
   AgencyRoomingListItem
 } from "./types";
+import { convertKrwToQuoteCurrency } from "@/lib/domain/currency.mjs";
 
 type SupabaseClientLike = {
   from: (table: string) => any;
@@ -22,7 +23,7 @@ export async function listAgencyQuoteCases(
   const { data, error } = await supabase
     .from("quote_cases")
     .select(
-      "id, case_code, share_id, tour_name, tour_type, status, currency, estimated_pax, start_date, end_date, created_at, quote_versions(id, version_no, status, public_total_amount, sent_at, accepted_at)"
+      "id, case_code, share_id, tour_name, tour_type, status, currency, estimated_pax, start_date, end_date, created_at, quote_versions(id, version_no, status, currency, exchange_rate_to_krw, public_total_amount, sent_at, accepted_at)"
     )
     .eq("agency_account_id", agencyAccountId)
     .in("status", ["sent", "revision_requested", "accepted", "expired"])
@@ -158,6 +159,15 @@ function mapAgencyQuoteListItem(row: any): AgencyQuoteListItem {
     .filter((version: any) => ["sent", "accepted", "superseded"].includes(version.status))
     .sort((left: any, right: any) => Number(right.version_no) - Number(left.version_no));
   const latestVersion = visibleVersions[0];
+  const latestCurrency = latestVersion?.currency ?? row.currency;
+  const publicTotalAmount =
+    latestVersion?.public_total_amount === null || latestVersion?.public_total_amount === undefined
+      ? null
+      : convertKrwToQuoteCurrency(
+          Number(latestVersion.public_total_amount),
+          Number(latestVersion.exchange_rate_to_krw ?? 1),
+          latestCurrency
+        );
 
   return {
     id: row.id,
@@ -166,16 +176,13 @@ function mapAgencyQuoteListItem(row: any): AgencyQuoteListItem {
     tourName: row.tour_name,
     tourType: row.tour_type ?? null,
     status: row.status,
-    currency: row.currency,
+    currency: latestCurrency,
     estimatedPax: row.estimated_pax ?? null,
     startDate: row.start_date ?? null,
     endDate: row.end_date ?? null,
     latestVersionNo: latestVersion?.version_no ?? null,
     latestVersionStatus: latestVersion?.status ?? null,
-    publicTotalAmount:
-      latestVersion?.public_total_amount === null || latestVersion?.public_total_amount === undefined
-        ? null
-        : Number(latestVersion.public_total_amount),
+    publicTotalAmount,
     sentAt: latestVersion?.sent_at ?? null,
     acceptedAt: latestVersion?.accepted_at ?? null,
     createdAt: row.created_at

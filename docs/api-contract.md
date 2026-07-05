@@ -115,7 +115,8 @@
 - Agency APIs use Supabase RLS through the caller's JWT.
 - Agency inquiry, quote revision request, and quote booking request writes create internal audit evidence with agency account/user context.
 - Agency booking requests validate the selected/latest quote version is Agency-visible before storing the request payload.
-- Agency rooming list uploads verify agency-owned reservations, reject cancelled reservations, generate a storage path when omitted, and mark uploads with passenger rows as parsed.
+- Agency rooming list uploads verify agency-owned reservations, reject cancelled reservations, generate a storage path when omitted, reject duplicate `passengerNo` values, and mark uploads with passenger rows as parsed.
+- A parsed rooming list upload is a reservation-level replace-set: passengers omitted from the latest parsed upload are removed after the new passenger rows upsert successfully.
 - Agency reservation detail may show passenger names and service notes for its own reservation, while internal admin detail may show fuller passenger operations data.
 - Internal APIs require an internal user role through RLS.
 - Company creation is admin-only, normalizes company code to uppercase, preserves the unique code constraint, and writes an audit log.
