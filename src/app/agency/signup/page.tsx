@@ -20,6 +20,23 @@ export default function AgencySignupPage() {
           Back to Portal
         </Link>
       </div>
+      <section className="partner-onboarding-steps" aria-label="Partner onboarding steps">
+        <div>
+          <span>01</span>
+          <strong>Submit application</strong>
+          <p>Enter company, country, contact, email, and business notes.</p>
+        </div>
+        <div>
+          <span>02</span>
+          <strong>JHT review</strong>
+          <p>Internal admin approves or rejects the partner application.</p>
+        </div>
+        <div>
+          <span>03</span>
+          <strong>Mother account</strong>
+          <p>Approved partners receive portal access and can manage sub users.</p>
+        </div>
+      </section>
       <AgencySignupApplicationForm />
     </>
   );

@@ -179,6 +179,13 @@ export const agencyRoutes: V1RouteCard[] = [
     description: "Review issued invoices and safe payment summaries for own reservations.",
     status: "live",
     owner: "Agency User"
+  },
+  {
+    href: "/agency/workflows" as Route,
+    title: "Communication",
+    description: "Continue quote revisions, booking questions, cancellation requests, and invoice conversations by workflow code.",
+    status: "live",
+    owner: "Agency User"
   }
 ];
 

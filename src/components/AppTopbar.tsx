@@ -30,6 +30,7 @@ export function AppTopbar({ isSignedIn, locale }: AppTopbarProps) {
   const agencySignupLabel = locale === "ko" ? "파트너 등록" : "Partner Sign-up";
   const agencyNewInquiryLabel = locale === "ko" ? "신규 문의" : "New Inquiry";
   const invoiceLabel = locale === "ko" ? "인보이스" : "Invoices";
+  const communicationLabel = locale === "ko" ? "소통" : "Communication";
   const loginLabel = isSignedIn ? text.signOut : text.signIn;
   const agencyAuthHref = (isSignedIn ? "/auth/logout" : "/agency/login") as Route;
   const internalAuthHref = (isSignedIn ? "/auth/logout" : "/auth/login") as Route;
@@ -66,6 +67,7 @@ export function AppTopbar({ isSignedIn, locale }: AppTopbarProps) {
           <Link href={"/agency/quote-cases" as Route}>{text.quotes}</Link>
           <Link href={"/agency/reservations" as Route}>{text.reservations}</Link>
           <Link href={"/agency/invoices" as Route}>{invoiceLabel}</Link>
+          <Link href={"/agency/workflows" as Route}>{communicationLabel}</Link>
           <Link href={"/agency/signup" as Route}>{agencySignupLabel}</Link>
         </nav>
       ) : (

@@ -516,6 +516,192 @@ a {
   margin: 0;
 }
 
+.partner-portal-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.partner-portal-header {
+  align-items: stretch;
+  background: #ffffff;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.5fr);
+  padding: 22px;
+}
+
+.partner-portal-header h1 {
+  font-size: 32px;
+  line-height: 1.15;
+  margin: 0 0 8px;
+}
+
+.partner-portal-header p,
+.partner-access-panel p,
+.partner-task-card p,
+.partner-auth-copy p,
+.partner-auth-copy li,
+.partner-onboarding-steps p {
+  color: #52606d;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.partner-access-panel {
+  align-content: start;
+  background: #f7fbff;
+  border: 1px solid #c9e2ff;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.partner-access-panel span,
+.partner-task-card span,
+.partner-onboarding-steps span {
+  color: #5f7896;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.partner-access-panel strong {
+  color: #102a43;
+  font-size: 20px;
+}
+
+.partner-access-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.partner-status-strip {
+  background: #ffffff;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  overflow: hidden;
+}
+
+.partner-status-item {
+  border-right: 1px solid #e6ebf2;
+  display: grid;
+  gap: 3px;
+  min-height: 70px;
+  padding: 12px 14px;
+}
+
+.partner-status-item:last-child {
+  border-right: 0;
+}
+
+.partner-status-item small {
+  color: #829ab1;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.partner-status-item strong {
+  color: #102a43;
+  font-size: 14px;
+}
+
+.partner-task-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.partner-task-card {
+  background: #ffffff;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  color: inherit;
+  display: grid;
+  gap: 10px;
+  min-height: 168px;
+  padding: 16px;
+  text-decoration: none;
+  transition:
+    border-color 120ms ease,
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.partner-task-card:hover,
+.partner-task-card:focus-visible {
+  border-color: #8bb8dc;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.partner-task-card h2 {
+  color: #0f5b99;
+  font-size: 18px;
+  line-height: 1.25;
+  margin: 4px 0 0;
+}
+
+.partner-auth-layout {
+  align-items: stretch;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(320px, 1fr);
+}
+
+.partner-auth-copy {
+  background: #ffffff;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.partner-auth-copy h2 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.partner-auth-copy ul {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.partner-onboarding-steps {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 16px;
+}
+
+.partner-onboarding-steps div {
+  background: #ffffff;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  display: grid;
+  gap: 7px;
+  min-height: 126px;
+  padding: 16px;
+}
+
+.partner-onboarding-steps strong {
+  color: #102a43;
+  font-size: 16px;
+}
+
 .button-primary,
 .button-secondary {
   align-items: center;
@@ -3660,7 +3846,13 @@ html.dark .workflow-message,
 html.dark .workflow-action-card,
 html.dark .workflow-list-card,
 html.dark .workflow-filter-shell,
-html.dark .workflow-list-shell {
+html.dark .workflow-list-shell,
+html.dark .partner-portal-header,
+html.dark .partner-access-panel,
+html.dark .partner-status-strip,
+html.dark .partner-task-card,
+html.dark .partner-auth-copy,
+html.dark .partner-onboarding-steps div {
   background: var(--surface);
   border-color: var(--border);
   color: var(--text);
@@ -3706,6 +3898,12 @@ html.dark .workflow-message footer,
 html.dark .workflow-action-card p,
 html.dark .workflow-list-card p,
 html.dark .workflow-list-card > span,
+html.dark .partner-portal-header p,
+html.dark .partner-access-panel p,
+html.dark .partner-task-card p,
+html.dark .partner-auth-copy p,
+html.dark .partner-auth-copy li,
+html.dark .partner-onboarding-steps p,
 html.dark .workflow-filter-bar label,
 html.dark .workflow-list-row small {
   color: var(--text-muted);
@@ -3726,6 +3924,16 @@ html.dark .workflow-context-panel dt,
 html.dark .workflow-action-card span:first-child,
 html.dark .eyebrow {
   color: var(--text-soft);
+}
+
+html.dark .partner-access-panel strong,
+html.dark .partner-status-item strong,
+html.dark .partner-onboarding-steps strong {
+  color: var(--text);
+}
+
+html.dark .partner-status-item {
+  border-color: var(--border);
 }
 
 html.dark table th {
@@ -4717,8 +4925,22 @@ html.dark .nav-more-menu a:hover {
   .confirmation-list-row,
   .confirmation-row-meta,
   .workflow-filter-bar,
-  .workflow-list-row {
+  .workflow-list-row,
+  .partner-portal-header,
+  .partner-status-strip,
+  .partner-auth-layout,
+  .partner-onboarding-steps {
     grid-template-columns: 1fr;
+  }
+
+  .partner-status-item {
+    border-bottom: 1px solid #e6ebf2;
+    border-right: 0;
+    min-height: 56px;
+  }
+
+  .partner-status-item:last-child {
+    border-bottom: 0;
   }
 
   .workflow-list-header {

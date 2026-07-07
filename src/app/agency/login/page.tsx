@@ -20,7 +20,21 @@ export default function AgencyLoginPage() {
           Partner Sign-up
         </Link>
       </div>
-      <SupabaseLoginForm buttonLabel="Log In" pendingLabel="Logging in..." redirectTo="/agency" />
+      <section className="partner-auth-layout">
+        <div className="partner-auth-copy">
+          <h2>Partner account access</h2>
+          <p>
+            Use the account approved by JHT. All quotes, reservations, invoices, and communication are filtered by your
+            agency profile after sign-in.
+          </p>
+          <ul>
+            <li>Mother ID can manage agency-side sub users.</li>
+            <li>Inactive or frozen accounts cannot access partner records.</li>
+            <li>Internal costs and supplier details remain hidden.</li>
+          </ul>
+        </div>
+        <SupabaseLoginForm buttonLabel="Log In" pendingLabel="Logging in..." redirectTo="/agency" />
+      </section>
     </>
   );
 }
