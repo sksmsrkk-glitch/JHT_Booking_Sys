@@ -5538,3 +5538,212 @@ html.dark .jht-calendar-month-grid button {
     white-space: normal;
   }
 }
+
+/*
+ * 2026-07-07 UI normalization
+ * 여러 페이지에서 버튼/입력 박스 규격이 따로 커진 부분을 마지막 규칙으로 통일합니다.
+ * 신규 화면을 만들 때도 이 높이와 간격을 기준으로 맞추면 박스가 어긋나지 않습니다.
+ */
+:root {
+  --jht-control-height: 42px;
+  --jht-compact-control-height: 38px;
+}
+
+.button-primary,
+.button-secondary,
+.main button,
+.inline-actions button,
+.compact-actions button,
+.exchange-rate-page button {
+  align-items: center;
+  box-sizing: border-box;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 800;
+  height: var(--jht-control-height);
+  justify-content: center;
+  line-height: 1;
+  min-height: var(--jht-control-height);
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.jht-calendar-header button,
+.jht-calendar-grid button,
+.jht-calendar-month-grid button {
+  font-size: 13px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+
+.main input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+.main select {
+  box-sizing: border-box;
+  height: var(--jht-control-height);
+  min-height: var(--jht-control-height);
+}
+
+.main textarea {
+  box-sizing: border-box;
+  min-height: 78px;
+}
+
+.topbar .brand {
+  height: 58px !important;
+  min-width: 104px !important;
+  width: 104px !important;
+}
+
+.topbar .brand img {
+  max-height: 54px !important;
+  max-width: 98px !important;
+  width: 98px !important;
+}
+
+.primary-nav > a,
+.nav-more,
+.nav-more-trigger,
+.auth-nav-link {
+  height: var(--jht-compact-control-height);
+  min-height: var(--jht-compact-control-height);
+}
+
+.theme-toggle button,
+.language-switcher button {
+  height: 32px;
+  min-height: 32px;
+}
+
+.exchange-rate-page {
+  --exchange-control-height: 44px;
+}
+
+.exchange-rate-page input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+.exchange-rate-page select,
+.exchange-rate-page .button-primary,
+.exchange-rate-page .button-secondary {
+  height: var(--exchange-control-height);
+  min-height: var(--exchange-control-height);
+}
+
+.exchange-rate-page textarea {
+  height: auto;
+  min-height: 74px;
+}
+
+.exchange-rate-filter-toolbar {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(360px, 2fr) minmax(150px, 0.7fr) minmax(150px, 0.7fr) 104px;
+  padding: 14px 16px;
+}
+
+.exchange-rate-filter-toolbar label,
+.exchange-country-master-grid label,
+.exchange-rate-create-grid label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.exchange-rate-filter-toolbar .button-primary {
+  align-self: end;
+  width: 100%;
+}
+
+.exchange-rate-filter-note {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.exchange-rate-admin-grid {
+  align-items: start;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1180px) {
+  .exchange-rate-admin-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.exchange-country-master-grid {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(180px, 0.65fr) minmax(240px, 1.1fr) minmax(140px, 0.45fr) 132px;
+}
+
+.exchange-country-preset-field {
+  grid-column: 1 / -1;
+}
+
+.exchange-country-name-field {
+  grid-column: span 2;
+}
+
+.exchange-country-alias-field {
+  grid-column: span 3;
+}
+
+.exchange-country-master-grid .exchange-form-submit-cell {
+  align-self: end;
+  grid-column: span 1;
+}
+
+.exchange-rate-create-grid {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(260px, 1.35fr) minmax(130px, 0.6fr) minmax(110px, 0.5fr) minmax(130px, 0.6fr) minmax(140px, 0.65fr) minmax(120px, 0.55fr);
+}
+
+.exchange-rate-country-field {
+  grid-column: span 2;
+}
+
+.exchange-rate-source-field {
+  grid-column: span 2;
+}
+
+.exchange-rate-notes-field {
+  grid-column: span 4;
+}
+
+.exchange-rate-create-grid .exchange-form-submit-cell {
+  align-self: end;
+  grid-column: span 2;
+}
+
+.exchange-form-submit-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.exchange-form-submit-cell .button-primary {
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .exchange-rate-filter-toolbar,
+  .exchange-country-master-grid,
+  .exchange-rate-create-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .exchange-country-preset-field,
+  .exchange-country-name-field,
+  .exchange-country-alias-field,
+  .exchange-rate-country-field,
+  .exchange-rate-source-field,
+  .exchange-rate-notes-field,
+  .exchange-country-master-grid .exchange-form-submit-cell,
+  .exchange-rate-create-grid .exchange-form-submit-cell {
+    grid-column: 1;
+  }
+}

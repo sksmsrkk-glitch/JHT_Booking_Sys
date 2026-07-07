@@ -60,7 +60,7 @@ export function mergeCountryReferences(countries: CountryReference[] = []) {
   return [...merged.values()].sort((left, right) => left.countryName.localeCompare(right.countryName));
 }
 
-export function buildCurrencyOptions(countries: CountryReference[] = [], currentCurrency?: string | null) {
+export function buildCurrencyOptions(countries: Array<Pick<CountryReference, "defaultCurrency">> = [], currentCurrency?: string | null) {
   const values = new Set(COMMON_BASE_CURRENCIES);
   for (const country of countries) {
     if (country.defaultCurrency) values.add(country.defaultCurrency);

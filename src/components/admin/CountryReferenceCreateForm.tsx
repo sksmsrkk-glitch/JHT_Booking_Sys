@@ -13,9 +13,10 @@ type CountryFormState = {
 
 export function CountryReferenceCreateForm({ countries = [] }: { countries?: CountryReference[] }) {
   const initialCountries = useMemo(() => mergeCountryReferences(countries), [countries]);
+  const initialCountry = pickDefaultCountry(initialCountries);
   const [countryOptions, setCountryOptions] = useState<CountryReference[]>(initialCountries);
-  const [selectedCountry, setSelectedCountry] = useState(initialCountries[0]?.countryCode ?? "");
-  const [formState, setFormState] = useState<CountryFormState>(() => stateFromCountry(initialCountries[0]));
+  const [selectedCountry, setSelectedCountry] = useState(initialCountry?.countryCode ?? "");
+  const [formState, setFormState] = useState<CountryFormState>(() => stateFromCountry(initialCountry));
   const [isCustomCountry, setIsCustomCountry] = useState(false);
   const [message, setMessage] = useState("");
   const [isBusy, setIsBusy] = useState(false);
@@ -30,7 +31,7 @@ export function CountryReferenceCreateForm({ countries = [] }: { countries?: Cou
         const merged = mergeCountryReferences(payload.data);
         setCountryOptions(merged);
         if (!isCustomCountry) {
-          const selected = merged.find((country) => country.countryCode === selectedCountry) ?? merged[0];
+          const selected = merged.find((country) => country.countryCode === selectedCountry) ?? pickDefaultCountry(merged);
           setSelectedCountry(selected?.countryCode ?? "");
           setFormState(stateFromCountry(selected));
         }
@@ -167,4 +168,10 @@ function stateFromCountry(country: CountryReference | undefined): CountryFormSta
     defaultCurrency: country?.defaultCurrency ?? "",
     aliases: country?.aliases?.join(", ") ?? ""
   };
+}
+
+function pickDefaultCountry(countries: CountryReference[]) {
+  // JHT의 현재 주요 파트너 테스트 데이터가 Malaysia 기준이라 기본값을 MY로 고정합니다.
+  // MY가 DB에서 삭제된 경우에만 첫 번째 국가를 fallback으로 사용합니다.
+  return countries.find((country) => country.countryCode === "MY") ?? countries[0];
 }

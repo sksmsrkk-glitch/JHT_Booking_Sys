@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { buildCurrencyOptions, DEFAULT_COUNTRY_REFERENCES, mergeCountryReferences } from "@/features/countries/defaults";
+import type { CountryReference } from "@/features/countries/types";
 import type { CostSearchItem, CostSearchPrice } from "@/features/costing/types";
 import type { QuoteItineraryDayDetail } from "@/features/quotation/types";
 
@@ -30,6 +32,7 @@ export function QuoteItemCreateForm({
   const [snapshotSupplierName, setSnapshotSupplierName] = useState("");
   const [snapshotCostCurrency, setSnapshotCostCurrency] = useState("KRW");
   const [snapshotUnitCostAmount, setSnapshotUnitCostAmount] = useState("0");
+  const [countryOptions, setCountryOptions] = useState<CountryReference[]>(mergeCountryReferences(DEFAULT_COUNTRY_REFERENCES));
   const [exchangeRateCountryCode, setExchangeRateCountryCode] = useState("");
   const [exchangeRateToKrw, setExchangeRateToKrw] = useState("1");
   const [exchangeRateNotice, setExchangeRateNotice] = useState("");
@@ -40,6 +43,21 @@ export function QuoteItemCreateForm({
       .filter((price) => price.status === "active")
       .map((price) => ({ item, price }))
   );
+  const currencyOptions = buildCurrencyOptions(countryOptions, snapshotCostCurrency);
+
+  useEffect(() => {
+    let mounted = true;
+    fetch("/api/countries")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (!mounted || !payload?.data?.length) return;
+        setCountryOptions(mergeCountryReferences(payload.data));
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   async function submit(formData: FormData) {
     if (!quoteVersionId) return;
@@ -203,12 +221,18 @@ export function QuoteItemCreateForm({
         </label>
         <label>
           Cost Currency
-          <input
+          <select
             disabled={!quoteVersionId || isBusy}
             name="snapshotCostCurrency"
             onChange={(event) => setSnapshotCostCurrency(event.target.value.toUpperCase())}
             value={snapshotCostCurrency}
-          />
+          >
+            {currencyOptions.map((currency) => (
+              <option key={currency} value={currency}>
+                {currency}
+              </option>
+            ))}
+          </select>
         </label>
         <label>
           Unit Cost
@@ -224,13 +248,21 @@ export function QuoteItemCreateForm({
           />
         </label>
         <label>
-          FX Country Code
-          <input
+          FX Country
+          <select
             disabled={!quoteVersionId || isBusy}
-            onChange={(event) => setExchangeRateCountryCode(event.target.value.toUpperCase())}
-            placeholder="TH, MY, SG"
+            onChange={(event) => setExchangeRateCountryCode(event.target.value)}
             value={exchangeRateCountryCode}
-          />
+          >
+            <option value="">Global / common FX</option>
+            {countryOptions.map((country) => (
+              <option key={country.countryCode} value={country.countryCode}>
+                {country.countryCode} - {country.countryName}
+                {country.defaultCurrency ? ` (${country.defaultCurrency})` : ""}
+              </option>
+            ))}
+          </select>
+          <span className="subtext">Country Code is selected from the common country master.</span>
         </label>
         <label>
           FX to KRW

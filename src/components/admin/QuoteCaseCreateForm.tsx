@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useState } from "react";
 import type { AgencyListItem } from "@/features/agency/types";
 import type { CompanyListItem } from "@/features/company/types";
+import { buildCurrencyOptions, DEFAULT_COUNTRY_REFERENCES, mergeCountryReferences } from "@/features/countries/defaults";
 
 type QuoteItemRow = {
   id: string;
@@ -131,25 +132,14 @@ type CountryOption = {
   defaultCurrency: string | null;
 };
 
-const FALLBACK_COUNTRIES: CountryOption[] = [
-  { countryCode: "MY", countryName: "Malaysia", defaultCurrency: "MYR" },
-  { countryCode: "TH", countryName: "Thailand", defaultCurrency: "THB" },
-  { countryCode: "VN", countryName: "Vietnam", defaultCurrency: "VND" },
-  { countryCode: "ID", countryName: "Indonesia", defaultCurrency: "IDR" },
-  { countryCode: "PH", countryName: "Philippines", defaultCurrency: "PHP" },
-  { countryCode: "SG", countryName: "Singapore", defaultCurrency: "SGD" },
-  { countryCode: "JP", countryName: "Japan", defaultCurrency: "JPY" },
-  { countryCode: "CN", countryName: "China", defaultCurrency: "CNY" },
-  { countryCode: "TW", countryName: "Taiwan", defaultCurrency: "TWD" },
-  { countryCode: "HK", countryName: "Hong Kong", defaultCurrency: "HKD" },
-  { countryCode: "IN", countryName: "India", defaultCurrency: "INR" },
-  { countryCode: "AE", countryName: "United Arab Emirates", defaultCurrency: "AED" },
-  { countryCode: "US", countryName: "United States", defaultCurrency: "USD" },
-  { countryCode: "AU", countryName: "Australia", defaultCurrency: "AUD" }
-];
+const FALLBACK_COUNTRIES: CountryOption[] = mergeCountryReferences(DEFAULT_COUNTRY_REFERENCES).map((country) => ({
+  countryCode: country.countryCode,
+  countryName: country.countryName,
+  defaultCurrency: country.defaultCurrency
+}));
 
-// DB 연결 전 또는 로그인 전에도 국가 드롭다운이 비어 보이지 않도록 쓰는 기본 국가 목록입니다.
-// 실제 운영에서는 /api/countries와 country_references 테이블이 우선 기준이 됩니다.
+// DB 연결 전 또는 로그인 전에도 국가 드롭다운이 비어 보이지 않도록 공통 국가 프리셋을 사용합니다.
+// 실제 운영에서는 /api/countries와 country_references 테이블이 우선 기준입니다.
 const DEFAULT_ITEM_ROW: QuoteItemRow = {
   id: "row-1",
   sourceSupplierProductId: null,
@@ -475,6 +465,7 @@ export function QuoteCaseCreateForm({
   const [exchangeRateNotice, setExchangeRateNotice] = useState("");
   const [countryOptions, setCountryOptions] = useState<CountryOption[]>(FALLBACK_COUNTRIES);
   const itemDayGroups = buildItemDayGroups(itemRows, itineraryRows);
+  const caseCurrencyOptions = buildCurrencyOptions(countryOptions, caseFields.currency);
 
   useEffect(() => {
     let mounted = true;
@@ -483,7 +474,7 @@ export function QuoteCaseCreateForm({
       .then((payload) => {
         if (!mounted || !payload?.data?.length) return;
         setCountryOptions(
-          payload.data.map((country: CountryOption) => ({
+          mergeCountryReferences(payload.data).map((country) => ({
             countryCode: country.countryCode,
             countryName: country.countryName,
             defaultCurrency: country.defaultCurrency ?? null
@@ -648,11 +639,17 @@ export function QuoteCaseCreateForm({
         </label>
         <label>
           Currency
-          <input
+          <select
             name="currency"
             value={caseFields.currency}
-            onChange={(event) => updateCaseField("currency", event.target.value)}
-          />
+            onChange={(event) => updateCaseField("currency", event.target.value.toUpperCase())}
+          >
+            {caseCurrencyOptions.map((currency) => (
+              <option key={currency} value={currency}>
+                {currency}
+              </option>
+            ))}
+          </select>
         </label>
         <label>
           Estimated Pax
@@ -755,7 +752,9 @@ export function QuoteCaseCreateForm({
               </tr>
             </thead>
             <tbody>
-              {exchangeRateRows.map((row) => (
+              {exchangeRateRows.map((row) => {
+                const rowCurrencyOptions = buildCurrencyOptions(countryOptions, row.baseCurrency);
+                return (
                 <tr key={row.id}>
                   <td>
                     <select
@@ -773,20 +772,26 @@ export function QuoteCaseCreateForm({
                     {row.countryName ? <span className="subtext">{row.countryName}</span> : null}
                   </td>
                   <td>
-                    <input
+                    <select
                       aria-label="Base currency"
-                      placeholder="USD"
                       value={row.baseCurrency}
                       onChange={(event) => updateExchangeRateRow(row.id, { baseCurrency: event.target.value.toUpperCase() })}
-                    />
+                    >
+                      {rowCurrencyOptions.map((currency) => (
+                        <option key={currency} value={currency}>
+                          {currency}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td>
-                    <input
+                    <select
                       aria-label="Quote currency"
-                      placeholder="KRW"
                       value={row.quoteCurrency}
                       onChange={(event) => updateExchangeRateRow(row.id, { quoteCurrency: event.target.value.toUpperCase() })}
-                    />
+                    >
+                      <option value="KRW">KRW</option>
+                    </select>
                   </td>
                   <td>
                     <input
@@ -830,7 +835,8 @@ export function QuoteCaseCreateForm({
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1015,12 +1021,17 @@ export function QuoteCaseCreateForm({
                         </td>
                         <td>
                           <div className="money-cell">
-                            <input
+                            <select
                               aria-label="Currency"
-                              placeholder="KRW"
                               value={row.snapshotCostCurrency}
-                              onChange={(event) => updateItemRow(row.id, { snapshotCostCurrency: event.target.value })}
-                            />
+                              onChange={(event) => updateItemRow(row.id, { snapshotCostCurrency: event.target.value.toUpperCase() })}
+                            >
+                              {buildCurrencyOptions(countryOptions, row.snapshotCostCurrency).map((currency) => (
+                                <option key={currency} value={currency}>
+                                  {currency}
+                                </option>
+                              ))}
+                            </select>
                             <input
                               aria-label="Unit cost"
                               min="0"

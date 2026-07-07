@@ -1,8 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { buildCurrencyOptions, DEFAULT_COUNTRY_REFERENCES, mergeCountryReferences } from "@/features/countries/defaults";
+import type { CountryReference } from "@/features/countries/types";
 import { SUPPLIER_CATEGORIES } from "@/features/supplier/queries";
 import type { CompanyListItem } from "@/features/company/types";
+
+const initialCountryOptions = mergeCountryReferences(DEFAULT_COUNTRY_REFERENCES);
+const initialCountry = pickDefaultCountry(initialCountryOptions);
 
 export function DomesticSupplierCreateForm({ companies }: { companies: CompanyListItem[] }) {
   const [message, setMessage] = useState("");
@@ -103,6 +108,34 @@ export function DomesticSupplierCreateForm({ companies }: { companies: CompanyLi
 export function AgencyCreateForm({ companies }: { companies: CompanyListItem[] }) {
   const [message, setMessage] = useState("");
   const [isBusy, setIsBusy] = useState(false);
+  const [countryOptions, setCountryOptions] = useState<CountryReference[]>(initialCountryOptions);
+  const [selectedCountryCode, setSelectedCountryCode] = useState(initialCountry?.countryCode ?? "");
+  const [billingCurrency, setBillingCurrency] = useState(initialCountry?.defaultCurrency ?? "KRW");
+  const currencyOptions = buildCurrencyOptions(countryOptions, billingCurrency);
+
+  useEffect(() => {
+    let mounted = true;
+    fetch("/api/countries")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (!mounted || !payload?.data?.length) return;
+        const merged = mergeCountryReferences(payload.data);
+        const nextCountry = merged.find((country) => country.countryCode === selectedCountryCode) ?? pickDefaultCountry(merged);
+        setCountryOptions(merged);
+        setSelectedCountryCode(nextCountry?.countryCode ?? "");
+        setBillingCurrency(nextCountry?.defaultCurrency ?? "KRW");
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  function selectCountry(countryCode: string) {
+    const country = countryOptions.find((item) => item.countryCode === countryCode);
+    setSelectedCountryCode(country?.countryCode ?? "");
+    setBillingCurrency(country?.defaultCurrency ?? "KRW");
+  }
 
   async function submit(formData: FormData) {
     setIsBusy(true);
@@ -110,13 +143,13 @@ export function AgencyCreateForm({ companies }: { companies: CompanyListItem[] }
     const payload = readForm(formData, [
       "companyId",
       "name",
-      "countryCode",
       "emailDomain",
       "phone",
       "website",
-      "billingCurrency",
       "googleDriveFolderUrl"
     ]);
+    payload.countryCode = selectedCountryCode;
+    payload.billingCurrency = billingCurrency;
 
     const response = await fetch("/api/agencies", {
       method: "POST",
@@ -141,8 +174,16 @@ export function AgencyCreateForm({ companies }: { companies: CompanyListItem[] }
           <input name="name" placeholder="Overseas agency name" required />
         </label>
         <label>
-          Country Code
-          <input maxLength={12} name="countryCode" placeholder="MY, VN, JP" />
+          Country
+          <select disabled={isBusy} name="countryCode" required value={selectedCountryCode} onChange={(event) => selectCountry(event.target.value)}>
+            {countryOptions.map((country) => (
+              <option key={country.countryCode} value={country.countryCode}>
+                {country.countryCode} - {country.countryName}
+                {country.defaultCurrency ? ` (${country.defaultCurrency})` : ""}
+              </option>
+            ))}
+          </select>
+          <span className="subtext">Common country master</span>
         </label>
         <label>
           Email Domain
@@ -150,7 +191,13 @@ export function AgencyCreateForm({ companies }: { companies: CompanyListItem[] }
         </label>
         <label>
           Billing Currency
-          <input defaultValue="KRW" name="billingCurrency" />
+          <select disabled={isBusy} name="billingCurrency" required value={billingCurrency} onChange={(event) => setBillingCurrency(event.target.value)}>
+            {currencyOptions.map((currency) => (
+              <option key={currency} value={currency}>
+                {currency}
+              </option>
+            ))}
+          </select>
         </label>
         <label>
           Phone
@@ -200,4 +247,9 @@ function formatLabel(value: string) {
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+function pickDefaultCountry(countries: CountryReference[]) {
+  // 해외 파트너 기본값은 공통 국가 마스터의 MY/MYR을 우선 사용합니다.
+  return countries.find((country) => country.countryCode === "MY") ?? countries[0];
 }

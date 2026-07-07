@@ -5,11 +5,12 @@ import { buildCurrencyOptions, DEFAULT_COUNTRY_REFERENCES, mergeCountryReference
 import type { CountryReference } from "@/features/countries/types";
 
 const initialCountryOptions = mergeCountryReferences(DEFAULT_COUNTRY_REFERENCES);
+const initialCountry = pickDefaultCountry(initialCountryOptions);
 
 export function AgencySignupApplicationForm() {
   const [countryOptions, setCountryOptions] = useState<CountryReference[]>(initialCountryOptions);
-  const [selectedCountryCode, setSelectedCountryCode] = useState("");
-  const [billingCurrency, setBillingCurrency] = useState("");
+  const [selectedCountryCode, setSelectedCountryCode] = useState(initialCountry?.countryCode ?? "");
+  const [billingCurrency, setBillingCurrency] = useState(initialCountry?.defaultCurrency ?? "");
   const [message, setMessage] = useState("");
   const [isBusy, setIsBusy] = useState(false);
   const selectedCountry = countryOptions.find((country) => country.countryCode === selectedCountryCode) ?? countryOptions[0];
@@ -25,10 +26,10 @@ export function AgencySignupApplicationForm() {
       .then((payload) => {
         if (!mounted || !payload?.data?.length) return;
         const merged = mergeCountryReferences(payload.data);
-        const nextCountry = merged.find((country) => country.countryCode === selectedCountryCode);
+        const nextCountry = merged.find((country) => country.countryCode === selectedCountryCode) ?? pickDefaultCountry(merged);
         setCountryOptions(merged);
         setSelectedCountryCode(nextCountry?.countryCode ?? "");
-        setBillingCurrency(nextCountry?.defaultCurrency ?? "");
+        setBillingCurrency(nextCountry?.defaultCurrency ?? billingCurrency);
       })
       .catch(() => undefined);
     return () => {
@@ -137,11 +138,16 @@ export function AgencySignupApplicationForm() {
         <textarea disabled={isBusy} name="notes" placeholder="Business type, expected Korea groups, contact notes" rows={3} />
       </label>
       <div className="inline-actions">
-        <button disabled={isBusy} type="submit">
+        <button className="button-primary" disabled={isBusy} type="submit">
           Submit Application
         </button>
         {message ? <span>{message}</span> : null}
       </div>
     </form>
   );
+}
+
+function pickDefaultCountry(countries: CountryReference[]) {
+  // 파트너 가입 테스트의 기본 국가/통화도 공통 마스터의 MY/MYR 기준으로 시작합니다.
+  return countries.find((country) => country.countryCode === "MY") ?? countries[0];
 }
