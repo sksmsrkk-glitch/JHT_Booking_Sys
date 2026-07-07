@@ -27,9 +27,7 @@ export function AppTopbar({ isSignedIn, locale }: AppTopbarProps) {
   const financeLabel = locale === "ko" ? "재무" : "Finance";
   const moreLabel = locale === "ko" ? "더보기" : "More";
   const agencyHomeLabel = locale === "ko" ? "포털 홈" : "Portal Home";
-  const agencySignupLabel = locale === "ko" ? "파트너 등록" : "Partner Sign-up";
   const agencyNewInquiryLabel = locale === "ko" ? "신규 문의" : "New Inquiry";
-  const invoiceLabel = locale === "ko" ? "인보이스" : "Invoices";
   const communicationLabel = locale === "ko" ? "소통" : "Communication";
   const loginLabel = isSignedIn ? text.signOut : text.signIn;
   const agencyAuthHref = (isSignedIn ? "/auth/logout" : "/agency/login") as Route;
@@ -64,11 +62,7 @@ export function AppTopbar({ isSignedIn, locale }: AppTopbarProps) {
         <nav className="nav primary-nav agency-nav" aria-label="Overseas agency portal navigation">
           <Link href={"/agency" as Route}>{agencyHomeLabel}</Link>
           <Link href={"/agency/inquiries/new" as Route}>{agencyNewInquiryLabel}</Link>
-          <Link href={"/agency/quote-cases" as Route}>{text.quotes}</Link>
-          <Link href={"/agency/reservations" as Route}>{text.reservations}</Link>
-          <Link href={"/agency/invoices" as Route}>{invoiceLabel}</Link>
           <Link href={"/agency/workflows" as Route}>{communicationLabel}</Link>
-          <Link href={"/agency/signup" as Route}>{agencySignupLabel}</Link>
         </nav>
       ) : (
         <nav className="nav primary-nav" aria-label="Primary navigation">

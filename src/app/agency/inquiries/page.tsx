@@ -58,7 +58,7 @@ export default async function AgencyInquiriesPage() {
         </section>
       ) : null}
 
-      {loadState.status === "ready" ? <InquiryTable inquiries={loadState.inquiries} /> : null}
+      {loadState.status === "ready" ? <InquiryDatabase inquiries={loadState.inquiries} /> : null}
 
       <section className="notice">
         <h2>Boundary Guardrails</h2>
@@ -72,7 +72,7 @@ export default async function AgencyInquiriesPage() {
   );
 }
 
-function InquiryTable({ inquiries }: { inquiries: AgencyInquirySummary[] }) {
+function InquiryDatabase({ inquiries }: { inquiries: AgencyInquirySummary[] }) {
   if (inquiries.length === 0) {
     return (
       <section className="empty-state">
@@ -82,36 +82,83 @@ function InquiryTable({ inquiries }: { inquiries: AgencyInquirySummary[] }) {
     );
   }
 
+  const revisionCount = inquiries.filter((inquiry) => inquiry.inquiryType !== "new_inquiry").length;
+  const paxCount = inquiries.reduce((total, inquiry) => total + (inquiry.paxCount ?? 0), 0);
+
   return (
-    <section className="table-shell" aria-label="Agency inquiries">
-      <table>
-        <thead>
-          <tr>
-            <th>Tour Code</th>
-            <th>Title</th>
-            <th>Type</th>
-            <th>Submitted</th>
-            <th>Period</th>
-            <th>Pax</th>
-            <th>Tour Type</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {inquiries.map((inquiry) => (
-            <tr key={inquiry.id}>
-              <td>{(inquiry as any).tourCode ?? "-"}</td>
-              <td>{inquiry.title}</td>
-              <td>{formatLabel(inquiry.inquiryType)}</td>
-              <td>{inquiry.createdAt.slice(0, 10)}</td>
-              <td>{(inquiry as any).periodText ?? formatDateRange(inquiry.requestedStartDate, inquiry.requestedEndDate)}</td>
-              <td>{inquiry.paxCount ?? "Not set"}</td>
-              <td>{inquiry.tourType ? formatLabel(inquiry.tourType) : "Not set"}</td>
-              <td>{inquiry.status}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <section className="partner-database-shell" aria-label="Agency inquiries">
+      <div className="partner-database-toolbar">
+        <div>
+          <p className="eyebrow">Inquiry Database</p>
+          <h2>Partner request ledger</h2>
+        </div>
+        <div className="partner-view-tabs" aria-label="Inquiry views">
+          <span className="active">Table</span>
+          <span>By Type</span>
+          <span>Recent</span>
+        </div>
+      </div>
+
+      <div className="partner-database-metrics" aria-label="Inquiry metrics">
+        <div>
+          <span>Requests</span>
+          <strong>{inquiries.length}</strong>
+        </div>
+        <div>
+          <span>Revision or booking</span>
+          <strong>{revisionCount}</strong>
+        </div>
+        <div>
+          <span>Total pax</span>
+          <strong>{paxCount || "-"}</strong>
+        </div>
+      </div>
+
+      <div className="partner-database-grid partner-inquiries-grid">
+        <div className="partner-database-header" role="row">
+          <span>Tour Code</span>
+          <span>Title</span>
+          <span>Type</span>
+          <span>Submitted</span>
+          <span>Period</span>
+          <span>Pax</span>
+          <span>Status</span>
+        </div>
+
+        {inquiries.map((inquiry) => (
+          <article className="partner-database-row" key={inquiry.id}>
+            <div className="partner-database-title">
+              <small>Tour Code</small>
+              <strong>{(inquiry as any).tourCode ?? "-"}</strong>
+            </div>
+            <div className="partner-property">
+              <small>Title</small>
+              <strong>{inquiry.title}</strong>
+              <span>{inquiry.tourType ? formatLabel(inquiry.tourType) : "Tour type not set"}</span>
+            </div>
+            <div className="partner-property">
+              <small>Type</small>
+              <strong>{formatLabel(inquiry.inquiryType)}</strong>
+            </div>
+            <div className="partner-property">
+              <small>Submitted</small>
+              <strong>{inquiry.createdAt.slice(0, 10)}</strong>
+            </div>
+            <div className="partner-property">
+              <small>Period</small>
+              <strong>{(inquiry as any).periodText ?? formatDateRange(inquiry.requestedStartDate, inquiry.requestedEndDate)}</strong>
+            </div>
+            <div className="partner-property">
+              <small>Pax</small>
+              <strong>{inquiry.paxCount ?? "Not set"}</strong>
+            </div>
+            <div className="partner-property">
+              <small>Status</small>
+              <span className={`status-dot status-${inquiry.status}`}>{formatLabel(inquiry.status)}</span>
+            </div>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }

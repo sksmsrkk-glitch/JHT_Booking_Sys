@@ -29,20 +29,93 @@ export default async function AgencyWorkflowsPage() {
         </section>
       ) : null}
 
-      <section className="workflow-list-grid" aria-label="Partner workflow communication list">
+      <WorkflowDatabase workflows={workflows} />
+    </>
+  );
+}
+
+function WorkflowDatabase({ workflows }: { workflows: WorkflowThreadSummary[] }) {
+  if (workflows.length === 0) {
+    return (
+      <section className="empty-state">
+        <h2>No communication yet</h2>
+        <p>JHT replies and partner requests will appear here by workflow code.</p>
+      </section>
+    );
+  }
+
+  const waitingCount = workflows.filter((workflow) => workflow.status === "waiting_internal").length;
+
+  return (
+    <section className="partner-database-shell" aria-label="Partner workflow communication list">
+      <div className="partner-database-toolbar">
+        <div>
+          <p className="eyebrow">Communication Database</p>
+          <h2>Workflow message ledger</h2>
+        </div>
+        <div className="partner-view-tabs" aria-label="Communication views">
+          <span className="active">List</span>
+          <span>By Status</span>
+          <span>Recent</span>
+        </div>
+      </div>
+
+      <div className="partner-database-metrics" aria-label="Communication metrics">
+        <div>
+          <span>Threads</span>
+          <strong>{workflows.length}</strong>
+        </div>
+        <div>
+          <span>Waiting JHT</span>
+          <strong>{waitingCount}</strong>
+        </div>
+        <div>
+          <span>Last update</span>
+          <strong>{workflows[0]?.lastMessageAt ? formatDate(workflows[0].lastMessageAt) : "-"}</strong>
+        </div>
+      </div>
+
+      <div className="partner-database-grid partner-workflows-grid">
+        <div className="partner-database-header" role="row">
+          <span>Workflow Code</span>
+          <span>Status</span>
+          <span>Group</span>
+          <span>Partner</span>
+          <span>Last Message</span>
+          <span>Open</span>
+        </div>
+
         {workflows.map((workflow) => (
-          <Link className="workflow-list-card" href={`/agency/workflows/${workflow.workflowCode}` as Route} key={workflow.id}>
-            <div>
+          <Link
+            className="partner-database-row"
+            href={`/agency/workflows/${workflow.workflowCode}` as Route}
+            key={workflow.id}
+          >
+            <div className="partner-database-title">
+              <small>Workflow Code</small>
               <strong>{workflow.workflowCode}</strong>
+            </div>
+            <div className="partner-property">
+              <small>Status</small>
               <span className={`status-dot status-${workflow.status}`}>{formatLabel(workflow.status)}</span>
             </div>
-            <h2>{workflow.title}</h2>
-            <p>{workflow.agencyName ?? "JHT workflow"}</p>
-            <span>{workflow.lastMessageAt ? `Last: ${formatDate(workflow.lastMessageAt)}` : "No message yet"}</span>
+            <div className="partner-property">
+              <small>Group</small>
+              <strong>{workflow.title}</strong>
+            </div>
+            <div className="partner-property">
+              <small>Partner</small>
+              <strong>{workflow.agencyName ?? "JHT workflow"}</strong>
+            </div>
+            <div className="partner-property">
+              <small>Last Message</small>
+              <strong>{workflow.lastMessageAt ? formatDate(workflow.lastMessageAt) : "No message yet"}</strong>
+            </div>
+            <span className="partner-database-open">Open</span>
           </Link>
         ))}
-      </section>
-    </>
+      </div>
+    </section>
   );
 }
 

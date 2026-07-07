@@ -5001,3 +5001,429 @@ html.dark .nav-more-menu a:hover {
     width: auto;
   }
 }
+
+/* 파트너 포털 전용 Notion형 워크스페이스 UI입니다. 내부 관리자 화면과 분리해서 관리합니다. */
+.partner-workspace {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 242px minmax(0, 1fr);
+}
+
+.partner-workspace-sidebar {
+  background: var(--jht-surface);
+  border: 1px solid var(--jht-line);
+  border-radius: 8px;
+  box-shadow: var(--jht-shadow-card);
+  display: grid;
+  gap: 12px;
+  max-height: none;
+  overflow: visible;
+  padding: 12px;
+  position: sticky;
+  top: 94px;
+}
+
+.partner-workspace-brand {
+  border-bottom: 1px solid var(--jht-line-soft);
+  display: grid;
+  gap: 5px;
+  padding: 2px 2px 11px;
+}
+
+.partner-workspace-brand span,
+.partner-workspace-nav-section h2,
+.partner-workspace-note span,
+.partner-database-toolbar .eyebrow,
+.partner-database-title small,
+.partner-property small {
+  color: var(--jht-text-tertiary);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0;
+  line-height: 1.2;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.partner-workspace-brand strong {
+  color: var(--jht-text-primary);
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+.partner-workspace-brand p,
+.partner-workspace-note p {
+  color: var(--jht-text-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.partner-workspace-nav {
+  display: grid;
+  gap: 10px;
+}
+
+.partner-workspace-nav-section {
+  display: grid;
+  gap: 5px;
+}
+
+.partner-workspace-link {
+  border-radius: 7px;
+  color: var(--jht-text-secondary);
+  display: grid;
+  gap: 2px;
+  min-height: 39px;
+  padding: 7px 10px;
+}
+
+.partner-workspace-link span {
+  color: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.partner-workspace-link small {
+  color: var(--jht-text-tertiary);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.partner-workspace-link:hover,
+.partner-workspace-link.active {
+  background: var(--jht-primary-weak);
+  color: var(--jht-primary);
+}
+
+.partner-workspace-link.active small {
+  color: var(--jht-primary);
+}
+
+.partner-workspace-note {
+  background: var(--jht-surface-subtle);
+  border: 1px solid var(--jht-line-soft);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  padding: 9px;
+}
+
+.partner-workspace-main {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.partner-workspace-main > .page-header {
+  margin-bottom: 0;
+}
+
+.partner-workspace-main .page-header h1 {
+  font-size: clamp(28px, 3vw, 38px);
+}
+
+.partner-database-shell {
+  background: var(--jht-surface);
+  border: 1px solid var(--jht-line);
+  border-radius: 8px;
+  box-shadow: var(--jht-shadow-card);
+  display: grid;
+  overflow: hidden;
+}
+
+.partner-database-toolbar {
+  align-items: center;
+  border-bottom: 1px solid var(--jht-line-soft);
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.partner-database-toolbar h2 {
+  color: var(--jht-text-primary);
+  font-size: 18px;
+  line-height: 1.25;
+  margin: 3px 0 0;
+}
+
+.partner-view-tabs {
+  background: var(--jht-surface-subtle);
+  border: 1px solid var(--jht-line);
+  border-radius: 999px;
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+}
+
+.partner-view-tabs span {
+  border-radius: 999px;
+  color: var(--jht-text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
+.partner-view-tabs span.active {
+  background: var(--jht-surface);
+  color: var(--jht-text-primary);
+  box-shadow: var(--jht-shadow-card);
+}
+
+.partner-database-metrics {
+  border-bottom: 1px solid var(--jht-line-soft);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.partner-database-metrics div {
+  border-right: 1px solid var(--jht-line-soft);
+  display: grid;
+  gap: 4px;
+  min-height: 70px;
+  padding: 12px 16px;
+}
+
+.partner-database-metrics div:last-child {
+  border-right: 0;
+}
+
+.partner-database-metrics span {
+  color: var(--jht-text-tertiary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.partner-database-metrics strong {
+  color: var(--jht-text-primary);
+  font-size: 20px;
+  line-height: 1.15;
+}
+
+.partner-database-grid {
+  display: grid;
+  min-width: 0;
+}
+
+.partner-database-header,
+.partner-database-row {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+}
+
+.partner-database-header {
+  background: var(--jht-surface-subtle);
+  border-bottom: 1px solid var(--jht-line-soft);
+  color: var(--jht-text-secondary);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+  min-height: 38px;
+  padding: 0 16px;
+  text-transform: uppercase;
+}
+
+.partner-database-row {
+  border-bottom: 1px solid var(--jht-line-soft);
+  color: inherit;
+  min-height: 74px;
+  padding: 11px 16px;
+  text-decoration: none;
+}
+
+.partner-database-row:last-child {
+  border-bottom: 0;
+}
+
+.partner-database-row:hover,
+.partner-database-row:focus-visible {
+  background: var(--jht-surface-subtle);
+  outline: none;
+}
+
+.partner-database-title,
+.partner-property,
+.partner-database-actions {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.partner-database-title strong,
+.partner-property strong {
+  color: var(--jht-text-primary);
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.28;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.partner-database-title > span,
+.partner-property > span:not(.status-dot),
+.partner-database-title .subtext,
+.partner-property .subtext {
+  color: var(--jht-text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.partner-database-actions {
+  justify-items: start;
+}
+
+.partner-database-actions .row-details summary {
+  align-items: center;
+  border: 1px solid var(--jht-line);
+  border-radius: 6px;
+  color: var(--jht-primary);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 850;
+  min-height: 34px;
+  padding: 0 11px;
+}
+
+.partner-database-open {
+  border: 1px solid var(--jht-line);
+  border-radius: 6px;
+  color: var(--jht-primary);
+  font-size: 12px;
+  font-weight: 850;
+  justify-self: start;
+  padding: 7px 10px;
+}
+
+.partner-quotes-grid .partner-database-header,
+.partner-quotes-grid .partner-database-row {
+  grid-template-columns: minmax(210px, 1.35fr) 116px minmax(150px, 1fr) 70px 100px 126px minmax(100px, 0.8fr);
+}
+
+.partner-workflows-grid .partner-database-header,
+.partner-workflows-grid .partner-database-row {
+  grid-template-columns: 150px 130px minmax(220px, 1.35fr) minmax(160px, 1fr) 130px 72px;
+}
+
+.partner-reservations-grid .partner-database-header,
+.partner-reservations-grid .partner-database-row {
+  grid-template-columns: minmax(220px, 1.4fr) 120px minmax(150px, 1fr) minmax(150px, 1fr) 90px 90px;
+}
+
+.partner-invoices-grid .partner-database-header,
+.partner-invoices-grid .partner-database-row {
+  grid-template-columns: minmax(170px, 1.25fr) 150px minmax(180px, 1.2fr) 110px 130px 120px 120px 100px;
+}
+
+.partner-inquiries-grid .partner-database-header,
+.partner-inquiries-grid .partner-database-row {
+  grid-template-columns: 150px minmax(210px, 1.35fr) 130px 110px minmax(180px, 1.2fr) 70px 110px;
+}
+
+.partner-workspace .notice,
+.partner-workspace .action-band,
+.partner-workspace .empty-state,
+.partner-workspace .panel,
+.partner-workspace .panel-section {
+  border-radius: 8px;
+}
+
+html.dark .partner-workspace-sidebar,
+html.dark .partner-database-shell,
+html.dark .partner-view-tabs span.active {
+  background: var(--jht-surface);
+  border-color: var(--jht-line);
+}
+
+html.dark .partner-workspace-note,
+html.dark .partner-view-tabs,
+html.dark .partner-database-header {
+  background: var(--jht-surface-subtle);
+}
+
+@media (max-width: 1180px) {
+  .partner-workspace {
+    grid-template-columns: 214px minmax(0, 1fr);
+  }
+
+  .partner-quotes-grid .partner-database-header,
+  .partner-quotes-grid .partner-database-row,
+  .partner-workflows-grid .partner-database-header,
+  .partner-workflows-grid .partner-database-row,
+  .partner-reservations-grid .partner-database-header,
+  .partner-reservations-grid .partner-database-row,
+  .partner-invoices-grid .partner-database-header,
+  .partner-invoices-grid .partner-database-row,
+  .partner-inquiries-grid .partner-database-header,
+  .partner-inquiries-grid .partner-database-row {
+    grid-template-columns: minmax(210px, 1.3fr) repeat(3, minmax(110px, 1fr));
+  }
+
+  .partner-database-header span:nth-child(n + 5),
+  .partner-database-row > :nth-child(n + 5) {
+    display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .partner-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .partner-workspace-sidebar {
+    max-height: none;
+    position: static;
+  }
+
+  .partner-workspace-nav {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  .partner-workspace-note {
+    display: none;
+  }
+
+  .partner-database-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .partner-view-tabs {
+    justify-content: space-between;
+    overflow-x: auto;
+  }
+
+  .partner-database-header {
+    display: none;
+  }
+
+  .partner-quotes-grid .partner-database-row,
+  .partner-workflows-grid .partner-database-row,
+  .partner-reservations-grid .partner-database-row,
+  .partner-invoices-grid .partner-database-row,
+  .partner-inquiries-grid .partner-database-row {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .partner-database-row > * {
+    display: grid !important;
+  }
+
+  .partner-database-title strong,
+  .partner-property strong,
+  .partner-database-title > span,
+  .partner-property > span:not(.status-dot) {
+    white-space: normal;
+  }
+}

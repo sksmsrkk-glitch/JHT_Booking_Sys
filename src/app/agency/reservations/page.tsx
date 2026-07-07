@@ -56,7 +56,7 @@ export default async function AgencyReservationsPage() {
         </section>
       ) : null}
 
-      {loadState.status === "ready" ? <ReservationTable reservations={loadState.reservations} /> : null}
+      {loadState.status === "ready" ? <ReservationDatabase reservations={loadState.reservations} /> : null}
 
       <section className="notice">
         <h2>Reservation boundary</h2>
@@ -70,7 +70,7 @@ export default async function AgencyReservationsPage() {
   );
 }
 
-function ReservationTable({ reservations }: { reservations: AgencyReservationListItem[] }) {
+function ReservationDatabase({ reservations }: { reservations: AgencyReservationListItem[] }) {
   if (reservations.length === 0) {
     return (
       <section className="empty-state">
@@ -80,46 +80,86 @@ function ReservationTable({ reservations }: { reservations: AgencyReservationLis
     );
   }
 
+  const confirmedCount = reservations.filter((reservation) => reservation.status === "confirmed").length;
+  const roomingListCount = reservations.reduce((total, reservation) => total + reservation.roomingListCount, 0);
+
   return (
-    <section className="table-shell" aria-label="Agency reservations">
-      <table>
-        <thead>
-          <tr>
-            <th>Reservation</th>
-            <th>Status</th>
-            <th>Tour Dates</th>
-            <th>Quote</th>
-            <th>Status History</th>
-            <th>Rooming Lists</th>
-          </tr>
-        </thead>
-        <tbody>
-          {reservations.map((reservation) => (
-            <tr key={reservation.id}>
-              <td>
+    <section className="partner-database-shell" aria-label="Agency reservations">
+      <div className="partner-database-toolbar">
+        <div>
+          <p className="eyebrow">Reservation Database</p>
+          <h2>Confirmed group records</h2>
+        </div>
+        <div className="partner-view-tabs" aria-label="Reservation views">
+          <span className="active">Table</span>
+          <span>Rooming</span>
+          <span>Status</span>
+        </div>
+      </div>
+
+      <div className="partner-database-metrics" aria-label="Reservation metrics">
+        <div>
+          <span>Reservations</span>
+          <strong>{reservations.length}</strong>
+        </div>
+        <div>
+          <span>Confirmed</span>
+          <strong>{confirmedCount}</strong>
+        </div>
+        <div>
+          <span>Rooming lists</span>
+          <strong>{roomingListCount}</strong>
+        </div>
+      </div>
+
+      <div className="partner-database-grid partner-reservations-grid">
+        <div className="partner-database-header" role="row">
+          <span>Reservation</span>
+          <span>Status</span>
+          <span>Tour Dates</span>
+          <span>Quote</span>
+          <span>History</span>
+          <span>Rooming</span>
+        </div>
+
+        {reservations.map((reservation) => (
+          <article className="partner-database-row" key={reservation.id}>
+            <div className="partner-database-title">
+              <small>Reservation</small>
+              <strong>
                 <Link className="strong-link" href={`/agency/reservations/${reservation.id}` as Route}>
                   {reservation.reservationCode}
                 </Link>
-                <span className="subtext">{reservation.tourName ?? "Tour name not set"}</span>
-              </td>
-              <td>
-                <span className={`status-dot status-${reservation.status}`}>{formatLabel(reservation.status)}</span>
-              </td>
-              <td>{formatDateRange(reservation.tourStartDate, reservation.tourEndDate)}</td>
-              <td>{reservation.caseCode ?? reservation.quoteCaseId}</td>
-              <td>{reservation.statusHistoryCount}</td>
-              <td>
-                <Link
-                  className="strong-link"
-                  href={`/agency/reservations/${reservation.id}/rooming-lists` as Route}
-                >
+              </strong>
+              <span>{reservation.tourName ?? "Tour name not set"}</span>
+            </div>
+            <div className="partner-property">
+              <small>Status</small>
+              <span className={`status-dot status-${reservation.status}`}>{formatLabel(reservation.status)}</span>
+            </div>
+            <div className="partner-property">
+              <small>Tour Dates</small>
+              <strong>{formatDateRange(reservation.tourStartDate, reservation.tourEndDate)}</strong>
+            </div>
+            <div className="partner-property">
+              <small>Quote</small>
+              <strong>{reservation.caseCode ?? reservation.quoteCaseId}</strong>
+            </div>
+            <div className="partner-property">
+              <small>Status History</small>
+              <strong>{reservation.statusHistoryCount}</strong>
+            </div>
+            <div className="partner-property">
+              <small>Rooming Lists</small>
+              <strong>
+                <Link className="strong-link" href={`/agency/reservations/${reservation.id}/rooming-lists` as Route}>
                   {reservation.roomingListCount}
                 </Link>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              </strong>
+            </div>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }

@@ -45,7 +45,7 @@ export default async function AgencyInvoicesPage() {
         </section>
       ) : null}
 
-      {loadState.status === "ready" ? <InvoiceTable invoices={loadState.invoices} /> : null}
+      {loadState.status === "ready" ? <InvoiceDatabase invoices={loadState.invoices} /> : null}
 
       <section className="notice">
         <h2>Invoice boundary</h2>
@@ -59,7 +59,7 @@ export default async function AgencyInvoicesPage() {
   );
 }
 
-function InvoiceTable({ invoices }: { invoices: AgencyInvoiceListItem[] }) {
+function InvoiceDatabase({ invoices }: { invoices: AgencyInvoiceListItem[] }) {
   if (invoices.length === 0) {
     return (
       <section className="empty-state">
@@ -69,55 +69,103 @@ function InvoiceTable({ invoices }: { invoices: AgencyInvoiceListItem[] }) {
     );
   }
 
+  const payableCount = invoices.filter((invoice) => invoice.collectionStatus !== "paid").length;
+  const firstCurrency = invoices[0]?.currency ?? "";
+  const usesOneCurrency = invoices.every((invoice) => invoice.currency === firstCurrency);
+  const totalAmount = invoices.reduce((total, invoice) => total + invoice.totalAmount, 0);
+  const confirmedPaymentTotal = invoices.reduce((total, invoice) => total + invoice.confirmedPaymentTotal, 0);
+
   return (
-    <section className="table-shell" aria-label="Agency invoices">
-      <table>
-        <thead>
-          <tr>
-            <th>Invoice</th>
-            <th>Tour Code</th>
-            <th>Reservation</th>
-            <th>Status</th>
-            <th>Collection</th>
-            <th>Total</th>
-            <th>Paid</th>
-            <th>Due Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          {invoices.map((invoice) => (
-            <tr key={invoice.id}>
-              <td>
+    <section className="partner-database-shell" aria-label="Agency invoices">
+      <div className="partner-database-toolbar">
+        <div>
+          <p className="eyebrow">Invoice Database</p>
+          <h2>Issued invoice records</h2>
+        </div>
+        <div className="partner-view-tabs" aria-label="Invoice views">
+          <span className="active">Table</span>
+          <span>Collection</span>
+          <span>Due Dates</span>
+        </div>
+      </div>
+
+      <div className="partner-database-metrics" aria-label="Invoice metrics">
+        <div>
+          <span>Invoices</span>
+          <strong>{invoices.length}</strong>
+        </div>
+        <div>
+          <span>Receivable</span>
+          <strong>{payableCount}</strong>
+        </div>
+        <div>
+          <span>Total</span>
+          <strong>{usesOneCurrency ? formatMoney(firstCurrency, totalAmount) : "Mixed"}</strong>
+        </div>
+        <div>
+          <span>Paid</span>
+          <strong>{usesOneCurrency ? formatMoney(firstCurrency, confirmedPaymentTotal) : "Mixed"}</strong>
+        </div>
+      </div>
+
+      <div className="partner-database-grid partner-invoices-grid">
+        <div className="partner-database-header" role="row">
+          <span>Invoice</span>
+          <span>Tour Code</span>
+          <span>Reservation</span>
+          <span>Status</span>
+          <span>Collection</span>
+          <span>Total</span>
+          <span>Paid</span>
+          <span>Due</span>
+        </div>
+
+        {invoices.map((invoice) => (
+          <article className="partner-database-row" key={invoice.id}>
+            <div className="partner-database-title">
+              <small>Invoice</small>
+              <strong>
                 <Link className="strong-link" href={`/agency/invoices/${invoice.id}` as Route}>
                   {invoice.invoiceNo}
                 </Link>
-                <span className="subtext">Version {invoice.versionNo}</span>
-                {invoice.storagePath ? <span className="subtext">File ready</span> : null}
-              </td>
-              <td>{invoice.tourCode ?? "Not set"}</td>
-              <td>
-                {invoice.reservationCode ?? invoice.reservationId}
-                {invoice.tourName ? <span className="subtext">{invoice.tourName}</span> : null}
-              </td>
-              <td>
-                <span className={`status-dot status-${invoice.status}`}>{formatLabel(invoice.status)}</span>
-              </td>
-              <td>
-                {formatLabel(invoice.collectionStatus)}
-                <span className="subtext">{invoice.collectionTiming ? formatLabel(invoice.collectionTiming) : "Timing not set"}</span>
-              </td>
-              <td>
-                {invoice.currency} {invoice.totalAmount.toLocaleString()}
-              </td>
-              <td>
-                {invoice.currency} {invoice.confirmedPaymentTotal.toLocaleString()}
-                <span className="subtext">{invoice.paymentCount} payments</span>
-              </td>
-              <td>{invoice.dueDate ?? "Not set"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              </strong>
+              <span>Version {invoice.versionNo}</span>
+              {invoice.storagePath ? <span>File ready</span> : null}
+            </div>
+            <div className="partner-property">
+              <small>Tour Code</small>
+              <strong>{invoice.tourCode ?? "Not set"}</strong>
+            </div>
+            <div className="partner-property">
+              <small>Reservation</small>
+              <strong>{invoice.reservationCode ?? invoice.reservationId}</strong>
+              {invoice.tourName ? <span>{invoice.tourName}</span> : null}
+            </div>
+            <div className="partner-property">
+              <small>Status</small>
+              <span className={`status-dot status-${invoice.status}`}>{formatLabel(invoice.status)}</span>
+            </div>
+            <div className="partner-property">
+              <small>Collection</small>
+              <strong>{formatLabel(invoice.collectionStatus)}</strong>
+              <span>{invoice.collectionTiming ? formatLabel(invoice.collectionTiming) : "Timing not set"}</span>
+            </div>
+            <div className="partner-property">
+              <small>Total</small>
+              <strong>{formatMoney(invoice.currency, invoice.totalAmount)}</strong>
+            </div>
+            <div className="partner-property">
+              <small>Paid</small>
+              <strong>{formatMoney(invoice.currency, invoice.confirmedPaymentTotal)}</strong>
+              <span>{invoice.paymentCount} payments</span>
+            </div>
+            <div className="partner-property">
+              <small>Due Date</small>
+              <strong>{invoice.dueDate ?? "Not set"}</strong>
+            </div>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }
@@ -158,4 +206,9 @@ function formatLabel(value: string) {
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+function formatMoney(currency: string, amount: number) {
+  if (!amount) return "-";
+  return `${currency} ${amount.toLocaleString()}`;
 }
