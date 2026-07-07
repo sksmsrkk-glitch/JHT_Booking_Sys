@@ -33,12 +33,21 @@ export default async function AgencyPage() {
       <section className="panel-section">
         <div className="section-heading">
           <div>
-            <h2>Partner Access Application</h2>
-            <p>New overseas partners must apply first. JHT admin approval creates the mother ID.</p>
+            <h2>{locale === "ko" ? "파트너 포털 접속" : "Partner Portal Access"}</h2>
+            <p>
+              {locale === "ko"
+                ? "승인된 해외 파트너사는 로그인 후 견적, 예약, 인보이스, 커뮤니케이션을 확인합니다. 신규 파트너사는 먼저 가입 신청을 제출합니다."
+                : "Approved overseas agencies can log in to review quotes, reservations, invoices, and communication. New partners should submit an access application first."}
+            </p>
           </div>
-          <Link className="button-primary" href={"/agency/signup" as Route}>
-            Apply
-          </Link>
+          <div className="action-row">
+            <Link className="button-primary" href={"/agency/login" as Route}>
+              {locale === "ko" ? "파트너 로그인" : "Partner Log In"}
+            </Link>
+            <Link className="button-secondary" href={"/agency/signup" as Route}>
+              {locale === "ko" ? "가입 신청" : "Apply"}
+            </Link>
+          </div>
         </div>
       </section>
       <RouteCardGrid locale={locale} routes={agencyRoutes} />
