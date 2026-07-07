@@ -1,6 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { buildCurrencyOptions, DEFAULT_COUNTRY_REFERENCES, mergeCountryReferences } from "@/features/countries/defaults";
+import type { CountryReference } from "@/features/countries/types";
 
 const inquiryTypes = [
   "new_inquiry",
@@ -12,11 +14,45 @@ const inquiryTypes = [
 ];
 
 const tourTypes = ["", "series_package", "incentive_tour", "private_tour", "mice", "other"];
+const initialCountryOptions = mergeCountryReferences(DEFAULT_COUNTRY_REFERENCES);
 
 export function InquiryCreateForm() {
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [countryOptions, setCountryOptions] = useState<CountryReference[]>(initialCountryOptions);
+  const [selectedCountryCode, setSelectedCountryCode] = useState("MY");
+  const [billingCurrency, setBillingCurrency] = useState("MYR");
+  const selectedCountry = countryOptions.find((country) => country.countryCode === selectedCountryCode);
+  const currencyOptions = useMemo(() => buildCurrencyOptions(countryOptions, selectedCountry?.defaultCurrency ?? billingCurrency), [
+    billingCurrency,
+    countryOptions,
+    selectedCountry?.defaultCurrency
+  ]);
   const submittedDate = new Date().toISOString().slice(0, 10);
+
+  useEffect(() => {
+    let mounted = true;
+    fetch("/api/countries")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (!mounted || !payload?.data?.length) return;
+        const merged = mergeCountryReferences(payload.data);
+        const nextCountry = merged.find((country) => country.countryCode === selectedCountryCode) ?? merged[0];
+        setCountryOptions(merged);
+        setSelectedCountryCode(nextCountry?.countryCode ?? "MY");
+        setBillingCurrency(nextCountry?.defaultCurrency ?? "KRW");
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  function selectCountry(countryCode: string) {
+    const country = countryOptions.find((item) => item.countryCode === countryCode);
+    setSelectedCountryCode(country?.countryCode ?? "");
+    setBillingCurrency(country?.defaultCurrency ?? "KRW");
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -24,7 +60,8 @@ export function InquiryCreateForm() {
     setMessage("");
 
     const form = new FormData(event.currentTarget);
-    const countryCode = String(form.get("countryCode") ?? "MY").trim().toUpperCase() || "MY";
+    const countryCode = selectedCountryCode;
+    const normalizedBillingCurrency = String(form.get("billingCurrency") ?? billingCurrency).trim().toUpperCase() || "KRW";
     const agencyName = String(form.get("agencyName") ?? "WorldTravellers").trim() || "WorldTravellers";
     const tourCode = buildTourCode(countryCode, agencyName, submittedDate);
     const flightDetails = [
@@ -48,6 +85,7 @@ export function InquiryCreateForm() {
       tourCode,
       countryCode,
       agencyName,
+      billingCurrency: normalizedBillingCurrency,
       submittedDate,
       arrivalDate: form.get("arrivalDate"),
       departureDate: form.get("departureDate"),
@@ -59,6 +97,8 @@ export function InquiryCreateForm() {
       relatedTourCode: form.get("relatedTourCode"),
       requestPayload: {
         countryCode,
+        countryName: selectedCountry?.countryName,
+        billingCurrency: normalizedBillingCurrency,
         agencyName,
         submittedDate,
         tourCode,
@@ -138,8 +178,25 @@ export function InquiryCreateForm() {
           <input name="preferredLanguage" placeholder="English" />
         </label>
         <label>
-          Partner Country Code
-          <input defaultValue="MY" maxLength={8} name="countryCode" placeholder="MY, TH, SG" />
+          Partner Country
+          <select name="countryCode" required value={selectedCountryCode} onChange={(event) => selectCountry(event.target.value)}>
+            {countryOptions.map((country) => (
+              <option key={country.countryCode} value={country.countryCode}>
+                {country.countryCode} - {country.countryName}
+                {country.defaultCurrency ? ` (${country.defaultCurrency})` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Billing Currency / FX Base
+          <select name="billingCurrency" value={billingCurrency} onChange={(event) => setBillingCurrency(event.target.value)}>
+            {currencyOptions.map((currency) => (
+              <option key={currency} value={currency}>
+                {currency}
+              </option>
+            ))}
+          </select>
         </label>
         <label>
           Agency Name

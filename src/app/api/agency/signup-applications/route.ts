@@ -20,7 +20,9 @@ export async function POST(request: Request) {
   try {
     const body = await readJson<Record<string, unknown>>(request);
     const supabase = createRequestSupabaseClient(request);
-    const country = await resolveCountryReference(supabase, requireString(body.country, "country"));
+    const countryInput = optionalString(body.countryCode) ?? requireString(body.country, "country");
+    const country = await resolveCountryReference(supabase, countryInput);
+    const requestedBillingCurrency = normalizeCurrency(optionalString(body.billingCurrency) ?? country.defaultCurrency ?? "KRW");
     const email = requireString(body.email, "email").toLowerCase();
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -37,6 +39,7 @@ export async function POST(request: Request) {
         country_code: country.countryCode,
         country_name: country.countryName,
         original_country_name: country.originalCountryName,
+        requested_billing_currency: requestedBillingCurrency,
         website: optionalString(body.website),
         notes: optionalString(body.notes),
         status: "pending"
@@ -55,4 +58,10 @@ function optionalString(value: unknown) {
   if (value === undefined || value === null || value === "") return null;
   const text = String(value).trim();
   return text.length > 0 ? text : null;
+}
+
+function normalizeCurrency(value: string) {
+  const normalized = value.trim().replace(/[^a-z]/gi, "").slice(0, 8).toUpperCase();
+  if (!normalized) throw new HttpError(400, "billingCurrency is required");
+  return normalized;
 }

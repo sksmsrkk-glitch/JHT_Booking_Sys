@@ -29,7 +29,7 @@ export async function listCountryReferences(
 export async function resolveCountryReference(
   supabase: SupabaseClientLike,
   rawCountry: string
-): Promise<{ countryCode: string; countryName: string; originalCountryName: string }> {
+): Promise<{ countryCode: string; countryName: string; originalCountryName: string; defaultCurrency: string | null }> {
   const originalCountryName = rawCountry.trim();
   const parsed = parseCountryInput(originalCountryName);
 
@@ -37,7 +37,7 @@ export async function resolveCountryReference(
   if (parsed.code) {
     const { data, error } = await supabase
       .from("country_references")
-      .select("country_code, country_name")
+      .select("country_code, country_name, default_currency")
       .eq("country_code", parsed.code)
       .eq("status", "active")
       .maybeSingle();
@@ -48,7 +48,7 @@ export async function resolveCountryReference(
   if (!matched && parsed.name) {
     const { data, error } = await supabase
       .from("country_references")
-      .select("country_code, country_name, aliases")
+      .select("country_code, country_name, default_currency, aliases")
       .eq("status", "active");
     if (error) throw new Error(error.message);
     const normalizedName = normalizeCountryName(parsed.name);
@@ -64,7 +64,8 @@ export async function resolveCountryReference(
   return {
     countryCode: matched?.country_code ?? parsed.code ?? originalCountryName.slice(0, 2).toUpperCase(),
     countryName: matched?.country_name ?? parsed.name ?? originalCountryName,
-    originalCountryName
+    originalCountryName,
+    defaultCurrency: matched?.default_currency ?? null
   };
 }
 

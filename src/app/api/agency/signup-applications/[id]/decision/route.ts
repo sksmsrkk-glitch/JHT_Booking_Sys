@@ -53,6 +53,7 @@ async function approveApplication(supabase: any, application: any, profileId: st
     .maybeSingle();
   if (companyError) throw new HttpError(500, companyError.message);
   if (!company) throw new HttpError(409, "A company record is required before approving partners");
+  const billingCurrency = await resolveBillingCurrency(supabase, application);
 
   const { data: agencyAccount, error: agencyError } = await supabase
     .from("agency_accounts")
@@ -63,7 +64,7 @@ async function approveApplication(supabase: any, application: any, profileId: st
       email_domain: domainFromEmail(application.email),
       phone: application.phone,
       website: application.website,
-      billing_currency: defaultCurrency(application.country_code),
+      billing_currency: billingCurrency,
       status: "active",
       lifecycle_status: "active",
       approved_at: reviewedAt
@@ -181,11 +182,21 @@ async function queueEmailEvent(supabase: any, payload: Record<string, unknown>) 
   if (error) throw new HttpError(500, error.message);
 }
 
-function defaultCurrency(countryCode: string | null) {
-  if (countryCode === "MY") return "MYR";
-  if (countryCode === "TH") return "THB";
-  if (countryCode === "JP") return "JPY";
-  if (countryCode === "US") return "USD";
+async function resolveBillingCurrency(supabase: any, application: any) {
+  const requested = optionalString(application.requested_billing_currency);
+  if (requested) return normalizeCurrency(requested);
+
+  if (application.country_code) {
+    const { data, error } = await supabase
+      .from("country_references")
+      .select("default_currency")
+      .eq("country_code", application.country_code)
+      .eq("status", "active")
+      .maybeSingle();
+    if (error) throw new HttpError(500, error.message);
+    if (data?.default_currency) return normalizeCurrency(data.default_currency);
+  }
+
   return "KRW";
 }
 
@@ -198,4 +209,8 @@ function optionalString(value: unknown) {
   if (value === undefined || value === null || value === "") return null;
   const text = String(value).trim();
   return text.length > 0 ? text : null;
+}
+
+function normalizeCurrency(value: string) {
+  return value.trim().replace(/[^a-z]/gi, "").slice(0, 8).toUpperCase() || "KRW";
 }

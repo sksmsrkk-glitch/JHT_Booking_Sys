@@ -71,8 +71,16 @@ const quoteVersionInternalsMigration = readFileSync(
   new URL("../supabase/migrations/202607040001_quote_version_internals.sql", import.meta.url),
   "utf8"
 );
-const schema = `${initialSchema}\n${gmailCandidatesMigration}\n${quoteExcelModelMigration}\n${quoteFareOptionsMigration}\n${quotePresentationBlocksMigration}\n${supplierMediaAttachmentsMigration}\n${partnerReceivableLedgerMigration}\n${exchangeRatesMigration}\n${agencyInquiryTourWorkflowMigration}\n${invoiceVersioningMigration}\n${finalOperationInvoiceMigration}\n${guideExpenseReportsMigration}\n${agencyOnboardingGovernanceMigration}\n${countryReferenceExchangeRatesMigration}\n${workflowPortalCommunicationMigration}\n${workflowMessageActorLinksMigration}\n${securityHardeningMigration}\n${quoteVersionInternalsMigration}`;
+const signupBillingCurrencyMigration = readFileSync(
+  new URL("../supabase/migrations/202607070001_signup_application_billing_currency.sql", import.meta.url),
+  "utf8"
+);
+const schema = `${initialSchema}\n${gmailCandidatesMigration}\n${quoteExcelModelMigration}\n${quoteFareOptionsMigration}\n${quotePresentationBlocksMigration}\n${supplierMediaAttachmentsMigration}\n${partnerReceivableLedgerMigration}\n${exchangeRatesMigration}\n${agencyInquiryTourWorkflowMigration}\n${invoiceVersioningMigration}\n${finalOperationInvoiceMigration}\n${guideExpenseReportsMigration}\n${agencyOnboardingGovernanceMigration}\n${countryReferenceExchangeRatesMigration}\n${workflowPortalCommunicationMigration}\n${workflowMessageActorLinksMigration}\n${securityHardeningMigration}\n${quoteVersionInternalsMigration}\n${signupBillingCurrencyMigration}`;
 const agencyPortalQueries = readFileSync(new URL("../src/features/agency-portal/queries.ts", import.meta.url), "utf8");
+const agencySignupDecisionRoute = readFileSync(
+  new URL("../src/app/api/agency/signup-applications/[id]/decision/route.ts", import.meta.url),
+  "utf8"
+);
 const apiHttp = readFileSync(new URL("../src/lib/api/http.ts", import.meta.url), "utf8");
 const seedSql = readFileSync(new URL("../supabase/seed.sql", import.meta.url), "utf8");
 const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
@@ -264,6 +272,7 @@ test("agency onboarding requires internal approval and preserves account governa
   assert.match(schema, /company_name text not null/);
   assert.match(schema, /email citext not null/);
   assert.match(schema, /country_code text not null/);
+  assert.match(schema, /requested_billing_currency text/);
   assert.match(schema, /create policy "agency signup applications public insert"/);
   assert.match(schema, /create policy "agency signup applications internal all"/);
   assert.match(schema, /add column if not exists lifecycle_status agency_lifecycle_status/);
@@ -285,6 +294,13 @@ test("country references are shared between exchange rates and partner signup", 
   assert.match(schema, /from exchange_rates/);
   assert.match(schema, /create policy "country references public active select"/);
   assert.match(schema, /create policy "country references internal all"/);
+});
+
+test("partner signup billing currency is resolved from common country master", () => {
+  assert.match(agencySignupDecisionRoute, /requested_billing_currency/);
+  assert.match(agencySignupDecisionRoute, /from\("country_references"\)/);
+  assert.match(agencySignupDecisionRoute, /default_currency/);
+  assert.doesNotMatch(agencySignupDecisionRoute, /if \(countryCode ===/);
 });
 
 test("data api role grants are minimized after security hardening", () => {

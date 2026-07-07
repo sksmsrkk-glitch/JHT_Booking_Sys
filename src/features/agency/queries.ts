@@ -132,7 +132,7 @@ export async function listAgencySignupApplications(
   let query = supabase
     .from("agency_signup_applications")
     .select(
-      "id, company_name, contact_name, phone, email, country_code, country_name, original_country_name, website, notes, status, rejection_reason, created_agency_account_id, created_mother_agency_user_id, email_notification_status, created_at, reviewed_at"
+      "id, company_name, contact_name, phone, email, country_code, country_name, original_country_name, requested_billing_currency, website, notes, status, rejection_reason, created_agency_account_id, created_mother_agency_user_id, email_notification_status, created_at, reviewed_at"
     )
     .limit(100);
 
@@ -151,6 +151,7 @@ export async function listAgencySignupApplications(
     countryCode: row.country_code,
     countryName: row.country_name ?? null,
     originalCountryName: row.original_country_name ?? row.country_name ?? null,
+    requestedBillingCurrency: row.requested_billing_currency ?? null,
     website: row.website ?? null,
     notes: row.notes ?? null,
     status: row.status,

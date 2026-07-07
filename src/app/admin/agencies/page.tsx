@@ -141,6 +141,7 @@ function SignupApplicationTable({
                 <th>Company</th>
                 <th>Contact</th>
                 <th>Country</th>
+                <th>Currency</th>
                 <th>Submitted</th>
                 <th>Status</th>
                 <th>Action</th>
@@ -166,6 +167,7 @@ function SignupApplicationTable({
                       <span className="subtext">Input: {application.originalCountryName}</span>
                     ) : null}
                   </td>
+                  <td>{application.requestedBillingCurrency ?? "-"}</td>
                   <td>{formatDateTime(application.createdAt)}</td>
                   <td>{formatLabel(application.status)}</td>
                   <td>

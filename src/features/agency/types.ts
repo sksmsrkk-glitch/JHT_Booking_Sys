@@ -82,6 +82,7 @@ export type AgencySignupApplication = {
   countryCode: string;
   countryName: string | null;
   originalCountryName: string | null;
+  requestedBillingCurrency: string | null;
   website: string | null;
   notes: string | null;
   status: AgencyApplicationStatus;

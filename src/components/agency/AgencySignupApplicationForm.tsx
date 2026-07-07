@@ -1,29 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { buildCurrencyOptions, DEFAULT_COUNTRY_REFERENCES, mergeCountryReferences } from "@/features/countries/defaults";
+import type { CountryReference } from "@/features/countries/types";
 
-const countries = [
-  "MY - Malaysia",
-  "TH - Thailand",
-  "VN - Vietnam",
-  "ID - Indonesia",
-  "PH - Philippines",
-  "SG - Singapore",
-  "JP - Japan",
-  "CN - China",
-  "TW - Taiwan",
-  "HK - Hong Kong",
-  "IN - India",
-  "AE - United Arab Emirates",
-  "EG - Egypt",
-  "US - United States",
-  "AU - Australia"
-];
+const initialCountryOptions = mergeCountryReferences(DEFAULT_COUNTRY_REFERENCES);
 
 export function AgencySignupApplicationForm() {
-  const [countryOptions, setCountryOptions] = useState<string[]>(countries);
+  const [countryOptions, setCountryOptions] = useState<CountryReference[]>(initialCountryOptions);
+  const [selectedCountryCode, setSelectedCountryCode] = useState("");
+  const [billingCurrency, setBillingCurrency] = useState("");
   const [message, setMessage] = useState("");
   const [isBusy, setIsBusy] = useState(false);
+  const selectedCountry = countryOptions.find((country) => country.countryCode === selectedCountryCode) ?? countryOptions[0];
+  const currencyOptions = useMemo(
+    () => buildCurrencyOptions(countryOptions, selectedCountry?.defaultCurrency ?? billingCurrency),
+    [billingCurrency, countryOptions, selectedCountry?.defaultCurrency]
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -31,9 +24,11 @@ export function AgencySignupApplicationForm() {
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         if (!mounted || !payload?.data?.length) return;
-        setCountryOptions(
-          payload.data.map((country: { countryCode: string; countryName: string }) => `${country.countryCode} - ${country.countryName}`)
-        );
+        const merged = mergeCountryReferences(payload.data);
+        const nextCountry = merged.find((country) => country.countryCode === selectedCountryCode);
+        setCountryOptions(merged);
+        setSelectedCountryCode(nextCountry?.countryCode ?? "");
+        setBillingCurrency(nextCountry?.defaultCurrency ?? "");
       })
       .catch(() => undefined);
     return () => {
@@ -41,15 +36,24 @@ export function AgencySignupApplicationForm() {
     };
   }, []);
 
+  function selectCountry(countryCode: string) {
+    const country = countryOptions.find((item) => item.countryCode === countryCode);
+    setSelectedCountryCode(country?.countryCode ?? "");
+    setBillingCurrency(country?.defaultCurrency ?? "KRW");
+  }
+
   async function submit(formData: FormData) {
     setIsBusy(true);
     setMessage("");
+    const country = countryOptions.find((item) => item.countryCode === selectedCountryCode);
     const payload = {
       companyName: String(formData.get("companyName") ?? "").trim(),
       contactName: String(formData.get("contactName") ?? "").trim(),
       phone: String(formData.get("phone") ?? "").trim(),
       email: String(formData.get("email") ?? "").trim(),
-      country: String(formData.get("country") ?? "").trim(),
+      countryCode: selectedCountryCode,
+      country: country ? `${country.countryCode} - ${country.countryName}` : selectedCountryCode,
+      billingCurrency: billingCurrency || country?.defaultCurrency || "KRW",
       website: String(formData.get("website") ?? "").trim(),
       notes: String(formData.get("notes") ?? "").trim()
     };
@@ -73,7 +77,7 @@ export function AgencySignupApplicationForm() {
       <div className="section-heading">
         <div>
           <h2>Partner Sign-up Application</h2>
-          <p>JHT admin will review and approve the mother account before portal access is activated.</p>
+          <p>Country and billing currency are selected from JHT common country / FX master data, not typed manually.</p>
         </div>
         <span>Approval required</span>
       </div>
@@ -96,12 +100,32 @@ export function AgencySignupApplicationForm() {
         </label>
         <label>
           Country
-          <input disabled={isBusy} list="agency-country-options" name="country" placeholder="Search country" required />
-          <datalist id="agency-country-options">
+          <select disabled={isBusy} name="countryCode" required value={selectedCountryCode} onChange={(event) => selectCountry(event.target.value)}>
+            <option value="" disabled>
+              Select country
+            </option>
             {countryOptions.map((country) => (
-              <option key={country} value={country} />
+              <option key={country.countryCode} value={country.countryCode}>
+                {country.countryCode} - {country.countryName}
+                {country.defaultCurrency ? ` (${country.defaultCurrency})` : ""}
+              </option>
             ))}
-          </datalist>
+          </select>
+          <span className="subtext">Country Code + Country Name are loaded from the common country master.</span>
+        </label>
+        <label>
+          Billing Currency / FX Base
+          <select disabled={isBusy} name="billingCurrency" required value={billingCurrency} onChange={(event) => setBillingCurrency(event.target.value)}>
+            <option value="" disabled>
+              Select currency
+            </option>
+            {currencyOptions.map((currency) => (
+              <option key={currency} value={currency}>
+                {currency}
+              </option>
+            ))}
+          </select>
+          <span className="subtext">Actual KRW rates are managed by JHT in Exchange Rates.</span>
         </label>
         <label>
           Website
