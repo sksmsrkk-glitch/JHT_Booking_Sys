@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "dev:team": "next dev -H 0.0.0.0 -p 3100",
     "build": "next build",
     "start": "next start",
+    "start:team": "next start -H 0.0.0.0 -p 3100",
+    "tunnel:cloudflare": "cloudflared tunnel --url http://localhost:3100",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.mjs",
     "verify:env": "node scripts/verify-env.mjs",

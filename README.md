@@ -1,5 +1,28 @@
 # 정호여행사 JHT Booking System
 
+## 팀 테스트 바로가기
+
+팀원이 외부에서 내부 관리자와 파트너 포털을 테스트해야 할 때는 아래 문서를 먼저 봅니다.
+
+- [팀 테스트 런북: 외부 접속, 테스트 체크리스트, Notion CSV import 절차](docs/team-test-runbook.md)
+- [Notion Markdown / CSV Export 변환기](docs/notion-markdown-import.md)
+
+빠른 실행 명령:
+
+```powershell
+npm run dev:team
+npm run tunnel:cloudflare
+```
+
+공유 URL 형식:
+
+```text
+내부 관리자: https://<temporary-tunnel-url>/admin
+파트너 포털: https://<temporary-tunnel-url>/agency
+```
+
+주의: Cloudflare Tunnel URL은 임시 테스트용입니다. 실제 개인정보, 여권 정보, 결제 정보, 운영 비밀번호를 입력하지 않습니다.
+
 정호여행사 인바운드 여행 업무를 하나의 `workflow code`로 연결해 관리하는 Next.js + Supabase 기반 운영 시스템입니다.
 
 이 문서는 GitHub 첫 화면에서 개발자, 내부 운영자, 회계 담당자, 파트너 포털 기획자가 같은 기준으로 시스템을 이해할 수 있도록 작성한 한글 시스템 아키텍처와 사용 설명서입니다.
