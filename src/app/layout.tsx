@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { headers } from "next/headers";
 import { AppTopbar } from "@/components/AppTopbar";
+import { CalendarLocaleEnforcer } from "@/components/CalendarLocaleEnforcer";
 import { GlobalTextTranslator } from "@/components/GlobalTextTranslator";
 import { normalizeLocale } from "@/lib/i18n";
 import "./globals.css";
@@ -25,6 +26,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <div className="shell">
           <AppTopbar isSignedIn={isSignedIn} locale={locale} />
           <main className="main">{children}</main>
+          <CalendarLocaleEnforcer />
           <GlobalTextTranslator locale={locale} />
         </div>
       </body>
