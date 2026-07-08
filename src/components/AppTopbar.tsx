@@ -22,13 +22,15 @@ type AppTopbarProps = {
 export function AppTopbar({ isSignedIn, locale }: AppTopbarProps) {
   const pathname = usePathname();
   const isAgencySurface = pathname === "/agency" || pathname.startsWith("/agency/");
-  const text = commonText[locale];
-  const dashboardLabel = locale === "ko" ? "대시보드" : "Dashboard";
-  const financeLabel = locale === "ko" ? "재무" : "Finance";
-  const moreLabel = locale === "ko" ? "더보기" : "More";
-  const agencyHomeLabel = locale === "ko" ? "포털 홈" : "Portal Home";
-  const agencyNewInquiryLabel = locale === "ko" ? "신규 문의" : "New Inquiry";
-  const communicationLabel = locale === "ko" ? "소통" : "Communication";
+  // 파트너 포털은 해외 업체가 쓰는 고객 화면이므로 전역 KOR 설정과 무관하게 영문 UI만 노출합니다.
+  const effectiveLocale = isAgencySurface ? "en" : locale;
+  const text = commonText[effectiveLocale];
+  const dashboardLabel = effectiveLocale === "ko" ? "대시보드" : "Dashboard";
+  const financeLabel = effectiveLocale === "ko" ? "재무" : "Finance";
+  const moreLabel = effectiveLocale === "ko" ? "더보기" : "More";
+  const agencyHomeLabel = "Portal Home";
+  const agencyNewInquiryLabel = "New Inquiry";
+  const communicationLabel = "Communication";
   const loginLabel = isSignedIn ? text.signOut : text.signIn;
   const agencyAuthHref = (isSignedIn ? "/auth/logout" : "/agency/login") as Route;
   const internalAuthHref = (isSignedIn ? "/auth/logout" : "/auth/login") as Route;
@@ -78,7 +80,7 @@ export function AppTopbar({ isSignedIn, locale }: AppTopbarProps) {
           {loginLabel}
         </Link>
         <ThemeToggle />
-        <LanguageSwitcher locale={locale} />
+        {isAgencySurface ? null : <LanguageSwitcher locale={effectiveLocale} />}
       </div>
     </header>
   );
