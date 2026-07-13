@@ -1,6 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_AGENCY_PATHS = ["/agency/login", "/agency/signup"];
+const PUBLIC_AGENCY_PATHS = [
+  "/agency/login",
+  "/agency/signup",
+  "/agency/forgot-email",
+  "/agency/forgot-password",
+  "/agency/reset-password"
+];
 const PUBLIC_ADMIN_PATHS = ["/admin/bootstrap"];
 
 export function middleware(request: NextRequest) {
