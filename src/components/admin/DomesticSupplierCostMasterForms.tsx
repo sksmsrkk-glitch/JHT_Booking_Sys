@@ -87,6 +87,7 @@ export function CostMasterQuickCreateForm({
       let savedPrices = 0;
       let savedImages = 0;
       const mediaItems = buildMediaItems(formData);
+      const mediaFiles = formData.getAll("imageFile").filter((value): value is File => value instanceof File && value.size > 0);
       for (const spec of productSpecs) {
         const product = await postJson(`/api/domestic-suppliers/${supplier.id}/products`, {
           productType: spec.productType,
@@ -118,9 +119,9 @@ export function CostMasterQuickCreateForm({
           savedPrices += 1;
         }
 
-        if (mediaItems.length > 0) {
-          const savedMedia = await postJson(`/api/supplier-products/${product.id}/media`, { mediaItems });
-          savedImages += Array.isArray(savedMedia) ? savedMedia.length : mediaItems.length;
+        if (mediaItems.length > 0 || mediaFiles.length > 0) {
+          const savedMedia = await postMedia(`/api/supplier-products/${product.id}/media`, mediaItems, mediaFiles);
+          savedImages += Array.isArray(savedMedia) ? savedMedia.length : mediaItems.length + mediaFiles.length;
         }
       }
 
@@ -607,7 +608,7 @@ function ItemImageInputs({ disabled }: { disabled: boolean }) {
       <div className="split-row">
         <div>
           <h3>Item Images</h3>
-          <p className="subtext">Attach up to 10 images to each created cost item. Use either Storage Path or Image URL.</p>
+          <p className="subtext">Upload image files or attach an existing Storage Path / Image URL. Maximum 10 images, 8 MB each.</p>
         </div>
         <button
           className="button-secondary"
@@ -622,6 +623,7 @@ function ItemImageInputs({ disabled }: { disabled: boolean }) {
         <table className="key-value-table image-attachment-table">
           <thead>
             <tr>
+              <th>Upload</th>
               <th>Storage Path</th>
               <th>Image URL</th>
               <th>Label</th>
@@ -632,6 +634,9 @@ function ItemImageInputs({ disabled }: { disabled: boolean }) {
           <tbody>
             {rows.map((row) => (
               <tr key={row.id}>
+                <td>
+                  <input accept="image/*" disabled={disabled} name="imageFile" type="file" />
+                </td>
                 <td>
                   <input disabled={disabled} name="imageStoragePath" placeholder="supplier-media/item/image.jpg" />
                 </td>
@@ -1137,6 +1142,16 @@ async function postJson(path: string, payload: Record<string, unknown>) {
   });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error ?? "Save failed.");
+  return result.data;
+}
+
+async function postMedia(path: string, mediaItems: ReturnType<typeof buildMediaItems>, files: File[]) {
+  const body = new FormData();
+  body.set("mediaItems", JSON.stringify(mediaItems));
+  for (const file of files) body.append("files", file);
+  const response = await fetch(path, { method: "POST", body });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error ?? "Image upload failed.");
   return result.data;
 }
 

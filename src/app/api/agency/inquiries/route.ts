@@ -3,6 +3,8 @@ import { requireAgencyUser } from "@/lib/api/auth";
 import { isDemoModeEnabled } from "@/lib/api/guards";
 import { created, fail, HttpError, ok, optionalPositiveInteger, optionalString, readJson, requireString } from "@/lib/api/http";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
+import { ensureWorkflowThread, getWorkflowThreadByCode } from "@/features/workflow/queries";
+import { makeWorkflowCode } from "@/lib/domain/workflow-code.mjs";
 
 const ALLOWED_INQUIRY_TYPES = [
   "new_inquiry",
@@ -33,49 +35,49 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = await readJson<Record<string, unknown>>(request);
-    const inquiryType = optionalString(body.inquiryType) ?? "new_inquiry";
-
-    if (!ALLOWED_INQUIRY_TYPES.includes(inquiryType)) {
-      throw new HttpError(400, "Unsupported inquiryType");
-    }
-
-    const title = requireString(body.title, "title");
-    const submittedDate = optionalString(body.submittedDate) ?? new Date().toISOString().slice(0, 10);
-    const tourCode =
-      optionalString(body.tourCode) ??
-      buildTourCode(optionalString(body.countryCode) ?? "MY", optionalString(body.agencyName) ?? "Agency", submittedDate);
-    const requestPayload = normalizeObject(body.requestPayload);
-    const flightDetails = Array.isArray(requestPayload.flightDetails) ? requestPayload.flightDetails : [];
-
-    const previewResponse = () =>
-      created({
-        id: `preview-${tourCode.toLowerCase()}`,
-        inquiry_type: inquiryType,
-        title,
-        tour_code: tourCode,
-        tourCode,
-        status: "preview_submitted",
-        created_at: new Date().toISOString(),
-        preview: true,
-        message: "Development preview mode: agency login was bypassed and no database row was written."
-      });
-
-    // preview 응답은 명시적 데모 모드에서만 허용합니다. 그 외에는 인증을 강제해
-    // 토큰 만료 사용자의 실제 문의가 조용히 유실되지 않게 합니다.
-    if (!request.headers.get("authorization")) {
-      if (isDemoModeEnabled()) return previewResponse();
-      throw new HttpError(401, "Authentication required");
-    }
-
     const supabase = createRequestSupabaseClient(request);
     let agencyUser;
     try {
       agencyUser = await requireAgencyUser(supabase);
     } catch (authError) {
-      if (isDemoModeEnabled()) return previewResponse();
-      throw authError;
+      if (!isDemoModeEnabled()) throw authError;
+      const body = await readJson<Record<string, unknown>>(request);
+      const title = requireString(body.title, "title");
+      const previewCode = makeWorkflowCode({
+        countryCode: optionalString(body.countryCode) ?? "MY",
+        agencyName: optionalString(body.agencyName) ?? "Agency"
+      });
+      return created({
+        id: `preview-${previewCode.toLowerCase()}`,
+        inquiry_type: optionalString(body.inquiryType) ?? "new_inquiry",
+        title,
+        tour_code: previewCode,
+        tourCode: previewCode,
+        status: "preview_submitted",
+        created_at: new Date().toISOString(),
+        preview: true,
+        message: "Development preview mode: no database row was written."
+      });
     }
+
+    const body = await readJson<Record<string, unknown>>(request);
+    const inquiryType = optionalString(body.inquiryType) ?? "new_inquiry";
+    if (!ALLOWED_INQUIRY_TYPES.includes(inquiryType)) throw new HttpError(400, "Unsupported inquiryType");
+    const title = requireString(body.title, "title");
+    const requestPayload = normalizeObject(body.requestPayload);
+    const flightDetails = Array.isArray(requestPayload.flightDetails) ? requestPayload.flightDetails : [];
+    const { data: agencyAccount, error: agencyError } = await supabase
+      .from("agency_accounts")
+      .select("id, name, country_code, billing_currency")
+      .eq("id", agencyUser.agencyAccountId)
+      .single();
+    if (agencyError) throw new HttpError(500, agencyError.message);
+
+    const relatedTourCode = optionalString(body.relatedTourCode);
+    const startsNewWorkflow = ["new_inquiry", "existing_product_inquiry"].includes(inquiryType);
+    if (!startsNewWorkflow && !relatedTourCode) throw new HttpError(400, "Related tour code is required for this inquiry type");
+    if (relatedTourCode) await assertWorkflowBelongsToAgency(supabase, relatedTourCode, agencyUser.agencyAccountId);
+    const tourCode = relatedTourCode ?? makeWorkflowCode({ countryCode: agencyAccount.country_code ?? "XX", agencyName: agencyAccount.name });
 
     const { data, error } = await supabase
       .from("agency_inquiries")
@@ -99,13 +101,35 @@ export async function POST(request: Request) {
         request_payload: {
           ...requestPayload,
           tourCode,
-          relatedTourCode: optionalString(body.relatedTourCode)
+          relatedTourCode,
+          countryCode: agencyAccount.country_code,
+          countryName: requestPayload.countryName ?? null,
+          agencyName: agencyAccount.name,
+          billingCurrency: agencyAccount.billing_currency
         }
       })
       .select("id, inquiry_type, title, tour_code, status, created_at")
       .single();
 
     if (error) throw new HttpError(500, error.message);
+    const existingThread = await getWorkflowThreadByCode(supabase, tourCode);
+    if (!existingThread) {
+      await ensureWorkflowThread(supabase, {
+        workflowCode: tourCode,
+        title,
+        agencyAccountId: agencyUser.agencyAccountId,
+        agencyInquiryId: data.id,
+        createdBy: null
+      });
+    }
+    await appendInquiryMessage(supabase, {
+      workflowCode: tourCode,
+      agencyUser,
+      inquiryId: data.id,
+      inquiryType,
+      title,
+      body: buildInquiryMessage(body, requestPayload)
+    });
     await writeAuditLog(supabase, {
       actorProfileId: null,
       action: "agency_inquiry.submitted",
@@ -123,11 +147,56 @@ export async function POST(request: Request) {
   }
 }
 
-function buildTourCode(countryCode: string, agencyName: string, submittedDate: string) {
-  const country = countryCode.trim().replace(/[^a-z0-9]/gi, "").slice(0, 8).toUpperCase() || "XX";
-  const agency = agencyName.trim().replace(/[^a-z0-9]/gi, "").slice(0, 10).toUpperCase() || "AGENCY";
-  const date = submittedDate.replace(/[^0-9]/g, "").slice(0, 8) || new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  return `${country}-${agency}-${date}`;
+async function assertWorkflowBelongsToAgency(supabase: any, workflowCode: string, agencyAccountId: string) {
+  const { data, error } = await supabase
+    .from("workflow_threads")
+    .select("id")
+    .eq("workflow_code", workflowCode)
+    .eq("agency_account_id", agencyAccountId)
+    .maybeSingle();
+  if (error) throw new HttpError(500, error.message);
+  if (!data) throw new HttpError(404, "Related tour code was not found for this partner account");
+}
+
+async function appendInquiryMessage(supabase: any, input: any) {
+  const { data: thread, error: threadError } = await supabase
+    .from("workflow_threads")
+    .select("id")
+    .eq("workflow_code", input.workflowCode)
+    .single();
+  if (threadError) throw new HttpError(500, threadError.message);
+  const { data: message, error: messageError } = await supabase
+    .from("workflow_messages")
+    .insert({
+      workflow_thread_id: thread.id,
+      sender_type: "agency",
+      sender_agency_user_id: input.agencyUser.agencyUserId,
+      sender_name: input.agencyUser.name,
+      sender_email: input.agencyUser.email,
+      message_type: input.inquiryType === "new_inquiry" ? "new_inquiry" : input.inquiryType === "cancellation_request" ? "cancellation" : "quote_revision",
+      body: input.body,
+      visibility: "partner_visible",
+      metadata: { agency_inquiry_id: input.inquiryId }
+    })
+    .select("created_at")
+    .single();
+  if (messageError) throw new HttpError(500, messageError.message);
+  const { error: updateError } = await supabase
+    .from("workflow_threads")
+    .update({ status: "waiting_internal", last_message_at: message.created_at })
+    .eq("id", thread.id);
+  if (updateError) throw new HttpError(500, updateError.message);
+}
+
+function buildInquiryMessage(body: Record<string, unknown>, requestPayload: Record<string, unknown>) {
+  const sections = [
+    `Inquiry: ${requireString(body.title, "title")}`,
+    optionalString(body.periodText) ? `Period: ${optionalString(body.periodText)}` : null,
+    body.paxCount ? `Pax: ${body.paxCount}` : null,
+    body.nightsCount ? `Nights: ${body.nightsCount}` : null,
+    optionalString(requestPayload.itineraryText) ?? optionalString(body.notes) ?? null
+  ];
+  return sections.filter(Boolean).join("\n");
 }
 
 function normalizeObject(value: unknown) {

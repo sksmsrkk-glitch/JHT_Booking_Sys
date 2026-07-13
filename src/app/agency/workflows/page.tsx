@@ -29,6 +29,13 @@ export default async function AgencyWorkflowsPage() {
         </section>
       ) : null}
 
+      {loadState.error ? (
+        <section className="notice warning">
+          <h2>Communication could not load</h2>
+          <p>{loadState.error}</p>
+        </section>
+      ) : null}
+
       <WorkflowDatabase workflows={workflows} />
     </>
   );
@@ -119,13 +126,20 @@ function WorkflowDatabase({ workflows }: { workflows: WorkflowThreadSummary[] })
   );
 }
 
-async function loadWorkflows(): Promise<{ workflows: WorkflowThreadSummary[]; previewMode: boolean }> {
+async function loadWorkflows(): Promise<{ workflows: WorkflowThreadSummary[]; previewMode: boolean; error?: string }> {
   const { headerStore, authorization } = await getPageAuthorization();
   const response = await fetch(buildInternalApiUrl("/api/workflows", headerStore), {
     headers: authorization ? { authorization } : {},
     cache: "no-store"
   });
   const payload = await response.json();
+  if (!response.ok) {
+    return {
+      workflows: [],
+      previewMode: false,
+      error: payload.error ?? "An active partner session is required."
+    };
+  }
   return { workflows: payload.data ?? [], previewMode: Boolean(!authorization || payload.data?.[0]?.preview) };
 }
 

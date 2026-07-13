@@ -1,4 +1,5 @@
 import { writeAuditLog } from "@/lib/api/audit";
+import { setAgencyAuthUsersEnabled } from "@/lib/api/agency-auth-admin";
 import { requireInternalUser } from "@/lib/api/auth";
 import { fail, HttpError, ok, readJson, requireString, requireUuid } from "@/lib/api/http";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
@@ -19,6 +20,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
     const now = new Date().toISOString();
     const status = lifecycleStatus === "active" ? "active" : "inactive";
+    const { data: before, error: beforeError } = await supabase
+      .from("agency_accounts")
+      .select("id, lifecycle_status")
+      .eq("id", agencyAccountId)
+      .maybeSingle();
+    if (beforeError) throw new HttpError(500, beforeError.message);
+    if (!before) throw new HttpError(404, "Agency account not found");
+    if (before.lifecycle_status === "withdrawn" && lifecycleStatus !== "withdrawn") {
+      throw new HttpError(409, "Withdrawn partner accounts cannot be reactivated");
+    }
 
     const { data: agency, error: updateError } = await supabase
       .from("agency_accounts")
@@ -33,12 +44,41 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       .single();
     if (updateError) throw new HttpError(500, updateError.message);
 
-    if (lifecycleStatus !== "active") {
+    const { data: linkedUsers, error: linkedUsersError } = await supabase
+      .from("agency_users")
+      .select("id, auth_user_id, forced_withdrawn_at, suspended_by_account_at")
+      .eq("agency_account_id", agencyAccountId);
+    if (linkedUsersError) throw new HttpError(500, linkedUsersError.message);
+
+    if (lifecycleStatus === "frozen") {
       const { error: userError } = await supabase
         .from("agency_users")
-        .update({ status: "inactive", forced_withdrawn_at: now })
+        .update({ status: "inactive", suspended_by_account_at: now })
         .eq("agency_account_id", agencyAccountId);
       if (userError) throw new HttpError(500, userError.message);
+      await setAgencyAuthUsersEnabled((linkedUsers ?? []).map((user: any) => user.auth_user_id), false);
+    } else if (lifecycleStatus === "withdrawn") {
+      const { error: userError } = await supabase
+        .from("agency_users")
+        .update({ status: "inactive", forced_withdrawn_at: now, suspended_by_account_at: null })
+        .eq("agency_account_id", agencyAccountId);
+      if (userError) throw new HttpError(500, userError.message);
+      await setAgencyAuthUsersEnabled((linkedUsers ?? []).map((user: any) => user.auth_user_id), false);
+    } else {
+      const recoverableIds = (linkedUsers ?? [])
+        .filter((user: any) => user.suspended_by_account_at && !user.forced_withdrawn_at)
+        .map((user: any) => user.id);
+      if (recoverableIds.length > 0) {
+        const { error: userError } = await supabase
+          .from("agency_users")
+          .update({ status: "active", suspended_by_account_at: null })
+          .in("id", recoverableIds);
+        if (userError) throw new HttpError(500, userError.message);
+        await setAgencyAuthUsersEnabled(
+          (linkedUsers ?? []).filter((user: any) => recoverableIds.includes(user.id)).map((user: any) => user.auth_user_id),
+          true
+        );
+      }
     }
 
     await queueLifecycleEmails(supabase, agencyAccountId, agency.name, lifecycleStatus);

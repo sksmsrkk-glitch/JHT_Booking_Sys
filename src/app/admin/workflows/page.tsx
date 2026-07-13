@@ -51,6 +51,13 @@ export default async function AdminWorkflowsPage({ searchParams }: { searchParam
         </section>
       ) : null}
 
+      {loadState.error ? (
+        <section className="notice warning">
+          <h2>{locale === "ko" ? "워크플로우를 불러오지 못했습니다" : "Workflows could not load"}</h2>
+          <p>{loadState.error}</p>
+        </section>
+      ) : null}
+
       <WorkflowFilterBar filters={filters} locale={locale} totalCount={loadState.workflows.length} visibleCount={workflows.length} />
       <WorkflowList locale={locale} workflows={workflows} />
     </>
@@ -162,13 +169,20 @@ function WorkflowList({ locale, workflows }: { locale: "en" | "ko"; workflows: W
   );
 }
 
-async function loadWorkflows(): Promise<{ workflows: WorkflowThreadSummary[]; previewMode: boolean }> {
+async function loadWorkflows(): Promise<{ workflows: WorkflowThreadSummary[]; previewMode: boolean; error?: string }> {
   const { headerStore, authorization } = await getPageAuthorization();
   const response = await fetch(buildInternalApiUrl("/api/workflows", headerStore), {
     headers: authorization ? { authorization } : {},
     cache: "no-store"
   });
   const payload = await response.json();
+  if (!response.ok) {
+    return {
+      workflows: [],
+      previewMode: false,
+      error: payload.error ?? "An active internal session is required."
+    };
+  }
   return { workflows: payload.data ?? [], previewMode: Boolean(!authorization || payload.data?.[0]?.preview) };
 }
 

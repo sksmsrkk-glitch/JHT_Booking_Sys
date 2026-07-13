@@ -4,11 +4,30 @@ import { NextResponse } from "next/server";
 const noStoreHeaders = { "Cache-Control": "no-store" };
 
 export async function readJson<T = Record<string, unknown>>(request: Request): Promise<T> {
+  const maxBytes = resolveMaxJsonBytes();
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    throw new HttpError(413, `JSON body exceeds the ${maxBytes} byte limit`);
+  }
+
   try {
-    return (await request.json()) as T;
-  } catch {
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).byteLength > maxBytes) {
+      throw new HttpError(413, `JSON body exceeds the ${maxBytes} byte limit`);
+    }
+    return JSON.parse(raw) as T;
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
     throw new HttpError(400, "Invalid JSON body");
   }
+}
+
+function resolveMaxJsonBytes() {
+  const configured = Number(process.env.API_MAX_JSON_BYTES ?? 1_048_576);
+  if (!Number.isFinite(configured) || configured < 1_024) {
+    return 1_048_576;
+  }
+  return Math.min(configured, 5_242_880);
 }
 
 export class HttpError extends Error {

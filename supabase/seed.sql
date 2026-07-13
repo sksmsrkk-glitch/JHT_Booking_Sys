@@ -117,7 +117,7 @@ values (
   'worldtravellers.example',
   '+60-3-0000-1000',
   'https://worldtravellers.example',
-  'USD',
+  'MYR',
   'active'
 )
 on conflict (id) do update set
@@ -423,6 +423,7 @@ insert into agency_inquiries (
   preferred_language,
   tour_type,
   source_channel,
+  tour_code,
   request_payload,
   status
 )
@@ -438,6 +439,7 @@ values (
   'English',
   'incentive_tour',
   'portal',
+  'MY-WORLDTRAVE-20260627-A1B2C3',
   '{"notes":"Demo inquiry for v1 local verification."}'::jsonb,
   'quoted'
 )
@@ -448,6 +450,7 @@ on conflict (id) do update set
   pax_count = excluded.pax_count,
   preferred_language = excluded.preferred_language,
   tour_type = excluded.tour_type,
+  tour_code = excluded.tour_code,
   request_payload = excluded.request_payload,
   status = excluded.status;
 
@@ -473,7 +476,7 @@ values (
   '00000000-0000-4000-8000-000000001001',
   '00000000-0000-4000-8000-000000003001',
   '00000000-0000-4000-8000-000000007001',
-  'JHT-2026-DEMO-001',
+  'MY-WORLDTRAVE-20260627-A1B2C3',
   'demo-seoul-busan-incentive',
   'Seoul and Busan Incentive',
   'incentive_tour',
@@ -789,7 +792,7 @@ values (
   '00000000-0000-4000-8000-000000009001',
   '00000000-0000-4000-8000-000000008001',
   '00000000-0000-4000-8000-000000008101',
-  'RSV-2026-DEMO-001',
+  'MY-WORLDTRAVE-20260627-A1B2C3',
   '00000000-0000-4000-8000-000000003001',
   'confirmed',
   '2026-09-10',
@@ -1088,13 +1091,13 @@ insert into invoices (
 values (
   '00000000-0000-4000-8000-000000009801',
   '00000000-0000-4000-8000-000000009001',
-  'INV-2026-DEMO-001',
+  'MY-WORLDTRAVE-20260627-A1B2C3-INV-V01',
   'partially_paid',
   'KRW',
   5740000,
   '2026-06-28 09:00:00+00',
   '2026-07-15',
-  'invoices/INV-2026-DEMO-001.pdf'
+  'invoices/MY-WORLDTRAVE-20260627-A1B2C3-INV-V01.pdf'
 )
 on conflict (id) do update set
   invoice_no = excluded.invoice_no,

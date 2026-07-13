@@ -61,11 +61,15 @@ export async function resolveCountryReference(
     });
   }
 
+  if (!matched) {
+    throw new Error("Country must be selected from the active country master");
+  }
+
   return {
-    countryCode: matched?.country_code ?? parsed.code ?? originalCountryName.slice(0, 2).toUpperCase(),
-    countryName: matched?.country_name ?? parsed.name ?? originalCountryName,
+    countryCode: matched.country_code,
+    countryName: matched.country_name,
     originalCountryName,
-    defaultCurrency: matched?.default_currency ?? null
+    defaultCurrency: matched.default_currency ?? null
   };
 }
 

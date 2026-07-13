@@ -1,4 +1,5 @@
 import { writeAuditLog } from "@/lib/api/audit";
+import { sendAgencyPasswordReset, setAgencyAuthUsersEnabled } from "@/lib/api/agency-auth-admin";
 import { requireInternalUser } from "@/lib/api/auth";
 import { fail, HttpError, ok, readJson, requireUuid } from "@/lib/api/http";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
@@ -27,9 +28,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       .update(patch)
       .eq("id", agencyUserId)
       .eq("agency_account_id", agencyAccountId)
-      .select("id, agency_account_id, email, name, status, password_reset_required")
+      .select("id, agency_account_id, auth_user_id, email, name, status, password_reset_required")
       .single();
     if (error) throw new HttpError(500, error.message);
+
+    if (patch.status) {
+      await setAgencyAuthUsersEnabled([user.auth_user_id], patch.status === "active");
+    }
+    if (patch.password_reset_required === true) {
+      await sendAgencyPasswordReset(user.email, new URL("/agency/login", request.url).toString());
+    }
 
     await queueUserEmail(supabase, user, patch);
 

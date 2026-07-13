@@ -79,7 +79,18 @@ export async function PATCH(request: Request, context: RouteContext) {
       afterData: quoteVersion
     });
 
-    return ok({ quoteVersion, quoteCaseStatus: update.quoteCaseStatus });
+    let reservation = null;
+    if (nextStatus === "accepted") {
+      const { data, error } = await supabase
+        .from("reservations")
+        .select("id, reservation_code, status, quote_case_id, accepted_quote_version_id")
+        .eq("quote_case_id", before.quote_case_id)
+        .maybeSingle();
+      if (error) throw new HttpError(500, error.message);
+      reservation = data;
+    }
+
+    return ok({ quoteVersion, quoteCaseStatus: update.quoteCaseStatus, reservation });
   } catch (error) {
     return fail(error);
   }

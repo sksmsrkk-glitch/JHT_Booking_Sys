@@ -39,5 +39,5 @@ export function requireWebhookSecret(request: Request, envName: string) {
  * 전달되어 데이터가 조용히 유실되지 않게 합니다.
  */
 export function isDemoModeEnabled() {
-  return process.env.NODE_ENV !== "production" && process.env.JHT_DEMO_MODE === "on";
+  return process.env.NODE_ENV !== "production" && ["on", "true", "1"].includes(process.env.JHT_DEMO_MODE ?? "");
 }

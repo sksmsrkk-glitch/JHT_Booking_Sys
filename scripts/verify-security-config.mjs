@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const nextConfig = readFile("next.config.mjs");
-const loginPage = readFile("src/app/auth/login/page.tsx");
+const loginPage = readFile("src/components/auth/SupabaseLoginForm.tsx");
 const logoutRoute = readFile("src/app/auth/logout/route.ts");
 const sessionRoute = readFile("src/app/auth/session/route.ts");
 const httpHelpers = readFile("src/lib/api/http.ts");

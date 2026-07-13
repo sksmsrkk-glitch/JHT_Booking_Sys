@@ -69,7 +69,26 @@ import {
 } from "../src/lib/domain/quote-export.mjs";
 import { createXlsxBuffer, buildQuoteExportWorkbook } from "../src/lib/domain/xlsx.mjs";
 import { sanitizeApiLogPayload } from "../src/lib/domain/api-log.mjs";
+import { makeVersionedDocumentNo, makeWorkflowCode } from "../src/lib/domain/workflow-code.mjs";
 import { listFailedAutomationJobs } from "../src/features/automation/queries.ts";
+
+test("workflow code keeps country, agency, inquiry date, and a collision-resistant suffix", () => {
+  const code = makeWorkflowCode({
+    countryCode: "my",
+    agencyName: "World Travellers",
+    submittedAt: new Date("2026-07-13T10:00:00Z")
+  });
+
+  assert.match(code, /^MY-WORLDTRAVE-20260713-[A-F0-9]{6}$/);
+  assert.notEqual(
+    code,
+    makeWorkflowCode({ countryCode: "MY", agencyName: "World Travellers", submittedAt: new Date("2026-07-13T10:00:00Z") })
+  );
+});
+
+test("versioned document number preserves the canonical workflow code", () => {
+  assert.equal(makeVersionedDocumentNo("MY-WORLDTRAV-20260713-ABC123", "INV", 3), "MY-WORLDTRAV-20260713-ABC123-INV-V03");
+});
 
 test("quote item stores supplier cost snapshot and supports positive margin", () => {
   const snapshot = buildQuoteSnapshot({
@@ -279,8 +298,10 @@ test("supplier message delivery worker builds dry-run and live provider attempts
   assert.equal(dryRun.provider, "email_dry_run");
   assert.equal(dryRun.dryRun, true);
   assert.equal(dryRun.sendingUpdate.status, "sending");
-  assert.equal(dryRun.finalUpdate.status, "sent");
+  assert.equal(dryRun.finalUpdate.status, "simulated");
+  assert.equal(dryRun.finalUpdate.sent_at, null);
   assert.match(dryRun.finalUpdate.provider_message_id, /^email_dry_run:/);
+  assert.equal(dryRun.finalEvent.event_type, "simulated");
   assert.equal(dryRun.finalEvent.provider_payload.dryRun, true);
 
   const live = buildSupplierMessageDeliveryAttempt({

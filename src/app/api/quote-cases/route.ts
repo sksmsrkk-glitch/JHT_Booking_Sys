@@ -1,7 +1,8 @@
 import { requireInternalUser } from "@/lib/api/auth";
 import { writeAuditLog } from "@/lib/api/audit";
 import { created, fail, HttpError, ok, readJson, requireArray, requireString, requireUuid } from "@/lib/api/http";
-import { makeCaseCode, makeShareId } from "@/lib/domain/ids";
+import { makeShareId } from "@/lib/domain/ids";
+import { makeWorkflowCode } from "@/lib/domain/workflow-code.mjs";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 import { listQuoteCases } from "@/features/quotation/queries";
 import { calculateQuoteItemInput, roundMoney, toQuoteItemRow, type QuoteItemInput } from "@/features/quotation/input";
@@ -25,10 +26,15 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  let supabase: ReturnType<typeof createRequestSupabaseClient> | null = null;
+  let createdQuoteCaseId: string | null = null;
   try {
-    const body = await readJson<Record<string, unknown>>(request);
-    const supabase = createRequestSupabaseClient(request);
+    supabase = createRequestSupabaseClient(request);
     const internalUser = await requireInternalUser(supabase);
+    const body = await readJson<Record<string, unknown>>(request);
+    const agencyAccountId = requireUuid(body.agencyAccountId, "agencyAccountId");
+    const agencyInquiryId = optionalUuid(body.agencyInquiryId);
+    const workflowSource = await resolveWorkflowSource(supabase, agencyAccountId, agencyInquiryId);
     const rawItems = body.items ? requireArray<QuoteItemInput>(body.items, "items") : [];
 
     const calculatedItems = rawItems.map((item, index) => calculateQuoteItemInput(item, `items[${index}]`));
@@ -45,11 +51,11 @@ export async function POST(request: Request) {
       .from("quote_cases")
       .insert({
         company_id: requireUuid(body.companyId, "companyId"),
-        agency_account_id: requireUuid(body.agencyAccountId, "agencyAccountId"),
-        agency_inquiry_id: optionalUuid(body.agencyInquiryId),
-        case_code: String(body.caseCode ?? makeCaseCode()),
+        agency_account_id: agencyAccountId,
+        agency_inquiry_id: agencyInquiryId,
+        case_code: workflowSource.workflowCode,
         share_id: String(body.shareId ?? makeShareId()),
-        tour_name: requireString(body.tourName, "tourName"),
+        tour_name: workflowSource.inquiryTitle ?? requireString(body.tourName, "tourName"),
         tour_type: optionalString(body.tourType),
         status: "quoting",
         currency: optionalString(body.currency) ?? "KRW",
@@ -62,6 +68,7 @@ export async function POST(request: Request) {
       .single();
 
     if (quoteCaseError) throw new HttpError(500, quoteCaseError.message);
+    createdQuoteCaseId = quoteCase.id;
 
     const { data: version, error: versionError } = await supabase
       .from("quote_versions")
@@ -152,6 +159,31 @@ export async function POST(request: Request) {
       if (itemError) throw new HttpError(500, itemError.message);
     }
 
+    if (agencyInquiryId) {
+      const { error: inquiryLinkError } = await supabase
+        .from("agency_inquiries")
+        .update({ related_quote_case_id: quoteCase.id, status: "in_review" })
+        .eq("id", agencyInquiryId)
+        .is("related_quote_case_id", null);
+      if (inquiryLinkError) throw new HttpError(500, inquiryLinkError.message);
+    }
+
+    const { error: workflowLinkError } = await supabase
+      .from("workflow_threads")
+      .upsert(
+        {
+          workflow_code: workflowSource.workflowCode,
+          agency_account_id: agencyAccountId,
+          agency_inquiry_id: agencyInquiryId,
+          quote_case_id: quoteCase.id,
+          title: quoteCase.tour_name,
+          updated_by: internalUser.profileId,
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: "workflow_code" }
+      );
+    if (workflowLinkError) throw new HttpError(500, workflowLinkError.message);
+
     await writeAuditLog(supabase, {
       actorProfileId: internalUser.profileId,
       action: "quote_case.created",
@@ -160,10 +192,52 @@ export async function POST(request: Request) {
       afterData: { quoteCase, version, itemCount: calculatedItems.length }
     });
 
+    createdQuoteCaseId = null;
     return created({ quoteCase, version, totals });
   } catch (error) {
+    // 하위 버전·원가·일정·아이템 중 하나라도 실패하면 cascade 삭제로 부분 견적을 정리합니다.
+    if (supabase && createdQuoteCaseId) {
+      await supabase.from("quote_cases").delete().eq("id", createdQuoteCaseId);
+    }
     return fail(error);
   }
+}
+
+async function resolveWorkflowSource(supabase: any, agencyAccountId: string, agencyInquiryId: string | null) {
+  const { data: agency, error: agencyError } = await supabase
+    .from("agency_accounts")
+    .select("id, name, country_code")
+    .eq("id", agencyAccountId)
+    .maybeSingle();
+
+  if (agencyError) throw new HttpError(500, agencyError.message);
+  if (!agency) throw new HttpError(404, "Agency account not found");
+
+  if (!agencyInquiryId) {
+    return {
+      workflowCode: makeWorkflowCode({ countryCode: agency.country_code ?? "XX", agencyName: agency.name }),
+      inquiryTitle: null
+    };
+  }
+
+  const { data: inquiry, error: inquiryError } = await supabase
+    .from("agency_inquiries")
+    .select("id, agency_account_id, title, tour_code, related_quote_case_id")
+    .eq("id", agencyInquiryId)
+    .maybeSingle();
+
+  if (inquiryError) throw new HttpError(500, inquiryError.message);
+  if (!inquiry || inquiry.agency_account_id !== agencyAccountId) {
+    throw new HttpError(404, "Agency inquiry not found for this agency");
+  }
+  if (inquiry.related_quote_case_id) {
+    throw new HttpError(409, "This inquiry is already linked to a quote case");
+  }
+  if (!inquiry.tour_code) {
+    throw new HttpError(409, "Inquiry does not have a canonical workflow code");
+  }
+
+  return { workflowCode: inquiry.tour_code, inquiryTitle: inquiry.title };
 }
 
 function optionalString(value: unknown) {

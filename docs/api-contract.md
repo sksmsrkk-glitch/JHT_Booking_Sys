@@ -8,6 +8,10 @@
 
 ## Agency APIs
 
+- `GET /api/agency/context`
+- `GET /api/agency/users`
+- `POST /api/agency/users`
+- `PATCH /api/agency/users/:userId`
 - `GET /api/agency/inquiries`
 - `POST /api/agency/inquiries`
 - `GET /api/agency/quote-cases`

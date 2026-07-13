@@ -22,6 +22,8 @@ export function InquiryCreateForm() {
   const [countryOptions, setCountryOptions] = useState<CountryReference[]>(initialCountryOptions);
   const [selectedCountryCode, setSelectedCountryCode] = useState("MY");
   const [billingCurrency, setBillingCurrency] = useState("MYR");
+  const [agencyName, setAgencyName] = useState("Agency");
+  const [hasAgencyContext, setHasAgencyContext] = useState(false);
   const selectedCountry = countryOptions.find((country) => country.countryCode === selectedCountryCode);
   const currencyOptions = useMemo(() => buildCurrencyOptions(countryOptions, selectedCountry?.defaultCurrency ?? billingCurrency), [
     billingCurrency,
@@ -32,13 +34,22 @@ export function InquiryCreateForm() {
 
   useEffect(() => {
     let mounted = true;
-    fetch("/api/countries")
-      .then((response) => (response.ok ? response.json() : null))
-      .then((payload) => {
-        if (!mounted || !payload?.data?.length) return;
-        const merged = mergeCountryReferences(payload.data);
-        const nextCountry = merged.find((country) => country.countryCode === selectedCountryCode) ?? merged[0];
+    Promise.all([
+      fetch("/api/agency/context").then((response) => (response.ok ? response.json() : null)),
+      fetch("/api/countries").then((response) => (response.ok ? response.json() : null))
+    ])
+      .then(([contextPayload, countriesPayload]) => {
+        if (!mounted) return;
+        const merged = mergeCountryReferences(countriesPayload?.data ?? []);
         setCountryOptions(merged);
+        if (contextPayload?.data) {
+          setAgencyName(contextPayload.data.agencyName);
+          setSelectedCountryCode(contextPayload.data.countryCode);
+          setBillingCurrency(contextPayload.data.billingCurrency);
+          setHasAgencyContext(true);
+          return;
+        }
+        const nextCountry = merged.find((country) => country.countryCode === selectedCountryCode) ?? merged[0];
         setSelectedCountryCode(nextCountry?.countryCode ?? "MY");
         setBillingCurrency(nextCountry?.defaultCurrency ?? "KRW");
       })
@@ -62,8 +73,6 @@ export function InquiryCreateForm() {
     const form = new FormData(event.currentTarget);
     const countryCode = selectedCountryCode;
     const normalizedBillingCurrency = String(form.get("billingCurrency") ?? billingCurrency).trim().toUpperCase() || "KRW";
-    const agencyName = String(form.get("agencyName") ?? "WorldTravellers").trim() || "WorldTravellers";
-    const tourCode = buildTourCode(countryCode, agencyName, submittedDate);
     const flightDetails = [
       {
         direction: "arrival",
@@ -82,7 +91,6 @@ export function InquiryCreateForm() {
     const payload = {
       inquiryType: form.get("inquiryType"),
       title: form.get("title"),
-      tourCode,
       countryCode,
       agencyName,
       billingCurrency: normalizedBillingCurrency,
@@ -101,7 +109,6 @@ export function InquiryCreateForm() {
         billingCurrency: normalizedBillingCurrency,
         agencyName,
         submittedDate,
-        tourCode,
         periodText: form.get("periodText"),
         nightsCount: form.get("nightsCount"),
         arrivalDate: form.get("arrivalDate"),
@@ -127,7 +134,7 @@ export function InquiryCreateForm() {
       return;
     }
 
-    setMessage(`Inquiry submitted. Tour code: ${result.tourCode ?? result.tour_code ?? tourCode}`);
+    setMessage(`Inquiry submitted. Tour code: ${result.data?.tourCode ?? result.data?.tour_code ?? "Created"}`);
     event.currentTarget.reset();
     setIsSubmitting(false);
   }
@@ -179,7 +186,7 @@ export function InquiryCreateForm() {
         </label>
         <label>
           Partner Country
-          <select name="countryCode" required value={selectedCountryCode} onChange={(event) => selectCountry(event.target.value)}>
+          <select disabled={hasAgencyContext} name="countryCode" required value={selectedCountryCode} onChange={(event) => selectCountry(event.target.value)}>
             {countryOptions.map((country) => (
               <option key={country.countryCode} value={country.countryCode}>
                 {country.countryCode} - {country.countryName}
@@ -190,7 +197,7 @@ export function InquiryCreateForm() {
         </label>
         <label>
           Billing Currency / FX Base
-          <select name="billingCurrency" value={billingCurrency} onChange={(event) => setBillingCurrency(event.target.value)}>
+          <select disabled={hasAgencyContext} name="billingCurrency" value={billingCurrency} onChange={(event) => setBillingCurrency(event.target.value)}>
             {currencyOptions.map((currency) => (
               <option key={currency} value={currency}>
                 {currency}
@@ -200,7 +207,7 @@ export function InquiryCreateForm() {
         </label>
         <label>
           Agency Name
-          <input defaultValue="WorldTravellers" name="agencyName" placeholder="WorldTravellers" />
+          <input name="agencyName" readOnly={hasAgencyContext} value={agencyName} onChange={(event) => setAgencyName(event.target.value)} />
         </label>
         <label>
           Related Tour Code
@@ -268,14 +275,6 @@ export function InquiryCreateForm() {
       {message ? <p className={message.includes("failed") ? "danger-text" : "success-text"}>{message}</p> : null}
     </form>
   );
-}
-
-function buildTourCode(countryCode: string, agencyName: string, submittedDate: string) {
-  const agencySlug = agencyName
-    .replace(/[^a-z0-9]/gi, "")
-    .slice(0, 10)
-    .toUpperCase() || "AGENCY";
-  return `${countryCode}-${agencySlug}-${submittedDate.replace(/-/g, "")}`;
 }
 
 function formatLabel(value: string) {

@@ -70,7 +70,7 @@ export async function requireAgencyUser(supabase: any) {
   const user = await requireCurrentUser(supabase);
   const { data, error } = await supabase
     .from("agency_users")
-    .select("id, agency_account_id, email, name")
+    .select("id, agency_account_id, email, name, is_account_admin, account_role")
     .eq("auth_user_id", user.id)
     .eq("status", "active")
     .maybeSingle();
@@ -88,6 +88,8 @@ export async function requireAgencyUser(supabase: any) {
     agencyUserId: data.id,
     agencyAccountId: data.agency_account_id,
     email: data.email,
-    name: data.name
+    name: data.name,
+    isAccountAdmin: Boolean(data.is_account_admin),
+    accountRole: data.account_role ?? "sub_account"
   };
 }

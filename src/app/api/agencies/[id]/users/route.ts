@@ -1,4 +1,5 @@
 import { requireInternalUser } from "@/lib/api/auth";
+import { provisionAgencyAuthUser, rollbackProvisionedAuthUser } from "@/lib/api/agency-auth-admin";
 import { writeAuditLog } from "@/lib/api/audit";
 import { created, fail, HttpError, readJson, requireString, requireUuid } from "@/lib/api/http";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
@@ -15,16 +16,28 @@ export async function POST(request: Request, context: RouteContext) {
 
     await assertAgencyExists(supabase, agencyAccountId);
 
+    const email = requireString(body.email, "email").toLowerCase();
+    const accountRole = normalizeAccountRole(body.accountRole);
+    const suppliedAuthUserId = optionalUuid(body.authUserId, "authUserId");
+    const authProvision = suppliedAuthUserId
+      ? { authUserId: suppliedAuthUserId, invitationSent: false, created: false }
+      : await provisionAgencyAuthUser({
+          email,
+          name: requireString(body.name, "name"),
+          accountRole,
+          redirectTo: new URL("/agency/login", request.url).toString()
+        });
+
     const { data, error } = await supabase
       .from("agency_users")
       .insert({
         agency_account_id: agencyAccountId,
-        auth_user_id: optionalUuid(body.authUserId, "authUserId"),
-        email: requireString(body.email, "email").toLowerCase(),
+        auth_user_id: authProvision.authUserId,
+        email,
         name: requireString(body.name, "name"),
         title: optionalString(body.title),
         is_account_admin: optionalBoolean(body.isAccountAdmin) ?? false,
-        account_role: normalizeAccountRole(body.accountRole),
+        account_role: accountRole,
         password_reset_required: optionalBoolean(body.passwordResetRequired) ?? true,
         status: "active"
       })
@@ -32,6 +45,7 @@ export async function POST(request: Request, context: RouteContext) {
       .single();
 
     if (error) {
+      await rollbackProvisionedAuthUser(authProvision);
       if (error.message?.includes("duplicate key")) {
         throw new HttpError(409, "Agency user email already exists for this agency");
       }
@@ -43,7 +57,7 @@ export async function POST(request: Request, context: RouteContext) {
       action: "agency_user.created",
       entityTable: "agency_users",
       entityId: data.id,
-      afterData: data
+      afterData: { ...data, invitationSent: authProvision.invitationSent }
     });
 
     return created(data);

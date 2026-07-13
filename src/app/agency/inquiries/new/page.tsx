@@ -1,6 +1,7 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { InquiryCreateForm } from "@/components/agency/InquiryCreateForm";
+import { isDemoModeEnabled } from "@/lib/api/guards";
 
 export const dynamic = "force-dynamic";
 
@@ -20,10 +21,12 @@ export default async function AgencyNewInquiryPage() {
         </Link>
       </div>
 
-      <section className="notice">
-        <h2>Development preview mode</h2>
-        <p>Agency login is bypassed while this portal is being designed and tested. Submitted preview inquiries return a tour code.</p>
-      </section>
+      {isDemoModeEnabled() ? (
+        <section className="notice">
+          <h2>Development preview mode</h2>
+          <p>Agency login is bypassed only because JHT_DEMO_MODE is enabled in this local environment.</p>
+        </section>
+      ) : null}
 
       <InquiryCreateForm />
 

@@ -2,6 +2,7 @@ import { listCountryReferences } from "@/features/countries/queries";
 import { DEFAULT_COUNTRY_REFERENCES } from "@/features/countries/defaults";
 import { requireInternalUser } from "@/lib/api/auth";
 import { writeAuditLog } from "@/lib/api/audit";
+import { isDemoModeEnabled } from "@/lib/api/guards";
 import { created, fail, HttpError, ok, readJson, requireString } from "@/lib/api/http";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
@@ -10,24 +11,25 @@ import { createRequestSupabaseClient } from "@/lib/supabase/server";
  *
  * 파트너가 입력한 country name은 원문을 보존하되, 내부 운영에서는 countryCode와
  * defaultCurrency를 기준으로 환율, 파트너사, 견적서를 연결합니다. 가입 신청 화면은
- * 로그인 전에도 국가 선택이 필요하므로 GET은 기본 국가 목록을 public fallback으로 제공합니다.
+ * 로그인 전에도 국가 선택이 필요하므로 GET은 active 국가 마스터를 public RLS 범위에서 조회합니다.
  */
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    // 파트너 가입 신청 전 단계에서는 JWT가 없기 때문에,
-    // DB 대신 기본 국가 목록을 내려서 드롭다운/검색 UI가 동작하게 합니다.
-    if (!hasAuthSession(request)) {
-      return ok(filterDefaultCountries(url.searchParams.get("q")));
-    }
-
+    // 파트너 가입 신청 전 단계에서는 JWT가 없으므로 public active-select RLS 정책을 사용합니다.
     const supabase = createRequestSupabaseClient(request);
     const countries = await listCountryReferences(supabase, {
       q: url.searchParams.get("q") ?? undefined,
       status: url.searchParams.get("status") ?? "active"
     });
+    if (countries.length === 0 && isDemoModeEnabled()) {
+      return ok(filterDefaultCountries(url.searchParams.get("q")));
+    }
     return ok(countries);
   } catch (error) {
+    if (isDemoModeEnabled()) {
+      return ok(filterDefaultCountries(new URL(request.url).searchParams.get("q")));
+    }
     return fail(error);
   }
 }
@@ -98,12 +100,6 @@ function optionalString(value: unknown) {
   if (value === undefined || value === null || value === "") return null;
   const text = String(value).trim();
   return text.length > 0 ? text : null;
-}
-
-function hasAuthSession(request: Request) {
-  const authorization = request.headers.get("authorization");
-  const cookie = request.headers.get("cookie") ?? "";
-  return Boolean(authorization || cookie.includes("jht_access_token="));
 }
 
 function filterDefaultCountries(query: string | null) {

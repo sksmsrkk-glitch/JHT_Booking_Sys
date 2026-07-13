@@ -3,7 +3,6 @@ import { requireInternalUser } from "@/lib/api/auth";
 import { fail, ok } from "@/lib/api/http";
 import { writeAuditLog } from "@/lib/api/audit";
 import { created, HttpError, readJson, requireUuid } from "@/lib/api/http";
-import { makeReservationCode } from "@/lib/domain/ids";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
@@ -26,14 +25,14 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = await readJson<Record<string, unknown>>(request);
-    const quoteCaseId = requireUuid(body.quoteCaseId, "quoteCaseId");
     const supabase = createRequestSupabaseClient(request);
     const internalUser = await requireInternalUser(supabase);
+    const body = await readJson<Record<string, unknown>>(request);
+    const quoteCaseId = requireUuid(body.quoteCaseId, "quoteCaseId");
 
     const { data: quoteCase, error: quoteCaseError } = await supabase
       .from("quote_cases")
-      .select("id, agency_account_id, status, start_date, end_date")
+      .select("id, case_code, agency_account_id, status, start_date, end_date")
       .eq("id", quoteCaseId)
       .maybeSingle();
 
@@ -61,7 +60,7 @@ export async function POST(request: Request) {
       .insert({
         quote_case_id: quoteCase.id,
         accepted_quote_version_id: acceptedVersion.id,
-        reservation_code: String(body.reservationCode ?? makeReservationCode()),
+        reservation_code: quoteCase.case_code,
         agency_account_id: quoteCase.agency_account_id,
         status: "requested",
         tour_start_date: optionalString(body.tourStartDate) ?? quoteCase.start_date,
@@ -81,6 +80,12 @@ export async function POST(request: Request) {
     });
 
     if (historyError) throw new HttpError(500, historyError.message);
+
+    const { error: workflowLinkError } = await supabase
+      .from("workflow_threads")
+      .update({ reservation_id: reservation.id, updated_at: new Date().toISOString() })
+      .eq("workflow_code", quoteCase.case_code);
+    if (workflowLinkError) throw new HttpError(500, workflowLinkError.message);
 
     await writeAuditLog(supabase, {
       actorProfileId: internalUser.profileId,

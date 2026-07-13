@@ -1,31 +1,28 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { normalizeLocale } from "@/lib/i18n";
+
+const PUBLIC_AGENCY_PATHS = ["/agency/login", "/agency/signup"];
+const PUBLIC_ADMIN_PATHS = ["/admin/bootstrap"];
 
 export function middleware(request: NextRequest) {
-  const requestedLocale = request.nextUrl.searchParams.get("lang");
-  const isAgencyPortal = request.nextUrl.pathname === "/agency" || request.nextUrl.pathname.startsWith("/agency/");
-  // 파트너 포털은 해외 파트너 전용 화면이므로 KOR 쿠키나 ?lang=ko가 있어도 항상 영문으로 고정합니다.
-  const locale = isAgencyPortal ? "en" : normalizeLocale(requestedLocale ?? request.cookies.get("jht_locale")?.value);
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("x-jht-locale", locale);
-
-  const response = NextResponse.next({
-    request: {
-      headers: requestHeaders
-    }
-  });
-
-  if (requestedLocale && !isAgencyPortal) {
-    response.cookies.set("jht_locale", locale, {
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365,
-      sameSite: "lax"
-    });
+  if (process.env.NODE_ENV !== "production" && ["on", "true", "1"].includes(process.env.JHT_DEMO_MODE ?? "")) {
+    return NextResponse.next();
   }
 
-  return response;
+  const path = request.nextUrl.pathname;
+  const isPublicAgencyPath = PUBLIC_AGENCY_PATHS.some((publicPath) => path === publicPath || path.startsWith(`${publicPath}/`));
+  const isPublicAdminPath = PUBLIC_ADMIN_PATHS.some((publicPath) => path === publicPath || path.startsWith(`${publicPath}/`));
+  const protectedAgencyPath = path.startsWith("/agency") && !isPublicAgencyPath;
+  // 최초 관리자 계정이 아직 없는 환경에서는 부트스트랩 화면만 로그인 없이 열 수 있어야 한다.
+  const protectedAdminPath = path.startsWith("/admin") && !isPublicAdminPath;
+  if (!protectedAgencyPath && !protectedAdminPath) return NextResponse.next();
+  if (request.cookies.get("jht_access_token")?.value) return NextResponse.next();
+
+  const loginPath = protectedAgencyPath ? "/agency/login" : "/auth/login";
+  const loginUrl = new URL(loginPath, request.url);
+  loginUrl.searchParams.set("next", `${path}${request.nextUrl.search}`);
+  return NextResponse.redirect(loginUrl);
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"]
+  matcher: ["/admin/:path*", "/agency/:path*"]
 };

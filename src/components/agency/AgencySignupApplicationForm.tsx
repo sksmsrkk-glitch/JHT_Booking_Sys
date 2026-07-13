@@ -25,9 +25,9 @@ export function AgencySignupApplicationForm() {
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         if (!mounted || !payload?.data?.length) return;
-        const merged = mergeCountryReferences(payload.data);
-        const nextCountry = merged.find((country) => country.countryCode === selectedCountryCode) ?? pickDefaultCountry(merged);
-        setCountryOptions(merged);
+        const countries = payload.data as CountryReference[];
+        const nextCountry = countries.find((country) => country.countryCode === selectedCountryCode) ?? pickDefaultCountry(countries);
+        setCountryOptions(countries);
         setSelectedCountryCode(nextCountry?.countryCode ?? "");
         setBillingCurrency(nextCountry?.defaultCurrency ?? billingCurrency);
       })
@@ -116,7 +116,7 @@ export function AgencySignupApplicationForm() {
         </label>
         <label>
           Billing Currency / FX Base
-          <select disabled={isBusy} name="billingCurrency" required value={billingCurrency} onChange={(event) => setBillingCurrency(event.target.value)}>
+          <select disabled name="billingCurrency" required value={billingCurrency} onChange={(event) => setBillingCurrency(event.target.value)}>
             <option value="" disabled>
               Select currency
             </option>

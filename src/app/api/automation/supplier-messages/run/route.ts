@@ -29,6 +29,7 @@ export async function POST(request: Request) {
     const responsePayload = {
       checkedCount: messages?.length ?? 0,
       sentCount: results.filter((result) => result.status === "sent").length,
+      simulatedCount: results.filter((result) => result.status === "simulated").length,
       failedCount: results.filter((result) => result.status === "failed").length,
       skippedCount: results.filter((result) => result.status === "skipped").length,
       results
@@ -101,7 +102,7 @@ async function processMessage(supabase: any, message: any) {
       }
     });
 
-    return { id: message.id, status: "sent", provider: attempt.provider, dryRun: attempt.dryRun };
+    return { id: message.id, status: attempt.dryRun ? "simulated" : "sent", provider: attempt.provider, dryRun: attempt.dryRun };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown supplier delivery error";
     await supabase

@@ -58,6 +58,11 @@ If Supabase CLI is unavailable, apply the SQL files in this order through the Su
 15. `supabase/migrations/202606300003_workflow_portal_communication.sql`
 16. `supabase/migrations/202607010001_workflow_message_actor_links.sql`
 17. `supabase/migrations/202607020001_data_api_role_grants.sql`
+18. `supabase/migrations/202607030001_security_hardening.sql`
+19. `supabase/migrations/202607040001_quote_version_internals.sql`
+20. `supabase/migrations/202607070001_signup_application_billing_currency.sql`
+21. `supabase/migrations/202607130001_partner_auth_lifecycle.sql`
+22. `supabase/migrations/202607130002_canonical_workflow_code.sql`
 
 After migration, open `/admin/readiness` with an internal admin account and confirm database smoke checks are ready.
 
@@ -88,9 +93,8 @@ If a staging demo is needed, rotate or replace these rows before external users 
 
 - `demo-admin@junghotravel.local`
 - `agency-user@worldtravellers.example`
-- `JHT-2026-DEMO-001`
-- `RSV-2026-DEMO-001`
-- `INV-2026-DEMO-001`
+- workflow code: `MY-WORLDTRAVE-20260627-A1B2C3`
+- invoice version: `MY-WORLDTRAVE-20260627-A1B2C3-INV-V01`
 
 For hosted Supabase projects, do not rely on raw SQL inserts into `auth.users` for login-ready demo accounts. Hosted Auth expects its own identity records and internal state. After migrations and optional demo business rows are loaded, create hosted demo Auth users with:
 
@@ -100,16 +104,16 @@ npm run seed:hosted-demo-auth
 
 The script uses the server-side Supabase secret key from `.env.local`, creates real Auth users through the Supabase Admin API, then links them to `profiles`, `user_roles`, and `agency_users`.
 
-Current local hosted-demo credentials:
-
-- Internal admin: `jht-admin@junghotravel.local` / `JhtDemo!2026`
-- Agency demo: `agency-demo@worldtravellers.example` / `AgencyDemo!2026`
-
-Rotate or remove these demo accounts before any external or production use.
+Set `DEMO_ADMIN_PASSWORD` and `DEMO_AGENCY_PASSWORD` only in the local environment before running the hosted demo seed.
+Never commit those values, and remove the demo accounts before external or production use.
 
 ## 4. Environment Values
 
 Copy `.env.example` into the deployment environment and fill values there, not in git.
+
+Security and development-only options include `API_MAX_JSON_BYTES`, `SIGNUP_RATE_LIMIT_SECRET`, `JHT_DEMO_MODE`,
+`DEMO_ADMIN_PASSWORD`, and `DEMO_AGENCY_PASSWORD`. Keep demo mode and demo passwords unset in production.
+Set `SUPPLIER_MEDIA_STORAGE_BUCKET=supplier-media` and create that private Storage bucket before uploading supplier images.
 
 Required:
 

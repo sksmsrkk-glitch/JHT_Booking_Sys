@@ -77,6 +77,13 @@ export const READINESS_ENV_CHECKS = [
     group: "Storage"
   },
   {
+    key: "supplier_media_storage_bucket",
+    label: "Supplier media storage bucket",
+    envName: "SUPPLIER_MEDIA_STORAGE_BUCKET",
+    required: false,
+    group: "Storage"
+  },
+  {
     key: "google_maps_api_key",
     label: "Google Maps API key",
     envName: "GOOGLE_MAPS_API_KEY",
@@ -103,6 +110,41 @@ export const READINESS_ENV_CHECKS = [
     envName: "SYSTEM_DEFAULT_CURRENCY",
     required: false,
     group: "Finance"
+  },
+  {
+    key: "jht_demo_mode",
+    label: "Local demo mode",
+    envName: "JHT_DEMO_MODE",
+    required: false,
+    group: "Development"
+  },
+  {
+    key: "api_max_json_bytes",
+    label: "Maximum JSON request size",
+    envName: "API_MAX_JSON_BYTES",
+    required: false,
+    group: "Security"
+  },
+  {
+    key: "signup_rate_limit_secret",
+    label: "Partner sign-up rate-limit hash secret",
+    envName: "SIGNUP_RATE_LIMIT_SECRET",
+    required: false,
+    group: "Security"
+  },
+  {
+    key: "demo_admin_password",
+    label: "Hosted demo admin password",
+    envName: "DEMO_ADMIN_PASSWORD",
+    required: false,
+    group: "Development"
+  },
+  {
+    key: "demo_agency_password",
+    label: "Hosted demo agency password",
+    envName: "DEMO_AGENCY_PASSWORD",
+    required: false,
+    group: "Development"
   }
 ];
 
@@ -357,6 +399,13 @@ export const READINESS_STORAGE_CHECKS = [
     label: "Quote export XLSX bucket",
     bucketEnvName: "EXPORT_STORAGE_BUCKET",
     defaultBucket: "exports",
+    group: "Storage"
+  },
+  {
+    key: "supplier_media_bucket",
+    label: "Supplier item image bucket",
+    bucketEnvName: "SUPPLIER_MEDIA_STORAGE_BUCKET",
+    defaultBucket: "supplier-media",
     group: "Storage"
   }
 ];

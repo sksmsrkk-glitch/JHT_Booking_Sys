@@ -439,7 +439,7 @@ test("local seed covers the v1 demo workflow surface", () => {
   }
 
   assert.match(seedSql, /demo-admin@junghotravel\.local/);
-  assert.match(seedSql, /JHT-2026-DEMO-001/);
+  assert.match(seedSql, /MY-WORLDTRAVE-20260627-A1B2C3/);
   assert.match(seedSql, /Demo provider timeout for failed jobs view/);
   assert.doesNotMatch(seedSql, /\?/);
 });

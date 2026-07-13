@@ -50,9 +50,8 @@ const requiredSnippets = [
   "JhtDemo!2026",
   "agency-user@worldtravellers.example",
   "AgencyDemo!2026",
-  "JHT-2026-DEMO-001",
-  "RSV-2026-DEMO-001",
-  "INV-2026-DEMO-001",
+  "MY-WORLDTRAVE-20260627-A1B2C3",
+  "MY-WORLDTRAVE-20260627-A1B2C3-INV-V01",
   "Demo provider timeout for failed jobs view",
   "Demo storage timeout for failed jobs view",
   "demo.seed_loaded"

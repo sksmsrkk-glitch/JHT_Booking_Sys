@@ -126,7 +126,11 @@ async function createInvoiceFromFinalSnapshot(supabase: any, reservationId: stri
         invoice_id: invoice.id
       }))
     );
-    if (lineError) throw new HttpError(500, lineError.message);
+    if (lineError) {
+      // 자동 생성 중 라인 저장이 실패하면 부분 인보이스가 다음 버전으로 오인되지 않도록 정리합니다.
+      await supabase.from("invoices").delete().eq("id", invoice.id);
+      throw new HttpError(500, lineError.message);
+    }
   }
 
   return { ...invoice, lineItemCount: draft.lineItems.length };

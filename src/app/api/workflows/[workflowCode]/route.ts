@@ -1,6 +1,7 @@
 import { getDemoWorkflowByCode } from "@/features/workflow/demo-data";
 import { ensureWorkflowThread, getWorkflowThreadByCode, resolveWorkflowSeedByCode } from "@/features/workflow/queries";
 import { requireAgencyUser, requireInternalUser } from "@/lib/api/auth";
+import { isDemoModeEnabled } from "@/lib/api/guards";
 import { fail, HttpError, ok } from "@/lib/api/http";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
@@ -10,12 +11,14 @@ export async function GET(request: Request, context: RouteContext) {
   try {
     const { workflowCode } = await context.params;
     const demo = getDemoWorkflowByCode(workflowCode);
-    if (!request.headers.get("authorization")) {
-      return ok(demo ? { ...demo, preview: true } : null);
-    }
-
     const supabase = createRequestSupabaseClient(request);
-    const actor = await resolveActor(supabase);
+    let actor;
+    try {
+      actor = await resolveActor(supabase);
+    } catch (error) {
+      if (isDemoModeEnabled()) return ok(demo ? { ...demo, preview: true } : null);
+      throw error;
+    }
     const partnerVisibleOnly = actor.type === "agency";
     const existing = await getWorkflowThreadByCode(supabase, workflowCode, { partnerVisibleOnly });
     if (existing) return ok(existing);
@@ -37,7 +40,8 @@ async function resolveActor(supabase: any) {
   try {
     const internalUser = await requireInternalUser(supabase);
     return { type: "internal" as const, profileId: internalUser.profileId, agencyAccountId: null };
-  } catch {
+  } catch (error) {
+    if (!(error instanceof HttpError) || ![401, 403].includes(error.status)) throw error;
     const agencyUser = await requireAgencyUser(supabase);
     return {
       type: "agency" as const,

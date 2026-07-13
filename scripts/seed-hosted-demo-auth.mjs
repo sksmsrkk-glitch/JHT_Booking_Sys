@@ -25,12 +25,12 @@ const publicClient = createClient(supabaseUrl, publishableKey, {
 const demoUsers = {
   admin: {
     email: "jht-admin@junghotravel.local",
-    password: "JhtDemo!2026",
+    password: requireEnv("DEMO_ADMIN_PASSWORD"),
     displayName: "JHT Demo Admin"
   },
   agency: {
     email: "agency-demo@worldtravellers.example",
-    password: "AgencyDemo!2026",
+    password: requireEnv("DEMO_AGENCY_PASSWORD"),
     displayName: "WorldTravellers Demo User"
   }
 };

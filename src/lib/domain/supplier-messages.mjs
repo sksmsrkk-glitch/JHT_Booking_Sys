@@ -233,9 +233,9 @@ export function buildSupplierMessageDeliveryAttempt({ message, env = {}, now = n
       error_message: null
     },
     finalUpdate: {
-      status: "sent",
+      status: dryRun ? "simulated" : "sent",
       provider_message_id: providerMessageId,
-      sent_at: timestamp,
+      sent_at: dryRun ? null : timestamp,
       error_message: null
     },
     sendingEvent: {
@@ -248,7 +248,7 @@ export function buildSupplierMessageDeliveryAttempt({ message, env = {}, now = n
       }
     },
     finalEvent: {
-      event_type: dryRun ? "sent" : "submitted",
+      event_type: dryRun ? "simulated" : "submitted",
       provider,
       provider_payload: {
         dryRun,

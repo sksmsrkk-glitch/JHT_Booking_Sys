@@ -1,4 +1,5 @@
 import { convertKrwToQuoteCurrency } from "../../lib/domain/currency.mjs";
+import { makeVersionedDocumentNo } from "../../lib/domain/workflow-code.mjs";
 
 /*
  * 최종 견적서 + 오퍼레이터 확정 내용을 인보이스 초안으로 변환하는 모듈입니다.
@@ -74,17 +75,13 @@ export function buildInvoiceFromFinalQuote({
   const totalAmount = lineItemTotal > 0 ? lineItemTotal : publicTotal;
   // 하나의 단체는 문의부터 가이드 지출결의서까지 같은 업무 코드로 추적해야 하므로,
   // 인보이스 번호도 같은 tourCode를 접두어로 사용합니다.
-  const tourCode = buildTourCode({
-    caseCode: quoteCase.case_code,
-    reservationCode: reservation.reservation_code,
-    acceptedAt: quoteVersion.accepted_at,
-    startDate: reservation.tour_start_date
-  });
+  const tourCode = String(quoteCase.case_code ?? reservation.reservation_code ?? "").trim();
+  if (!tourCode) throw new Error("A canonical workflow code is required to create an invoice");
 
   return {
     invoice: {
       reservation_id: reservation.id,
-      invoice_no: `${tourCode}-INV-v${versionNo}`,
+      invoice_no: makeVersionedDocumentNo(tourCode, "INV", versionNo),
       tour_code: tourCode,
       version_no: versionNo,
       // 운영 스냅샷에서 자동 생성되는 인보이스는 draft로 만들고, 발행(issued)은
@@ -185,23 +182,6 @@ function indexByDay(rows: unknown) {
     if (day !== undefined && day !== null) map.set(String(day), value);
   }
   return map;
-}
-
-function buildTourCode({
-  caseCode,
-  reservationCode,
-  acceptedAt,
-  startDate
-}: {
-  caseCode?: string | null;
-  reservationCode?: string | null;
-  acceptedAt?: string | null;
-  startDate?: string | null;
-}) {
-  // caseCode/reservationCode/날짜를 결합해 외부 문서에서도 추적 가능한 코드를 만듭니다.
-  // 특수문자는 제거해서 파일명, 엑셀 출력, 인보이스 번호에 안전하게 사용합니다.
-  const date = String(acceptedAt ?? startDate ?? new Date().toISOString()).slice(0, 10).replaceAll("-", "");
-  return [caseCode, reservationCode, date].filter(Boolean).join("-").replace(/[^A-Z0-9-]/gi, "").toUpperCase();
 }
 
 function defaultDueDate(tourStartDate: string | null | undefined) {

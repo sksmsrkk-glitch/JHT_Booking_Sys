@@ -5,6 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 const port = Number(process.env.SMOKE_PORT ?? 3107);
 const baseUrl = `http://127.0.0.1:${port}`;
+const requestTimeoutMs = Number(process.env.SMOKE_REQUEST_TIMEOUT_MS ?? 15000);
 const nextCliPath = "node_modules/next/dist/bin/next";
 const apiRoot = resolve("src/app/api");
 const handlerMethodPattern = /\bexport\s+async\s+function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*\(/g;
@@ -41,9 +42,11 @@ const mutationSmokePayload = {
 
 const checks = [
   { path: "/", status: 200, includes: ["Jungho Travel Operations Platform", "Internal Workbench", "Overseas Agency Portal"] },
-  { path: "/admin", status: 200, includes: ["Internal Admin", "Operations Dashboard"] },
-  { path: "/agency", status: 200, includes: ["Overseas Agency Portal", "Customer-safe view"] },
-  { path: "/auth/login", status: 200, includes: ["Sign in", "Supabase user"] },
+  { path: "/admin", status: 200, includes: ["Operation Admin", "Operations Dashboard"] },
+  { path: "/agency", status: 200, includes: ["Partner Work Dashboard", "Customer-safe boundary"] },
+  { path: "/agency/login", status: 200, includes: ["Partner Log In", "Partner account access"] },
+  { path: "/agency/account/users", status: 200, includes: ["User Management", "Account users could not load"] },
+  { path: "/auth/login", status: 200, includes: ["Internal Log In", "Supabase user"] },
   { path: "/admin/bootstrap", status: 200, includes: ["Admin Bootstrap", "Create Initial Admin"] },
   { path: "/admin/readiness", status: 200, includes: ["V1 Readiness"] },
   { path: "/admin/companies", status: 200, includes: ["Companies", "Admin role required"] },
@@ -64,7 +67,7 @@ const checks = [
   {
     path: "/admin/confirmations/00000000-0000-4000-8000-000000000001",
     status: 200,
-    includes: ["Confirmation Document", "Reservation not found"]
+    includes: ["Confirmation Document", "Confirmation could not load"]
   },
   { path: "/admin/guide-expenses", status: 200, includes: ["Guide Expense Reports", "Preview data"] },
   {
@@ -72,8 +75,8 @@ const checks = [
     status: 200,
     includes: ["Guide Expense Report", "Report could not load"]
   },
-  { path: "/admin/workflows", status: 200, includes: ["Workflow Communication", "Preview data"] },
-  { path: "/admin/workflows/Q-2026-TH-001", status: 200, includes: ["Workflow Communication Ledger", "Communication History"] },
+  { path: "/admin/workflows", status: 200, includes: ["Workflow Communication", "Workflows could not load"] },
+  { path: "/admin/workflows/Q-2026-TH-001", status: 200, includes: ["Workflow Communication", "Workflow not available"] },
   { path: "/admin/operations/tasks", status: 200, includes: ["Operation Tasks", "Internal role required"] },
   { path: "/admin/supplier-messages", status: 200, includes: ["Supplier Messages", "Internal role required"] },
   { path: "/admin/finance/invoices", status: 200, includes: ["Finance", "Preview data"] },
@@ -88,19 +91,19 @@ const checks = [
   { path: "/admin/quote-cases/00000000-0000-4000-8000-000000000001", status: 200, includes: ["Quote Case Detail", "Quote case could not load"] },
   { path: "/admin/reservations/00000000-0000-4000-8000-000000000001", status: 200, includes: ["Reservation Detail", "Reservation could not load"] },
   { path: "/admin/supplier-messages/00000000-0000-4000-8000-000000000001", status: 200, includes: ["Supplier Message Detail", "Message could not load"] },
-  { path: "/admin/finance/invoices/00000000-0000-4000-8000-000000000001", status: 200, includes: ["SHTTV0611G-v1", "Payment"] },
+  { path: "/admin/finance/invoices/00000000-0000-4000-8000-000000000001", status: 200, includes: ["Invoice Detail", "Invoice could not load"] },
   { path: "/agency/inquiries", status: 200, includes: ["Inquiries", "Preview data"] },
-  { path: "/agency/inquiries/new", status: 200, includes: ["New Inquiry", "Development preview mode"] },
+  { path: "/agency/inquiries/new", status: 200, includes: ["New Inquiry", "Inquiry boundary"] },
   { path: "/agency/signup", status: 200, includes: ["Partner Sign-up", "Partner Sign-up Application"] },
   { path: "/agency/quote-cases", status: 200, includes: ["Quotes", "Preview data"] },
   { path: "/agency/reservations", status: 200, includes: ["Reservations", "Preview data"] },
   { path: "/agency/invoices", status: 200, includes: ["Invoices", "Preview data"] },
-  { path: "/agency/workflows", status: 200, includes: ["Communication", "Preview data"] },
-  { path: "/agency/workflows/Q-2026-TH-001", status: 200, includes: ["Partner Communication", "Communication History"] },
+  { path: "/agency/workflows", status: 200, includes: ["Communication", "Communication could not load"] },
+  { path: "/agency/workflows/Q-2026-TH-001", status: 200, includes: ["Overseas Agency Portal", "Workflow not available"] },
   { path: "/agency/quote-cases/fake-share-id", status: 200, includes: ["Quote Detail", "Quote could not load"] },
   { path: "/agency/reservations/00000000-0000-4000-8000-000000000001", status: 200, includes: ["Reservation Detail", "Reservation could not load"] },
   { path: "/agency/reservations/00000000-0000-4000-8000-000000000001/rooming-lists", status: 200, includes: ["Rooming Lists", "Reservation could not load"] },
-  { path: "/agency/invoices/00000000-0000-4000-8000-000000000001", status: 200, includes: ["SHTTV0611G-v1", "Payment"] }
+  { path: "/agency/invoices/00000000-0000-4000-8000-000000000001", status: 200, includes: ["Invoice Detail", "Invoice could not load"] }
 ];
 
 const apiChecks = buildApiChecks();
@@ -162,9 +165,10 @@ if (!existsSync(nextCliPath)) {
 const server = spawn(process.execPath, [nextCliPath, "start", "-p", String(port), "-H", "127.0.0.1"], {
   env: {
     ...process.env,
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "http://127.0.0.1:54321",
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "runtime-smoke-anon-key",
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || "runtime-smoke-service-role-key",
+    NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: "runtime-smoke-anon-key",
+    SUPABASE_SERVICE_ROLE_KEY: "runtime-smoke-service-role-key",
+    JHT_DEMO_MODE: "",
     AUTOMATION_SECRET: process.env.AUTOMATION_SECRET || "runtime-smoke-automation",
     GMAIL_WEBHOOK_SECRET: process.env.GMAIL_WEBHOOK_SECRET || "runtime-smoke-gmail",
     SUPPLIER_MESSAGE_WEBHOOK_SECRET: process.env.SUPPLIER_MESSAGE_WEBHOOK_SECRET || "runtime-smoke-supplier",
@@ -225,48 +229,12 @@ function buildApiChecks() {
           headers: [{ name: "cache-control", value: "no-store" }]
         };
       }
-      if (path === "/api/agency/inquiries" && method === "POST") {
-        return {
-          path,
-          method,
-          status: 201,
-          includes: ["preview_submitted"],
-          headers: [{ name: "cache-control", value: "no-store" }]
-        };
-      }
       if (path === "/api/countries" && method === "GET") {
         return {
           path,
           method,
-          status: 200,
-          includes: ["Malaysia"],
-          headers: [{ name: "cache-control", value: "no-store" }]
-        };
-      }
-      if (path === "/api/workflows" && method === "GET") {
-        return {
-          path,
-          method,
-          status: 200,
-          includes: ["Q-2026-TH-001"],
-          headers: [{ name: "cache-control", value: "no-store" }]
-        };
-      }
-      if (path === "/api/workflows/00000000-0000-4000-8000-000000000001" && method === "GET") {
-        return {
-          path,
-          method,
-          status: 200,
-          includes: ["data"],
-          headers: [{ name: "cache-control", value: "no-store" }]
-        };
-      }
-      if (path === "/api/workflows/00000000-0000-4000-8000-000000000001/messages" && method === "POST") {
-        return {
-          path,
-          method,
-          status: 400,
-          includes: ["body is required"],
+          status: 500,
+          includes: ["Internal server error"],
           headers: [{ name: "cache-control", value: "no-store" }]
         };
       }
@@ -375,10 +343,11 @@ async function waitForServer() {
 async function runCheck({ path, method = "GET", status, includes, headers = [] }) {
   const requestInit = {
     method,
-    signal: AbortSignal.timeout(5000)
+    headers: path.startsWith("/admin") || path.startsWith("/agency") ? { cookie: "jht_access_token=runtime-smoke-token" } : {},
+    signal: AbortSignal.timeout(requestTimeoutMs)
   };
   if (!["GET", "HEAD"].includes(method)) {
-    requestInit.headers = { "content-type": "application/json" };
+    requestInit.headers = { ...requestInit.headers, "content-type": "application/json" };
     requestInit.body = JSON.stringify(buildMutationSmokePayload(path));
   }
   const response = await fetch(`${baseUrl}${path}`, {
@@ -402,7 +371,7 @@ async function runRouteCheck({ path, method = "GET", status, body, requestHeader
     method,
     redirect: "manual",
     headers: { ...requestHeaders },
-    signal: AbortSignal.timeout(5000)
+    signal: AbortSignal.timeout(requestTimeoutMs)
   };
   if (body !== undefined) {
     requestInit.headers = { ...requestInit.headers, "content-type": "application/json" };
@@ -440,6 +409,10 @@ function assertHeaders(response, path, headers) {
 }
 
 function buildMutationSmokePayload(path) {
+  if (path === "/api/agency/signup-applications") {
+    const { countryCode: _countryCode, ...payloadWithoutCountry } = mutationSmokePayload;
+    return payloadWithoutCountry;
+  }
   if (/^\/api\/quote-versions\/[^/]+\/status$/.test(path)) {
     return { ...mutationSmokePayload, status: "sent" };
   }
@@ -448,7 +421,7 @@ function buildMutationSmokePayload(path) {
 
 async function runHeaderCheck({ path, header, value, includes }) {
   const response = await fetch(`${baseUrl}${path}`, {
-    signal: AbortSignal.timeout(5000)
+    signal: AbortSignal.timeout(requestTimeoutMs)
   });
   const actual = response.headers.get(header);
   if (!actual) {

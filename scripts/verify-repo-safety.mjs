@@ -4,6 +4,7 @@ import { resolve, sep } from "node:path";
 const root = resolve(".");
 const ignoredDirectories = new Set([
   ".git",
+  ".claude",
   ".next",
   "node_modules",
   ".turbo",

@@ -27,10 +27,14 @@ const ACTION_CATEGORIES = new Set(["hotel", "meal", "vehicle", "attraction", "gu
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { workflowCode } = await context.params;
-
-    // 개발/시연 중에는 로그인 없이도 포털 커뮤니케이션 UI를 눌러볼 수 있게 preview 응답을 돌려줍니다.
-    // 단, 명시적 데모 모드에서만 허용하고, 그 외에는 인증을 강제해 가짜 성공 응답을 막습니다.
-    if (!request.headers.get("authorization") && isDemoModeEnabled()) {
+    const supabase = createRequestSupabaseClient(request);
+    // body를 읽기 전에 actor를 먼저 확정합니다.
+    // 이렇게 해야 인증 실패 요청이 잘못된 JSON body 때문에 400으로 가려지지 않고 401/403 흐름으로 처리됩니다.
+    let actor;
+    try {
+      actor = await resolveActor(supabase);
+    } catch (error) {
+      if (!isDemoModeEnabled()) throw error;
       const body = await readJson<Record<string, unknown>>(request);
       const text = requireString(body.body, "body");
       const messageType = normalizeSetValue(body.messageType, MESSAGE_TYPES, "general");
@@ -55,11 +59,6 @@ export async function POST(request: Request, context: RouteContext) {
         }
       });
     }
-
-    const supabase = createRequestSupabaseClient(request);
-    // body를 읽기 전에 actor를 먼저 확정합니다.
-    // 이렇게 해야 인증 실패 요청이 잘못된 JSON body 때문에 400으로 가려지지 않고 401/403 흐름으로 처리됩니다.
-    const actor = await resolveActor(supabase);
     const body = await readJson<Record<string, unknown>>(request);
     const text = requireString(body.body, "body");
     const messageType = normalizeSetValue(body.messageType, MESSAGE_TYPES, "general");
@@ -79,64 +78,32 @@ export async function POST(request: Request, context: RouteContext) {
       throw new HttpError(403, "Workflow does not belong to this agency");
     }
 
-    const { data: message, error: messageError } = await supabase
-      .from("workflow_messages")
-      .insert({
-        workflow_thread_id: thread.id,
-        sender_type: actor.type,
-        sender_profile_id: actor.profileId,
-        sender_agency_user_id: actor.agencyUserId,
-        sender_name: actor.displayName,
-        sender_email: actor.email,
-        message_type: messageType,
-        body: text,
-        visibility,
-        created_by: actor.profileId
-      })
-      .select("id, workflow_thread_id, sender_type, sender_profile_id, sender_agency_user_id, sender_name, sender_email, message_type, body, visibility, linked_quote_version_id, linked_invoice_id, created_at")
-      .single();
-
-    if (messageError) throw new HttpError(500, messageError.message);
-
     const nextStatus = actor.type === "agency" ? "waiting_internal" : "waiting_partner";
     // 메시지 작성 주체에 따라 다음 follow-up 책임자를 상태로 표현합니다.
     // 파트너가 쓰면 내부 대기, 내부가 답하면 파트너 대기 상태가 됩니다.
-    const { error: threadError } = await supabase
-      .from("workflow_threads")
-      .update({
-        status: nextStatus,
-        last_message_at: message.created_at,
-        updated_by: actor.profileId
-      })
-      .eq("id", thread.id);
-
-    if (threadError) throw new HttpError(500, threadError.message);
-
     const actionTitle = optionalString(body.actionTitle);
-    let actionItem = null;
-    if (actionTitle) {
-      // 메시지와 동시에 action item을 만들 수 있게 해서
-      // "호텔 변경 요청", "인보이스 확인 필요" 같은 후속 작업이 커뮤니케이션 원장에 남습니다.
-      const category = normalizeSetValue(body.actionCategory, ACTION_CATEGORIES, "other");
-      const { data: action, error: actionError } = await supabase
-        .from("workflow_action_items")
-        .insert({
-          workflow_thread_id: thread.id,
-          source_message_id: message.id,
-          category,
-          title: actionTitle,
-          details: optionalString(body.actionDetails),
-          status: "open",
-          partner_visible: visibility === "partner_visible",
-          created_by: actor.profileId,
-          updated_by: actor.profileId
-        })
-        .select("id, workflow_thread_id, source_message_id, category, title, details, status, partner_visible, linked_quote_version_id, assigned_to, due_at, resolved_at, created_at")
-        .single();
-      if (actionError) throw new HttpError(500, actionError.message);
-      actionItem = action;
-    }
-
+    const actionCategory = normalizeSetValue(body.actionCategory, ACTION_CATEGORIES, "other");
+    const { data: appendResult, error: appendError } = await supabase.rpc("append_workflow_message", {
+      p_thread_id: thread.id,
+      p_sender_type: actor.type,
+      p_sender_profile_id: actor.profileId,
+      p_sender_agency_user_id: actor.agencyUserId,
+      p_sender_name: actor.displayName,
+      p_sender_email: actor.email,
+      p_message_type: messageType,
+      p_body: text,
+      p_visibility: visibility,
+      p_next_status: nextStatus,
+      p_action_title: actionTitle,
+      p_action_category: actionCategory,
+      p_action_details: optionalString(body.actionDetails)
+    });
+    if (appendError) throw new HttpError(500, appendError.message);
+    const message = appendResult?.message;
+    let actionItem = appendResult?.actionItem ?? null;
+    if (!message?.id) throw new HttpError(500, "Workflow message was not returned");
+    // 메시지와 동시에 action item을 만들 수 있게 해서
+    // "호텔 변경 요청", "인보이스 확인 필요" 같은 후속 작업이 커뮤니케이션 원장에 남습니다.
     await writeAuditLog(supabase, {
       actorProfileId: actor.profileId,
       action: "workflow.message.created",
@@ -168,7 +135,8 @@ async function resolveActor(supabase: any) {
       displayName: profile?.display_name ?? profile?.email ?? "JHT Internal",
       email: profile?.email ?? null
     };
-  } catch {
+  } catch (error) {
+    if (!(error instanceof HttpError) || ![401, 403].includes(error.status)) throw error;
     const agencyUser = await requireAgencyUser(supabase);
     return {
       type: "agency" as const,

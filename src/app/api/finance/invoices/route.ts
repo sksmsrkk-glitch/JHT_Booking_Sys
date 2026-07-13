@@ -2,7 +2,7 @@ import { listInvoices } from "@/features/finance/queries";
 import { requireFinanceUser } from "@/lib/api/auth";
 import { writeAuditLog } from "@/lib/api/audit";
 import { created, fail, HttpError, ok, readJson, requireUuid } from "@/lib/api/http";
-import { makeInvoiceNo } from "@/lib/domain/ids";
+import { makeVersionedDocumentNo } from "@/lib/domain/workflow-code.mjs";
 import { assertFinanceEntryAllowed } from "@/lib/domain/finance.mjs";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
@@ -24,15 +24,17 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  let supabase: ReturnType<typeof createRequestSupabaseClient> | null = null;
+  let createdInvoiceId: string | null = null;
   try {
+    supabase = createRequestSupabaseClient(request);
+    const financeUser = await requireFinanceUser(supabase);
     const body = await readJson<Record<string, unknown>>(request);
     const reservationId = requireUuid(body.reservationId, "reservationId");
-    const supabase = createRequestSupabaseClient(request);
-    const financeUser = await requireFinanceUser(supabase);
 
     const { data: reservation, error: reservationError } = await supabase
       .from("reservations")
-      .select("id, status, accepted_quote_version_id, reservation_code")
+      .select("id, status, accepted_quote_version_id, reservation_code, quote_cases(case_code)")
       .eq("id", reservationId)
       .maybeSingle();
 
@@ -43,11 +45,13 @@ export async function POST(request: Request) {
       throw new HttpError(409, "Reservation must have an accepted quote version before invoice creation");
     }
 
-    const tourCode = optionalString(body.tourCode);
+    const quoteCase = Array.isArray(reservation.quote_cases) ? reservation.quote_cases[0] : reservation.quote_cases;
+    const tourCode = optionalString(quoteCase?.case_code) ?? optionalString(reservation.reservation_code);
+    if (!tourCode) throw new HttpError(409, "Reservation does not have a canonical workflow code");
     const { data: latestInvoice, error: existingError } = await supabase
       .from("invoices")
       .select("id, invoice_no, status, reservation_id, total_amount, version_no")
-      .eq(tourCode ? "tour_code" : "reservation_id", tourCode ?? reservationId)
+      .eq("tour_code", tourCode)
       .order("version_no", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -85,7 +89,7 @@ export async function POST(request: Request) {
       .from("invoices")
       .insert({
         reservation_id: reservationId,
-        invoice_no: optionalString(body.invoiceNo) ?? makeInvoiceNo(),
+        invoice_no: makeVersionedDocumentNo(tourCode, "INV", versionNo),
         tour_code: tourCode,
         version_no: versionNo,
         status,
@@ -108,6 +112,7 @@ export async function POST(request: Request) {
       .single();
 
     if (invoiceError) throw new HttpError(500, invoiceError.message);
+    createdInvoiceId = invoice.id;
 
     if (lineItems.length > 0) {
       const { error: lineItemError } = await supabase.from("invoice_line_items").insert(
@@ -118,6 +123,12 @@ export async function POST(request: Request) {
       );
       if (lineItemError) throw new HttpError(500, lineItemError.message);
     }
+
+    const { error: workflowLinkError } = await supabase
+      .from("workflow_threads")
+      .update({ current_invoice_id: invoice.id, updated_at: new Date().toISOString() })
+      .eq("workflow_code", tourCode);
+    if (workflowLinkError) throw new HttpError(500, workflowLinkError.message);
 
     await writeAuditLog(supabase, {
       actorProfileId: financeUser.profileId,
@@ -134,8 +145,13 @@ export async function POST(request: Request) {
       }
     });
 
+    createdInvoiceId = null;
     return created({ invoice, existing: false, previousInvoice: latestInvoice ?? null });
   } catch (error) {
+    // 라인, 워크플로우 연결, 감사 로그 중 하나라도 실패하면 불완전한 인보이스를 남기지 않습니다.
+    if (supabase && createdInvoiceId) {
+      await supabase.from("invoices").delete().eq("id", createdInvoiceId);
+    }
     return fail(error);
   }
 }

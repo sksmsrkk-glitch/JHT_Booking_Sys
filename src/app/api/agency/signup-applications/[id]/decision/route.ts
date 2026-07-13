@@ -1,4 +1,5 @@
 import { writeAuditLog } from "@/lib/api/audit";
+import { provisionAgencyAuthUser, rollbackProvisionedAuthUser } from "@/lib/api/agency-auth-admin";
 import { requireInternalUser } from "@/lib/api/auth";
 import { fail, HttpError, ok, readJson, requireString, requireUuid } from "@/lib/api/http";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
@@ -23,7 +24,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
     const reviewedAt = new Date().toISOString();
     if (decision === "approve") {
-      const result = await approveApplication(supabase, application, internalUser.profileId, reviewedAt);
+      const result = await approveApplication(
+        supabase,
+        application,
+        internalUser.profileId,
+        reviewedAt,
+        new URL("/agency/login", request.url).toString()
+      );
       return ok(result);
     }
 
@@ -44,7 +51,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
 }
 
-async function approveApplication(supabase: any, application: any, profileId: string, reviewedAt: string) {
+async function approveApplication(
+  supabase: any,
+  application: any,
+  profileId: string,
+  reviewedAt: string,
+  loginRedirectTo: string
+) {
   const { data: company, error: companyError } = await supabase
     .from("companies")
     .select("id")
@@ -54,78 +67,94 @@ async function approveApplication(supabase: any, application: any, profileId: st
   if (companyError) throw new HttpError(500, companyError.message);
   if (!company) throw new HttpError(409, "A company record is required before approving partners");
   const billingCurrency = await resolveBillingCurrency(supabase, application);
-
-  const { data: agencyAccount, error: agencyError } = await supabase
-    .from("agency_accounts")
-    .insert({
-      company_id: company.id,
-      name: application.company_name,
-      country_code: application.country_code,
-      email_domain: domainFromEmail(application.email),
-      phone: application.phone,
-      website: application.website,
-      billing_currency: billingCurrency,
-      status: "active",
-      lifecycle_status: "active",
-      approved_at: reviewedAt
-    })
-    .select("id, name, country_code, lifecycle_status")
-    .single();
-  if (agencyError) throw new HttpError(500, agencyError.message);
-
-  const { data: agencyUser, error: userError } = await supabase
-    .from("agency_users")
-    .insert({
-      agency_account_id: agencyAccount.id,
-      email: application.email,
-      name: application.contact_name ?? `${application.company_name} Admin`,
-      title: "Mother account",
-      is_account_admin: true,
-      account_role: "mother",
-      password_reset_required: true,
-      status: "active"
-    })
-    .select("id, email, name, account_role, password_reset_required")
-    .single();
-  if (userError) throw new HttpError(500, userError.message);
-
-  const { data: updatedApplication, error: updateError } = await supabase
-    .from("agency_signup_applications")
-    .update({
-      status: "approved",
-      reviewed_by: profileId,
-      reviewed_at: reviewedAt,
-      created_agency_account_id: agencyAccount.id,
-      created_mother_agency_user_id: agencyUser.id,
-      email_notification_status: "queued"
-    })
-    .eq("id", application.id)
-    .select("id, status, created_agency_account_id, created_mother_agency_user_id")
-    .single();
-  if (updateError) throw new HttpError(500, updateError.message);
-
-  await queueEmailEvent(supabase, {
-    agencyAccountId: agencyAccount.id,
-    agencyUserId: agencyUser.id,
-    eventType: "signup_approved",
-    recipientEmail: application.email,
-    subject: "[JHT] Partner portal application approved",
-    body:
-      `Your JHT partner portal application has been approved.\n\n` +
-      `Login ID: ${application.email}\n` +
-      `Temporary access status: password reset required\n` +
-      `JHT admin will send an invitation or password reset link before first login.`
+  const authProvision = await provisionAgencyAuthUser({
+    email: application.email,
+    name: application.contact_name ?? `${application.company_name} Admin`,
+    accountRole: "mother",
+    redirectTo: loginRedirectTo
   });
 
-  await writeAuditLog(supabase, {
-    actorProfileId: profileId,
-    action: "agency_signup_application.approved",
-    entityTable: "agency_signup_applications",
-    entityId: application.id,
-    afterData: { agencyAccount, agencyUser, updatedApplication }
-  });
+  let agencyAccount: any = null;
+  try {
+    const { data, error: agencyError } = await supabase
+      .from("agency_accounts")
+      .insert({
+        company_id: company.id,
+        name: application.company_name,
+        country_code: application.country_code,
+        email_domain: domainFromEmail(application.email),
+        phone: application.phone,
+        website: application.website,
+        billing_currency: billingCurrency,
+        status: "active",
+        lifecycle_status: "active",
+        approved_at: reviewedAt
+      })
+      .select("id, name, country_code, lifecycle_status")
+      .single();
+    if (agencyError) throw new HttpError(500, agencyError.message);
+    agencyAccount = data;
 
-  return updatedApplication;
+    const { data: agencyUser, error: userError } = await supabase
+      .from("agency_users")
+      .insert({
+        agency_account_id: agencyAccount.id,
+        auth_user_id: authProvision.authUserId,
+        email: application.email,
+        name: application.contact_name ?? `${application.company_name} Admin`,
+        title: "Mother account",
+        is_account_admin: true,
+        account_role: "mother",
+        password_reset_required: true,
+        status: "active"
+      })
+      .select("id, auth_user_id, email, name, account_role, password_reset_required")
+      .single();
+    if (userError) throw new HttpError(500, userError.message);
+
+    const { data: updatedApplication, error: updateError } = await supabase
+      .from("agency_signup_applications")
+      .update({
+        status: "approved",
+        reviewed_by: profileId,
+        reviewed_at: reviewedAt,
+        created_agency_account_id: agencyAccount.id,
+        created_mother_agency_user_id: agencyUser.id,
+        email_notification_status: authProvision.invitationSent ? "sent" : "existing_auth_user"
+      })
+      .eq("id", application.id)
+      .select("id, status, created_agency_account_id, created_mother_agency_user_id")
+      .single();
+    if (updateError) throw new HttpError(500, updateError.message);
+
+    await queueEmailEvent(supabase, {
+      agencyAccountId: agencyAccount.id,
+      agencyUserId: agencyUser.id,
+      eventType: "signup_approved",
+      recipientEmail: application.email,
+      subject: "[JHT] Partner portal application approved",
+      body:
+        `Your JHT partner portal application has been approved.\n\n` +
+        `Login ID: ${application.email}\n` +
+        `Use the Supabase invitation email to set your password and sign in.`,
+      deliveryStatus: authProvision.invitationSent ? "sent" : "not_required",
+      sentAt: authProvision.invitationSent ? reviewedAt : null
+    });
+
+    await writeAuditLog(supabase, {
+      actorProfileId: profileId,
+      action: "agency_signup_application.approved",
+      entityTable: "agency_signup_applications",
+      entityId: application.id,
+      afterData: { agencyAccount, agencyUser, updatedApplication, authProvision }
+    });
+
+    return updatedApplication;
+  } catch (error) {
+    if (agencyAccount?.id) await supabase.from("agency_accounts").delete().eq("id", agencyAccount.id);
+    await rollbackProvisionedAuthUser(authProvision);
+    throw error;
+  }
 }
 
 async function rejectApplication(
@@ -177,7 +206,8 @@ async function queueEmailEvent(supabase: any, payload: Record<string, unknown>) 
     recipient_email: payload.recipientEmail,
     subject: payload.subject,
     body: payload.body,
-    delivery_status: "queued"
+    delivery_status: payload.deliveryStatus ?? "queued",
+    sent_at: payload.sentAt ?? null
   });
   if (error) throw new HttpError(500, error.message);
 }

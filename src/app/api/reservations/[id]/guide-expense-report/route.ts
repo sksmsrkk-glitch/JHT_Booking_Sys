@@ -44,6 +44,18 @@ export async function POST(request: Request, context: RouteContext) {
     const status = ["draft", "submitted", "approved", "rejected"].includes(String(body.status))
       ? String(body.status)
       : "draft";
+    if (["approved", "rejected"].includes(status) && !internalUser.roles.some((role: string) => ["admin", "finance"].includes(role))) {
+      throw new HttpError(403, "Finance or admin role is required to approve or reject an expense report");
+    }
+    const { data: existingReport, error: existingReportError } = await supabase
+      .from("guide_expense_reports")
+      .select("id, status, created_by, submitted_at, approved_at, approved_by, rejected_at")
+      .eq("reservation_id", id)
+      .maybeSingle();
+    if (existingReportError) throw new HttpError(500, existingReportError.message);
+    if (existingReport?.status === "approved" && status !== "approved") {
+      throw new HttpError(409, "Approved expense reports cannot be reopened");
+    }
     const linesInput = Array.isArray(body.lines) ? body.lines : [];
     const cashAdvanceAmount = numberValue(body.cashAdvanceAmount);
     // 화면에서 받은 라인들을 PMB 엑셀 기준 섹션별 합계로 정규화합니다.
@@ -78,9 +90,12 @@ export async function POST(request: Request, context: RouteContext) {
           settlement_amount: summary.settlementAmount,
           source_workbook_summary: normalizeObject(body.sourceWorkbookSummary),
           internal_notes: optionalString(body.internalNotes),
-          submitted_at: status === "submitted" ? new Date().toISOString() : null,
+          submitted_at: status === "submitted" ? existingReport?.submitted_at ?? new Date().toISOString() : existingReport?.submitted_at ?? null,
+          approved_at: status === "approved" ? existingReport?.approved_at ?? new Date().toISOString() : existingReport?.approved_at ?? null,
+          approved_by: status === "approved" ? internalUser.profileId : existingReport?.approved_by ?? null,
+          rejected_at: status === "rejected" ? new Date().toISOString() : existingReport?.rejected_at ?? null,
           updated_by: internalUser.profileId,
-          created_by: internalUser.profileId
+          created_by: existingReport?.created_by ?? internalUser.profileId
         },
         { onConflict: "reservation_id" }
       )
@@ -89,35 +104,36 @@ export async function POST(request: Request, context: RouteContext) {
 
     if (reportError) throw new HttpError(500, reportError.message);
 
-    const { error: deleteError } = await supabase.from("guide_expense_report_lines").delete().eq("report_id", report.id);
-    if (deleteError) throw new HttpError(500, deleteError.message);
+    const replacementLines = summary.lines.map((line: any) => ({
+      line_no: line.lineNo,
+      section: line.section,
+      expense_date: line.expenseDate,
+      day_no: line.dayNo,
+      vendor_name: line.vendorName,
+      description: line.description,
+      unit_amount: line.unitAmount,
+      quantity: line.quantity,
+      pax_count: line.paxCount,
+      total_amount: line.totalAmount,
+      payment_method: line.paymentMethod,
+      receipt_storage_path: line.receiptStoragePath,
+      notes: line.notes,
+      source_sheet_name: line.sourceSheetName,
+      source_sheet_row: line.sourceSheetRow
+    }));
+    const { error: replaceError } = await supabase.rpc("replace_guide_expense_report_lines", {
+      p_report_id: report.id,
+      p_reservation_id: id,
+      p_lines: replacementLines
+    });
+    if (replaceError) throw new HttpError(500, replaceError.message);
 
     let savedLines: any[] = [];
-    if (summary.lines.length > 0) {
+    if (replacementLines.length > 0) {
       const { data: lineRows, error: lineError } = await supabase
         .from("guide_expense_report_lines")
-        .insert(
-          summary.lines.map((line: any) => ({
-            report_id: report.id,
-            reservation_id: id,
-            line_no: line.lineNo,
-            section: line.section,
-            expense_date: line.expenseDate,
-            day_no: line.dayNo,
-            vendor_name: line.vendorName,
-            description: line.description,
-            unit_amount: line.unitAmount,
-            quantity: line.quantity,
-            pax_count: line.paxCount,
-            total_amount: line.totalAmount,
-            payment_method: line.paymentMethod,
-            receipt_storage_path: line.receiptStoragePath,
-            notes: line.notes,
-            source_sheet_name: line.sourceSheetName,
-            source_sheet_row: line.sourceSheetRow
-          }))
-        )
         .select("*")
+        .eq("report_id", report.id)
         .order("line_no", { ascending: true });
       if (lineError) throw new HttpError(500, lineError.message);
       savedLines = lineRows ?? [];

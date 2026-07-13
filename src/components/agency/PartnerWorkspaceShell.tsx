@@ -38,7 +38,10 @@ const partnerNavSections: Array<{ title: string; items: PartnerNavItem[] }> = [
   },
   {
     title: "Account",
-    items: [{ href: "/agency/signup" as Route, label: "Partner Sign-up", helper: "Apply for access" }]
+    items: [
+      { href: "/agency/account/users" as Route, label: "User Management", helper: "Mother and sub accounts" },
+      { href: "/agency/signup" as Route, label: "Partner Sign-up", helper: "Apply for access" }
+    ]
   }
 ];
 
