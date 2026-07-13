@@ -13,8 +13,8 @@ export async function POST(request: Request) {
 
     const requestFingerprint = await createRecoveryFingerprint(request, "password_reset");
     const service = createServiceSupabaseClient();
-    const redirectUrl = new URL("/auth/reset-password", request.url);
-    redirectUrl.searchParams.set("portal", accountType);
+    const redirectPath = accountType === "agency" ? "/agency/reset-password" : "/auth/reset-password";
+    const redirectUrl = new URL(redirectPath, request.url);
 
     // Supabase는 존재하지 않는 주소에도 동일한 공개 응답을 반환합니다. 화면에서도 계정 존재 여부를 구분하지 않습니다.
     const { error } = await service.auth.resetPasswordForEmail(email, { redirectTo: redirectUrl.toString() });

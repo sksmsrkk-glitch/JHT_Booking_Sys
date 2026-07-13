@@ -17,6 +17,8 @@ export function SupabaseLoginForm({ accountType, buttonLabel, pendingLabel, redi
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const forgotEmailHref = accountType === "agency" ? "/agency/forgot-email" : "/auth/forgot-email";
+  const forgotPasswordHref = accountType === "agency" ? "/agency/forgot-password" : "/auth/forgot-password";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -85,8 +87,8 @@ export function SupabaseLoginForm({ accountType, buttonLabel, pendingLabel, redi
         {isSubmitting ? pendingLabel : buttonLabel}
       </button>
       <div className="auth-recovery-links" aria-label="Account recovery">
-        <Link href={`/auth/forgot-email?portal=${accountType}` as Route}>Forgot email?</Link>
-        <Link href={`/auth/forgot-password?portal=${accountType}` as Route}>Forgot password?</Link>
+        <Link href={forgotEmailHref as Route}>Forgot email?</Link>
+        <Link href={forgotPasswordHref as Route}>Forgot password?</Link>
       </div>
       {message ? <p className="danger-text">{message}</p> : null}
     </form>
