@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { sanitizeApiLogPayload } from "@/lib/domain/api-log.mjs";
+
 // 운영/회계/파트너 데이터는 화면마다 최신 상태가 중요하므로 API JSON 응답은 기본적으로 캐시하지 않습니다.
 const noStoreHeaders = { "Cache-Control": "no-store" };
 
@@ -49,15 +51,28 @@ export function created(data: unknown) {
 
 export function fail(error: unknown) {
   if (error instanceof HttpError) {
+    if (error.status >= 500) logInternalError(error);
     return jsonResponse({ error: publicErrorMessage(error) }, { status: error.status });
   }
 
   if (error instanceof Error) {
     // 서버 내부 에러 메시지는 DB 구조나 보안 정보를 포함할 수 있으므로 외부에 그대로 노출하지 않습니다.
+    logInternalError(error);
     return jsonResponse({ error: "Internal server error" }, { status: 500 });
   }
 
+  logInternalError(error);
   return jsonResponse({ error: "Unknown error" }, { status: 500 });
+}
+
+function logInternalError(error: unknown) {
+  // 운영 로그에는 분석에 필요한 오류 종류와 메시지만 남기고 토큰, 비밀번호,
+  // 요청 본문처럼 민감할 수 있는 값은 공통 sanitizer로 제거합니다.
+  const payload =
+    error instanceof Error
+      ? { name: error.name, message: error.message }
+      : { name: "UnknownError", message: String(error) };
+  console.error("[jht-api-error]", sanitizeApiLogPayload(payload));
 }
 
 function publicErrorMessage(error: HttpError) {
