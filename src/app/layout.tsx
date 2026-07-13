@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { AppTopbar } from "@/components/AppTopbar";
 import { CalendarLocaleEnforcer } from "@/components/CalendarLocaleEnforcer";
 import { GlobalTextTranslator } from "@/components/GlobalTextTranslator";
+import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "@/lib/domain/auth-session.mjs";
 import { normalizeLocale } from "@/lib/i18n";
 import "./globals.css";
 
@@ -18,7 +19,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const headerStore = await headers();
   const cookieStore = await cookies();
   const locale = normalizeLocale(headerStore.get("x-jht-locale") ?? cookieStore.get("jht_locale")?.value);
-  const isSignedIn = Boolean(cookieStore.get("jht_access_token")?.value);
+  const isSignedIn = Boolean(
+    cookieStore.get(ACCESS_TOKEN_COOKIE)?.value || cookieStore.get(REFRESH_TOKEN_COOKIE)?.value
+  );
 
   return (
     <html lang={locale}>

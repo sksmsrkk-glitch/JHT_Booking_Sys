@@ -40,8 +40,8 @@ export function CalendarLocaleEnforcer() {
       activeMode = mode;
       viewDate = resolveInitialViewDate(input.value, mode);
       renderPicker();
-      positionPicker();
       popover.hidden = false;
+      positionPicker();
     };
 
     const renderPicker = () => {
@@ -73,11 +73,17 @@ export function CalendarLocaleEnforcer() {
     const positionPicker = () => {
       if (!activeInput) return;
       const rect = activeInput.getBoundingClientRect();
-      const width = activeMode === "month" ? 300 : 316;
-      const left = Math.min(window.scrollX + rect.left, window.scrollX + window.innerWidth - width - 16);
-      popover.style.left = `${Math.max(12, left)}px`;
-      popover.style.top = `${window.scrollY + rect.bottom + 6}px`;
+      const preferredWidth = activeMode === "month" ? 300 : 316;
+      const width = Math.min(preferredWidth, Math.max(220, window.innerWidth - 24));
+      const left = Math.min(Math.max(12, rect.left), Math.max(12, window.innerWidth - width - 12));
       popover.style.width = `${width}px`;
+      const height = popover.getBoundingClientRect().height;
+      const below = rect.bottom + 6;
+      const above = rect.top - height - 6;
+      const preferredTop = below + height <= window.innerHeight - 12 || above < 12 ? below : above;
+      const top = Math.min(Math.max(12, preferredTop), Math.max(12, window.innerHeight - height - 12));
+      popover.style.left = `${left}px`;
+      popover.style.top = `${top}px`;
     };
 
     const enhanceRoot = (root: ParentNode | Element) => {
@@ -193,7 +199,9 @@ function applyEnglishCalendarAttributes(input: HTMLInputElement, mode: PickerMod
   input.lang = englishCalendarLocale;
   input.setAttribute("lang", englishCalendarLocale);
   input.setAttribute("data-calendar-locale", englishCalendarLocale);
-  input.setAttribute("aria-label", input.getAttribute("aria-label") ?? (mode === "month" ? "Month" : "Date"));
+  if (!input.hasAttribute("aria-label") && !input.closest("label") && !input.hasAttribute("aria-labelledby")) {
+    input.setAttribute("aria-label", mode === "month" ? "Month" : "Date");
+  }
 }
 
 function renderDatePicker(

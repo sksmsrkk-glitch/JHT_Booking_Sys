@@ -44,7 +44,8 @@ export function SupabaseLoginForm({ accountType, buttonLabel, pendingLabel, redi
     const sessionResponse = await fetch("/auth/session", {
       body: JSON.stringify({
         accessToken: data.session.access_token,
-        expiresIn: data.session.expires_in
+        expiresIn: data.session.expires_in,
+        refreshToken: data.session.refresh_token
       }),
       headers: { "content-type": "application/json" },
       method: "POST"
@@ -56,7 +57,7 @@ export function SupabaseLoginForm({ accountType, buttonLabel, pendingLabel, redi
       return;
     }
 
-    window.location.href = redirectTo;
+    window.location.assign(redirectTo);
   }
 
   return (

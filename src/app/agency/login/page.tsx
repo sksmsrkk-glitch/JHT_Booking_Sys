@@ -1,13 +1,16 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { SupabaseLoginForm } from "@/components/auth/SupabaseLoginForm";
+import { resolvePostLoginPath } from "@/lib/domain/auth-session.mjs";
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = Promise<{ reset?: string }>;
+type SearchParams = Promise<{ next?: string; reset?: string }>;
 
 export default async function AgencyLoginPage({ searchParams }: { searchParams: SearchParams }) {
-  const resetComplete = (await searchParams).reset === "complete";
+  const params = await searchParams;
+  const resetComplete = params.reset === "complete";
+  const redirectTo = resolvePostLoginPath("agency", params.next);
   return (
     <>
       <div className="page-header">
@@ -38,7 +41,7 @@ export default async function AgencyLoginPage({ searchParams }: { searchParams: 
         </div>
         <div className="partner-auth-form-stack">
           {resetComplete ? <section className="notice compact"><p>Password updated. Log in with your new password.</p></section> : null}
-          <SupabaseLoginForm accountType="agency" buttonLabel="Log In" pendingLabel="Logging in..." redirectTo="/agency" />
+          <SupabaseLoginForm accountType="agency" buttonLabel="Log In" pendingLabel="Logging in..." redirectTo={redirectTo} />
         </div>
       </section>
     </>

@@ -5,6 +5,7 @@ const nextConfig = readFile("next.config.mjs");
 const loginPage = readFile("src/components/auth/SupabaseLoginForm.tsx");
 const logoutRoute = readFile("src/app/auth/logout/route.ts");
 const sessionRoute = readFile("src/app/auth/session/route.ts");
+const middleware = readFile("src/middleware.ts");
 const httpHelpers = readFile("src/lib/api/http.ts");
 const runtimeSmoke = readFile("scripts/runtime-smoke.mjs");
 const launchRunbook = readFile("docs/launch-runbook.md");
@@ -41,7 +42,9 @@ for (const snippet of [
   "fallbackMaxAgeSeconds",
   "maximumMaxAgeSeconds",
   "minimumMaxAgeSeconds",
-  "secure: isHttpsRequest(request, requestUrl)"
+  "const secure = isHttpsRequest(request, requestUrl)",
+  "REFRESH_TOKEN_COOKIE",
+  "refreshTokenMaxAgeSeconds"
 ]) {
   if (!sessionRoute.includes(snippet)) {
     failures.push(`Session route is missing secure cookie attribute or helper: ${snippet}`);
@@ -76,8 +79,24 @@ if (!httpHelpers.includes("...callerHeaders,\n      ...noStoreHeaders")) {
   failures.push("Shared API JSON responses must enforce Cache-Control: no-store after caller headers are merged");
 }
 
-if (!logoutRoute.includes("sameSite: \"lax\"") || !logoutRoute.includes("secure: requestUrl.protocol === \"https:\" || request.headers.get(\"x-forwarded-proto\") === \"https\"")) {
+if (
+  !logoutRoute.includes("sameSite: \"lax\"") ||
+  !logoutRoute.includes("const secure = requestUrl.protocol === \"https:\" || request.headers.get(\"x-forwarded-proto\") === \"https\"") ||
+  !logoutRoute.includes("REFRESH_TOKEN_COOKIE")
+) {
   failures.push("Logout cookie clearing is missing SameSite lax or HTTPS-aware secure option");
+}
+
+for (const snippet of [
+  "REFRESH_TOKEN_COOKIE",
+  "refreshSupabaseSession",
+  "grant_type=refresh_token",
+  "continueWithRefreshedSession",
+  "redirectToLogin"
+]) {
+  if (!middleware.includes(snippet)) {
+    failures.push(`Middleware is missing persistent-session behavior: ${snippet}`);
+  }
 }
 
 for (const snippet of [

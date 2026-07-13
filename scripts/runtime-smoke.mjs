@@ -120,10 +120,11 @@ const routeChecks = [
     path: "/auth/session",
     method: "POST",
     status: 200,
-    body: { accessToken: "runtime-smoke-token", expiresIn: 120 },
+    body: { accessToken: "runtime-smoke-token", expiresIn: 120, refreshToken: "runtime-smoke-refresh-token" },
     requestHeaders: { origin: baseUrl, "x-forwarded-proto": "https" },
     headers: [
       { name: "set-cookie", includes: "jht_access_token=" },
+      { name: "set-cookie", includes: "jht_refresh_token=" },
       { name: "set-cookie", includes: "Max-Age=120" },
       { name: "set-cookie", includes: "HttpOnly" },
       { name: "set-cookie", includes: "Secure" },
@@ -146,6 +147,7 @@ const routeChecks = [
     requestHeaders: { "x-forwarded-proto": "https" },
     headers: [
       { name: "set-cookie", includes: "jht_access_token=;" },
+      { name: "set-cookie", includes: "jht_refresh_token=;" },
       { name: "set-cookie", includes: "Secure" },
       { name: "cache-control", value: "no-store" }
     ]

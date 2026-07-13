@@ -178,7 +178,9 @@ In Supabase Auth settings, add the production site URL and any required redirect
 - any preview/staging domain used for QA
 
 Confirm cookies are sent only over HTTPS in production.
-The `jht_access_token` cookie is issued by `/auth/session` as an HttpOnly cookie with same-origin `Origin` validation, Max-Age aligned to the Supabase session expiry, and cleared by `/auth/logout`.
+`/auth/session` issues separate `jht_access_token` and `jht_refresh_token` HttpOnly cookies after same-origin `Origin` validation. The access-cookie Max-Age follows the Supabase session expiry, middleware rotates stale sessions through Supabase Auth, and `/auth/logout` clears both cookies.
+
+After deploying this session upgrade, users holding an older access-only cookie must log out once and log in again so the browser receives the refresh-token cookie. Verify that an authenticated click into `/admin/...` or `/agency/...` remains on the selected page after the access token is refreshed.
 
 ## 8. Webhooks
 

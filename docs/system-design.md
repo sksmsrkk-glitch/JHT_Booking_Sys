@@ -72,13 +72,18 @@ sequenceDiagram
   participant Login as /auth/login
   participant Supabase as Supabase Auth
   participant Session as /auth/session
+  participant Middleware as Route Middleware
   participant Api as API Routes
 
   User->>Login: Email/password sign-in
   Login->>Supabase: signInWithPassword
-  Supabase-->>Login: access token + expiry
-  Login->>Session: POST token and expiresIn
-  Session-->>User: HttpOnly jht_access_token cookie
+  Supabase-->>Login: access token + refresh token + expiry
+  Login->>Session: POST tokens and expiresIn
+  Session-->>User: Separate HttpOnly session cookies
+  User->>Middleware: Open a protected page
+  Middleware->>Supabase: Refresh stale access token
+  Supabase-->>Middleware: Rotated session
+  Middleware-->>User: Continue original request and rotate cookies
   User->>Api: Request with cookie
   Api->>Supabase: Caller JWT through RLS
 ```
@@ -86,10 +91,12 @@ sequenceDiagram
 Session and response rules:
 
 - `/auth/session` accepts same-origin requests only.
-- The access token is stored in `jht_access_token` as HttpOnly, SameSite=Lax, path `/`.
+- The access token and refresh token are stored separately in `jht_access_token` and `jht_refresh_token` as HttpOnly, SameSite=Lax cookies with path `/`.
 - Cookie `Max-Age` follows the Supabase session expiry with server-side min/max clamps.
+- The refresh cookie remains available for up to 30 days so middleware can rotate a stale access token without interrupting active work.
+- Safe `next` routing returns users to the protected page they originally selected and blocks cross-portal or external redirects.
 - HTTPS deployments use the Secure cookie flag, including proxy deployments with `x-forwarded-proto: https`.
-- `/auth/logout` clears the cookie and returns no-store headers.
+- `/auth/logout` clears both cookies and returns no-store headers.
 - JSON API responses use shared response helpers and enforce `Cache-Control: no-store`.
 - Server errors are returned as a generic `Internal server error` message to avoid leaking SQL, RLS, provider, or environment details.
 

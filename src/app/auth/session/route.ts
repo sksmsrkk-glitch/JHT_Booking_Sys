@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "@/lib/domain/auth-session.mjs";
 
 const fallbackMaxAgeSeconds = 60 * 60;
 const maximumMaxAgeSeconds = 60 * 60 * 8;
 const minimumMaxAgeSeconds = 60;
+const refreshTokenMaxAgeSeconds = 60 * 60 * 24 * 30;
 
 export async function POST(request: Request) {
   const requestUrl = new URL(request.url);
@@ -10,7 +12,7 @@ export async function POST(request: Request) {
     return jsonResponse({ error: "Invalid session origin" }, { status: 403 });
   }
 
-  let payload: { accessToken?: unknown; expiresIn?: unknown };
+  let payload: { accessToken?: unknown; expiresIn?: unknown; refreshToken?: unknown };
   try {
     payload = await request.json();
   } catch {
@@ -20,16 +22,29 @@ export async function POST(request: Request) {
   if (typeof payload.accessToken !== "string" || payload.accessToken.trim().length === 0) {
     return jsonResponse({ error: "accessToken is required" }, { status: 400 });
   }
+  if (payload.refreshToken !== undefined && (typeof payload.refreshToken !== "string" || payload.refreshToken.trim().length === 0)) {
+    return jsonResponse({ error: "refreshToken must be a non-empty string" }, { status: 400 });
+  }
 
   const maxAge = resolveMaxAgeSeconds(payload.expiresIn);
   const response = jsonResponse({ ok: true });
-  response.cookies.set("jht_access_token", payload.accessToken, {
+  const secure = isHttpsRequest(request, requestUrl);
+  response.cookies.set(ACCESS_TOKEN_COOKIE, payload.accessToken, {
     httpOnly: true,
     maxAge,
     path: "/",
     sameSite: "lax",
-    secure: isHttpsRequest(request, requestUrl)
+    secure
   });
+  if (typeof payload.refreshToken === "string") {
+    response.cookies.set(REFRESH_TOKEN_COOKIE, payload.refreshToken, {
+      httpOnly: true,
+      maxAge: refreshTokenMaxAgeSeconds,
+      path: "/",
+      sameSite: "lax",
+      secure
+    });
+  }
   return response;
 }
 

@@ -209,10 +209,12 @@
 
 ## Browser Session
 
-- `/auth/login` signs in with Supabase email/password and posts the access token to `/auth/session`.
-- `POST /auth/session` stores the access token in the `jht_access_token` HttpOnly cookie for v1 server-rendered page requests, aligns cookie Max-Age with the Supabase session expiry, and rejects mismatched `Origin` headers.
+- `/auth/login` and `/agency/login` sign in with Supabase email/password and post the access token, refresh token, and expiry to `/auth/session`.
+- `POST /auth/session` stores the tokens in separate `jht_access_token` and `jht_refresh_token` HttpOnly cookies, aligns access-cookie Max-Age with the Supabase session expiry, and rejects mismatched `Origin` headers.
+- Middleware refreshes a stale access token through Supabase Auth before serving a protected page and rotates both HttpOnly cookies. A failed refresh clears both cookies and returns the user to the correct internal or partner login page.
+- The login `next` value is accepted only when it is a same-portal absolute path (`/admin/...` for internal accounts or `/agency/...` for partner accounts); external and cross-portal redirects fall back to the portal home.
 - API routes accept either an `Authorization: Bearer ...` header or the `jht_access_token` cookie.
-- `/auth/logout` clears the cookie.
+- `/auth/logout` clears both session cookies.
 
 ## Local Demo Seed
 

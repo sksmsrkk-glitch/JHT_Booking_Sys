@@ -1,9 +1,12 @@
 import { SupabaseLoginForm } from "@/components/auth/SupabaseLoginForm";
+import { resolvePostLoginPath } from "@/lib/domain/auth-session.mjs";
 
-type SearchParams = Promise<{ reset?: string }>;
+type SearchParams = Promise<{ next?: string; reset?: string }>;
 
 export default async function LoginPage({ searchParams }: { searchParams: SearchParams }) {
-  const resetComplete = (await searchParams).reset === "complete";
+  const params = await searchParams;
+  const resetComplete = params.reset === "complete";
+  const redirectTo = resolvePostLoginPath("internal", params.next);
   return (
     <>
       <div className="page-header">
@@ -14,7 +17,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
         </div>
       </div>
       {resetComplete ? <section className="notice compact"><p>Password updated. Log in with your new password.</p></section> : null}
-      <SupabaseLoginForm accountType="internal" buttonLabel="Log In" pendingLabel="Logging in..." redirectTo="/admin" />
+      <SupabaseLoginForm accountType="internal" buttonLabel="Log In" pendingLabel="Logging in..." redirectTo={redirectTo} />
     </>
   );
 }
