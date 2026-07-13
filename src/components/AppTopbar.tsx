@@ -42,6 +42,7 @@ export function AppTopbar({ isSignedIn, locale }: AppTopbarProps) {
     { href: "/admin/guide-expenses" as Route, label: "Guide Expenses" },
     { href: "/agency", label: text.overseasAgencyPortal },
     { href: "/admin/users" as Route, label: "Users" },
+    { href: "/admin/account-recovery" as Route, label: "Account Recovery" },
     { href: "/admin/audit" as Route, label: "Audit" }
   ];
 

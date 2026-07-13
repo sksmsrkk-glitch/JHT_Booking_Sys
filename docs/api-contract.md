@@ -5,6 +5,8 @@
 - `GET /api/health`
 - `POST /api/agency/signup-applications`
 - `GET /api/countries`
+- `POST /api/auth/forgot-email`
+- `POST /api/auth/forgot-password`
 
 ## Agency APIs
 
@@ -87,6 +89,9 @@
 - `POST /api/admin/bootstrap`
 - `GET /api/admin/users`
 - `POST /api/admin/users`
+- `GET /api/admin/account-recovery`
+- `PATCH /api/admin/account-recovery/:id`
+- `POST /api/auth/password-reset-complete`
 - `GET /api/finance/invoices`
 - `POST /api/finance/invoices`
 - `GET /api/finance/invoices/:id`
@@ -131,7 +136,7 @@
 - Internal user role management requires admin role, manages existing Supabase Auth users through `profiles`/`user_roles`, validates the optional default company against active companies, and audits role changes.
 - Automation endpoints require `x-automation-secret`.
 - External provider callbacks require `x-webhook-secret` and the matching provider-specific webhook secret environment variable.
-- `npm run verify:api-guards` audits every App Router API handler and fails if a handler lacks an internal, agency, finance, admin, automation, webhook, bootstrap, or route-specific helper guard. Public allowlist entries are limited to health checks, partner signup submission, and shared country selector reads.
+- `npm run verify:api-guards` audits every App Router API handler and fails if a handler lacks an internal, agency, finance, admin, automation, webhook, bootstrap, or route-specific helper guard. Public allowlist entries are limited to health checks, partner signup submission, shared country selector reads, and rate-limited account recovery requests.
 - `npm run verify:api-body-order` audits API handlers so request bodies are parsed only after an auth or shared-secret guard.
 - `npm run verify:api-responses` audits API handlers so JSON responses go through shared no-store helpers.
 - `npm run verify:api-contract` audits this file against `src/app/api/**/route.ts` so implemented handlers and documented handlers stay aligned.
@@ -147,6 +152,9 @@
 - API logs are internal-only technical traces for webhook/automation/API support; Gmail webhooks, provider callbacks, and automation workers write sanitized logs that redact secrets, tokens, passport fields, and large message bodies.
 - Health checks are public, do not touch the database, and expose only boolean configuration presence.
 - Partner signup applications can be submitted without an existing login, resolve country data through the shared country reference master, and enter an internal approval queue before an Agency account or mother account is created.
+- Forgot-password requests return the same public response regardless of account existence, use Supabase Auth recovery links, and record a rate-limited audit row. Password-reset completion requires a valid recovery JWT and clears the partner `password_reset_required` flag.
+- Forgot-email requests require company, contact, and registered phone identity fields. Exact active partner matches return only a masked email; unmatched and internal requests enter the admin-only account recovery queue.
+- Account recovery queue reads and resolution writes require admin role. The underlying table has RLS and no anonymous table privilege.
 - Agency signup application list and approve/reject decisions are internal-only; approval creates the Agency account, mother agency user, queued email event, and audit evidence.
 - Agency lifecycle changes are internal-only. Freezing or withdrawing an agency also inactivates its users and queues account status email events.
 - Agency user lifecycle changes are internal-only and support mother account governance over sub accounts while preserving audit evidence.

@@ -47,10 +47,14 @@ const checks = [
   { path: "/agency/login", status: 200, includes: ["Partner Log In", "Partner account access"] },
   { path: "/agency/account/users", status: 200, includes: ["User Management", "Account users could not load"] },
   { path: "/auth/login", status: 200, includes: ["Internal Log In", "Supabase user"] },
+  { path: "/auth/forgot-email", status: 200, includes: ["Find account email", "masked email"] },
+  { path: "/auth/forgot-password", status: 200, includes: ["Reset password", "one-time recovery link"] },
+  { path: "/auth/reset-password", status: 200, includes: ["Set a new password", "Secure Recovery"] },
   { path: "/admin/bootstrap", status: 200, includes: ["Admin Bootstrap", "Create Initial Admin"] },
   { path: "/admin/readiness", status: 200, includes: ["V1 Readiness"] },
   { path: "/admin/companies", status: 200, includes: ["Companies", "Admin role required"] },
   { path: "/admin/users", status: 200, includes: ["Internal Users", "Admin role required"] },
+  { path: "/admin/account-recovery", status: 200, includes: ["Account Recovery", "Recovery requests could not load"] },
   { path: "/admin/agencies", status: 200, includes: ["Overseas Agencies", "Internal role required"] },
   { path: "/admin/domestic-suppliers", status: 200, includes: ["Domestic Suppliers", "Internal role required"] },
   { path: "/admin/exchange-rates", status: 200, includes: ["Exchange Rates", "Internal role required"] },
@@ -235,6 +239,24 @@ function buildApiChecks() {
           method,
           status: 500,
           includes: ["Internal server error"],
+          headers: [{ name: "cache-control", value: "no-store" }]
+        };
+      }
+      if (path === "/api/auth/forgot-email" && method === "POST") {
+        return {
+          path,
+          method,
+          status: 400,
+          includes: ["accountType must be internal or agency"],
+          headers: [{ name: "cache-control", value: "no-store" }]
+        };
+      }
+      if (path === "/api/auth/forgot-password" && method === "POST") {
+        return {
+          path,
+          method,
+          status: 400,
+          includes: ["accountType must be internal or agency"],
           headers: [{ name: "cache-control", value: "no-store" }]
         };
       }

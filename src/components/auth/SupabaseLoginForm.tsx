@@ -2,14 +2,17 @@
 
 import { FormEvent, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import type { Route } from "next";
+import Link from "next/link";
 
 type SupabaseLoginFormProps = {
   buttonLabel: string;
   pendingLabel: string;
   redirectTo: string;
+  accountType: "internal" | "agency";
 };
 
-export function SupabaseLoginForm({ buttonLabel, pendingLabel, redirectTo }: SupabaseLoginFormProps) {
+export function SupabaseLoginForm({ accountType, buttonLabel, pendingLabel, redirectTo }: SupabaseLoginFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -81,6 +84,10 @@ export function SupabaseLoginForm({ buttonLabel, pendingLabel, redirectTo }: Sup
       <button className="button-primary" disabled={isSubmitting} type="submit">
         {isSubmitting ? pendingLabel : buttonLabel}
       </button>
+      <div className="auth-recovery-links" aria-label="Account recovery">
+        <Link href={`/auth/forgot-email?portal=${accountType}` as Route}>Forgot email?</Link>
+        <Link href={`/auth/forgot-password?portal=${accountType}` as Route}>Forgot password?</Link>
+      </div>
       {message ? <p className="danger-text">{message}</p> : null}
     </form>
   );

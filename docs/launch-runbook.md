@@ -63,6 +63,7 @@ If Supabase CLI is unavailable, apply the SQL files in this order through the Su
 20. `supabase/migrations/202607070001_signup_application_billing_currency.sql`
 21. `supabase/migrations/202607130001_partner_auth_lifecycle.sql`
 22. `supabase/migrations/202607130002_canonical_workflow_code.sql`
+23. `supabase/migrations/202607130003_account_recovery.sql`
 
 After migration, open `/admin/readiness` with an internal admin account and confirm database smoke checks are ready.
 
@@ -112,7 +113,7 @@ Never commit those values, and remove the demo accounts before external or produ
 Copy `.env.example` into the deployment environment and fill values there, not in git.
 
 Security and development-only options include `API_MAX_JSON_BYTES`, `SIGNUP_RATE_LIMIT_SECRET`, `JHT_DEMO_MODE`,
-`DEMO_ADMIN_PASSWORD`, and `DEMO_AGENCY_PASSWORD`. Keep demo mode and demo passwords unset in production.
+`ACCOUNT_RECOVERY_RATE_LIMIT_SECRET`, `DEMO_ADMIN_PASSWORD`, and `DEMO_AGENCY_PASSWORD`. Keep demo mode and demo passwords unset in production.
 Set `SUPPLIER_MEDIA_STORAGE_BUCKET=supplier-media` and create that private Storage bucket before uploading supplier images.
 
 Required:

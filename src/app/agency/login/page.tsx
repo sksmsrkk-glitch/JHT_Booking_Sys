@@ -4,7 +4,10 @@ import { SupabaseLoginForm } from "@/components/auth/SupabaseLoginForm";
 
 export const dynamic = "force-dynamic";
 
-export default function AgencyLoginPage() {
+type SearchParams = Promise<{ reset?: string }>;
+
+export default async function AgencyLoginPage({ searchParams }: { searchParams: SearchParams }) {
+  const resetComplete = (await searchParams).reset === "complete";
   return (
     <>
       <div className="page-header">
@@ -33,7 +36,10 @@ export default function AgencyLoginPage() {
             <li>Internal costs and supplier details remain hidden.</li>
           </ul>
         </div>
-        <SupabaseLoginForm buttonLabel="Log In" pendingLabel="Logging in..." redirectTo="/agency" />
+        <div className="partner-auth-form-stack">
+          {resetComplete ? <section className="notice compact"><p>Password updated. Log in with your new password.</p></section> : null}
+          <SupabaseLoginForm accountType="agency" buttonLabel="Log In" pendingLabel="Logging in..." redirectTo="/agency" />
+        </div>
       </section>
     </>
   );

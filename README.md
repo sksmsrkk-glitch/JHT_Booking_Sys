@@ -461,6 +461,7 @@ erDiagram
 | `agency_inquiries` | 신규 문의, 재견적, 변경, 취소 요청 |
 | `agency_login_events` | 파트너 로그인 기록 |
 | `agency_account_email_events` | 가입 승인, freezing 등 이메일 이벤트 |
+| `account_recovery_requests` | 이메일 찾기와 비밀번호 재설정 요청 이력 및 관리자 처리 상태 |
 
 #### Domestic Supplier 계열
 
@@ -676,6 +677,17 @@ flowchart TB
 3. 내부 직원은 partner visible 답변 또는 internal only 메모 작성
 4. 메시지에서 action item 생성 가능
 5. 작성자 이름, 이메일, 실제 profile/agency user ID가 연결됨
+
+### 9.9 계정 이메일 및 비밀번호 복구
+
+1. 관리자와 파트너 로그인 화면에서 `Forgot email?` 또는 `Forgot password?`를 선택합니다.
+2. 비밀번호 찾기는 등록 이메일로 Supabase Auth의 일회성 복구 링크를 전송합니다.
+3. 복구 링크는 `/auth/reset-password`에서 열리며, 새 비밀번호는 12자 이상이고 영문 대문자·소문자·숫자·특수문자를 모두 포함해야 합니다.
+4. 이메일 찾기는 회사명, 담당자명, 등록 전화번호가 모두 일치하는 파트너 계정만 마스킹된 이메일을 표시합니다.
+5. 자동 확인에 실패한 요청과 내부 직원 요청은 `account_recovery_requests` 원장에 기록됩니다.
+6. 관리자만 `/admin/account-recovery`에서 미처리 요청을 조회하고 `Resolve` 또는 `Dismiss`로 처리할 수 있습니다.
+7. 공개 복구 API는 IP 원문 대신 해시 fingerprint를 저장하고 시간당 호출 횟수를 제한합니다.
+8. Supabase Auth의 Site URL과 Redirect URL에는 실제 운영 도메인 및 `/auth/reset-password` 경로가 등록되어 있어야 합니다.
 
 ## 10. 로컬 개발과 검증 방법
 

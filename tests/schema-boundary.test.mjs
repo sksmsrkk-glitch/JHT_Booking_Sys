@@ -75,7 +75,11 @@ const signupBillingCurrencyMigration = readFileSync(
   new URL("../supabase/migrations/202607070001_signup_application_billing_currency.sql", import.meta.url),
   "utf8"
 );
-const schema = `${initialSchema}\n${gmailCandidatesMigration}\n${quoteExcelModelMigration}\n${quoteFareOptionsMigration}\n${quotePresentationBlocksMigration}\n${supplierMediaAttachmentsMigration}\n${partnerReceivableLedgerMigration}\n${exchangeRatesMigration}\n${agencyInquiryTourWorkflowMigration}\n${invoiceVersioningMigration}\n${finalOperationInvoiceMigration}\n${guideExpenseReportsMigration}\n${agencyOnboardingGovernanceMigration}\n${countryReferenceExchangeRatesMigration}\n${workflowPortalCommunicationMigration}\n${workflowMessageActorLinksMigration}\n${securityHardeningMigration}\n${quoteVersionInternalsMigration}\n${signupBillingCurrencyMigration}`;
+const accountRecoveryMigration = readFileSync(
+  new URL("../supabase/migrations/202607130003_account_recovery.sql", import.meta.url),
+  "utf8"
+);
+const schema = `${initialSchema}\n${gmailCandidatesMigration}\n${quoteExcelModelMigration}\n${quoteFareOptionsMigration}\n${quotePresentationBlocksMigration}\n${supplierMediaAttachmentsMigration}\n${partnerReceivableLedgerMigration}\n${exchangeRatesMigration}\n${agencyInquiryTourWorkflowMigration}\n${invoiceVersioningMigration}\n${finalOperationInvoiceMigration}\n${guideExpenseReportsMigration}\n${agencyOnboardingGovernanceMigration}\n${countryReferenceExchangeRatesMigration}\n${workflowPortalCommunicationMigration}\n${workflowMessageActorLinksMigration}\n${securityHardeningMigration}\n${quoteVersionInternalsMigration}\n${signupBillingCurrencyMigration}\n${accountRecoveryMigration}`;
 const agencyPortalQueries = readFileSync(new URL("../src/features/agency-portal/queries.ts", import.meta.url), "utf8");
 const agencySignupDecisionRoute = readFileSync(
   new URL("../src/app/api/agency/signup-applications/[id]/decision/route.ts", import.meta.url),
@@ -282,6 +286,16 @@ test("agency onboarding requires internal approval and preserves account governa
   assert.match(schema, /create table if not exists agency_login_events/);
   assert.match(schema, /create policy "agency account email events internal all"/);
   assert.match(schema, /create policy "agency login events internal all"/);
+});
+
+test("account recovery requests are rate-limited, audited, and internal-only", () => {
+  assert.match(schema, /create table if not exists account_recovery_requests/);
+  assert.match(schema, /recovery_type text not null check \(recovery_type in \('email_lookup', 'password_reset'\)\)/);
+  assert.match(schema, /request_fingerprint text not null/);
+  assert.match(schema, /alter table account_recovery_requests enable row level security/);
+  assert.match(schema, /create policy "account recovery internal all"/);
+  assert.match(schema, /revoke all privileges on table account_recovery_requests from anon/);
+  assert.doesNotMatch(accountRecoveryMigration, /account recovery agency/);
 });
 
 test("country references are shared between exchange rates and partner signup", () => {

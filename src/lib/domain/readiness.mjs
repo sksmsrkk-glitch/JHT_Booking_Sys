@@ -133,6 +133,13 @@ export const READINESS_ENV_CHECKS = [
     group: "Security"
   },
   {
+    key: "account_recovery_rate_limit_secret",
+    label: "Account recovery rate-limit hash secret",
+    envName: "ACCOUNT_RECOVERY_RATE_LIMIT_SECRET",
+    required: false,
+    group: "Security"
+  },
+  {
     key: "demo_admin_password",
     label: "Hosted demo admin password",
     envName: "DEMO_ADMIN_PASSWORD",
@@ -165,6 +172,12 @@ export const READINESS_WORKFLOW_CHECKS = [
     key: "internal_user_role_management",
     label: "Admin users can manage internal roles and validate default company selection",
     route: "/admin/users",
+    group: "Auth"
+  },
+  {
+    key: "account_recovery_management",
+    label: "Users can recover credentials and admins can resolve unmatched requests",
+    route: "/admin/account-recovery",
     group: "Auth"
   },
   {

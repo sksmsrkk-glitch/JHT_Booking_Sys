@@ -5,7 +5,9 @@ const apiRoot = resolve("src/app/api");
 const publicRoutes = new Map([
   ["src/app/api/health/route.ts", { methods: new Set(["GET"]), reason: "public health check" }],
   ["src/app/api/agency/signup-applications/route.ts", { methods: new Set(["POST"]), reason: "public partner signup application" }],
-  ["src/app/api/countries/route.ts", { methods: new Set(["GET"]), reason: "public country selector options" }]
+  ["src/app/api/countries/route.ts", { methods: new Set(["GET"]), reason: "public country selector options" }],
+  ["src/app/api/auth/forgot-email/route.ts", { methods: new Set(["POST"]), reason: "public account email recovery" }],
+  ["src/app/api/auth/forgot-password/route.ts", { methods: new Set(["POST"]), reason: "public password recovery request" }]
 ]);
 
 const guardPatterns = [
@@ -13,6 +15,7 @@ const guardPatterns = [
   { name: "admin user guard", pattern: /\brequireAdminUser\s*\(/ },
   { name: "finance user guard", pattern: /\brequireFinanceUser\s*\(/ },
   { name: "agency user guard", pattern: /\brequireAgencyUser\s*\(/ },
+  { name: "current user guard", pattern: /\brequireCurrentUser\s*\(/ },
   { name: "automation secret guard", pattern: /\brequireAutomationSecret\s*\(/ },
   { name: "webhook secret guard", pattern: /\brequireWebhookSecret\s*\(/ },
   { name: "bootstrap secret guard", pattern: /\brequireBootstrapSecret\s*\(/ },

@@ -65,7 +65,8 @@ const agencyForbiddenTables = [
   "migration_errors",
   "audit_logs",
   "api_logs",
-  "gmail_match_candidates"
+  "gmail_match_candidates",
+  "account_recovery_requests"
 ];
 const failures = [];
 
