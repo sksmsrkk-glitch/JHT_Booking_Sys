@@ -173,12 +173,12 @@ Configure the production domain in the deployment platform.
 In Supabase Auth settings, add the production site URL and any required redirect URLs for:
 
 - `/auth/login`
-- `/auth/logout`
+- `POST /auth/logout`
 - the production root domain
 - any preview/staging domain used for QA
 
 Confirm cookies are sent only over HTTPS in production.
-`/auth/session` issues separate `jht_access_token` and `jht_refresh_token` HttpOnly cookies after same-origin `Origin` validation. The access-cookie Max-Age follows the Supabase session expiry, middleware rotates stale sessions through Supabase Auth, and `/auth/logout` clears both cookies.
+`/auth/session` issues separate `jht_access_token` and `jht_refresh_token` HttpOnly cookies after same-origin `Origin` validation. The access-cookie Max-Age follows the Supabase session expiry, middleware rotates stale sessions through Supabase Auth, and `POST /auth/logout` clears both cookies without exposing a prefetchable GET side effect.
 
 After deploying this session upgrade, users holding an older access-only cookie must log out once and log in again so the browser receives the refresh-token cookie. Verify that an authenticated click into `/admin/...` or `/agency/...` remains on the selected page after the access token is refreshed.
 

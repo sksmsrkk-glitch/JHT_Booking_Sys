@@ -96,7 +96,7 @@ Session and response rules:
 - The refresh cookie remains available for up to 30 days so middleware can rotate a stale access token without interrupting active work.
 - Safe `next` routing returns users to the protected page they originally selected and blocks cross-portal or external redirects.
 - HTTPS deployments use the Secure cookie flag, including proxy deployments with `x-forwarded-proto: https`.
-- `/auth/logout` clears both cookies and returns no-store headers.
+- `POST /auth/logout` clears both cookies and returns no-store headers. The top bar submits a form instead of prefetching a state-changing GET link.
 - JSON API responses use shared response helpers and enforce `Cache-Control: no-store`.
 - Server errors are returned as a generic `Internal server error` message to avoid leaking SQL, RLS, provider, or environment details.
 

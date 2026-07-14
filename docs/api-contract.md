@@ -214,7 +214,7 @@
 - Middleware refreshes a stale access token through Supabase Auth before serving a protected page and rotates both HttpOnly cookies. A failed refresh clears both cookies and returns the user to the correct internal or partner login page.
 - The login `next` value is accepted only when it is a same-portal absolute path (`/admin/...` for internal accounts or `/agency/...` for partner accounts); external and cross-portal redirects fall back to the portal home.
 - API routes accept either an `Authorization: Bearer ...` header or the `jht_access_token` cookie.
-- `/auth/logout` clears both session cookies.
+- `POST /auth/logout` clears both session cookies. Logout is intentionally not exposed as GET so Next.js link prefetch cannot terminate an active session.
 
 ## Local Demo Seed
 

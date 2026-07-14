@@ -26,6 +26,17 @@ test("middleware keeps partner landing public while protecting partner records",
   assert.match(middleware, /refreshSupabaseSession/);
 });
 
+test("logout cannot be triggered by Next.js link prefetch", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const topbar = await readFile(new URL("../src/components/AppTopbar.tsx", import.meta.url), "utf8");
+  const logoutRoute = await readFile(new URL("../src/app/auth/logout/route.ts", import.meta.url), "utf8");
+
+  assert.match(topbar, /<form action="\/auth\/logout"[^>]*method="post">/);
+  assert.doesNotMatch(topbar, /href=\{?[^\n]*\/auth\/logout/);
+  assert.match(logoutRoute, /export function POST/);
+  assert.doesNotMatch(logoutRoute, /export function GET/);
+});
+
 function jwtWithExpiry(exp) {
   const payload = Buffer.from(JSON.stringify({ exp })).toString("base64url");
   return `header.${payload}.signature`;

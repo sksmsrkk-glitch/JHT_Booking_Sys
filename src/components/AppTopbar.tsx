@@ -32,8 +32,7 @@ export function AppTopbar({ isSignedIn, locale }: AppTopbarProps) {
   const agencyNewInquiryLabel = "New Inquiry";
   const communicationLabel = "Communication";
   const loginLabel = isSignedIn ? text.signOut : text.signIn;
-  const agencyAuthHref = (isSignedIn ? "/auth/logout" : "/agency/login") as Route;
-  const internalAuthHref = (isSignedIn ? "/auth/logout" : "/auth/login") as Route;
+  const loginHref = (isAgencySurface ? "/agency/login" : "/auth/login") as Route;
   const moreItems = [
     { href: "/admin/domestic-suppliers" as Route, label: text.domesticSuppliers },
     { href: "/admin/exchange-rates" as Route, label: text.exchangeRates },
@@ -77,9 +76,13 @@ export function AppTopbar({ isSignedIn, locale }: AppTopbarProps) {
         </nav>
       )}
       <div className="topbar-controls">
-        <Link className="auth-nav-link" href={isAgencySurface ? agencyAuthHref : internalAuthHref}>
-          {loginLabel}
-        </Link>
+        {isSignedIn ? (
+          <form action="/auth/logout" className="auth-nav-form" method="post">
+            <button className="auth-nav-link" type="submit">{loginLabel}</button>
+          </form>
+        ) : (
+          <Link className="auth-nav-link" href={loginHref}>{loginLabel}</Link>
+        )}
         <ThemeToggle />
         {isAgencySurface ? null : <LanguageSwitcher locale={effectiveLocale} />}
       </div>

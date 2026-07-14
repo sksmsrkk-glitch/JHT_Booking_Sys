@@ -283,6 +283,7 @@ a {
 }
 
 .auth-nav-link {
+  background: transparent;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   color: var(--text-muted);
@@ -3984,6 +3985,8 @@ html.dark .partner-onboarding-steps p,
 html.dark .workflow-filter-bar label,
 html.dark .workflow-list-row small {
   color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
 }
 
 html.dark .toolbar label,
@@ -4380,6 +4383,11 @@ summary:focus-visible {
   min-height: 44px;
   padding: 0 16px;
   white-space: nowrap;
+}
+
+.auth-nav-form {
+  display: inline-flex;
+  margin: 0;
 }
 
 .confirmation-filter-bar input[type="submit"],

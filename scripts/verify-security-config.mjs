@@ -87,6 +87,10 @@ if (
   failures.push("Logout cookie clearing is missing SameSite lax or HTTPS-aware secure option");
 }
 
+if (!logoutRoute.includes("export function POST") || logoutRoute.includes("export function GET")) {
+  failures.push("Logout must be POST-only so navigation prefetch cannot clear an active session");
+}
+
 for (const snippet of [
   "REFRESH_TOKEN_COOKIE",
   "refreshSupabaseSession",

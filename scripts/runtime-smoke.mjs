@@ -143,7 +143,13 @@ const routeChecks = [
   },
   {
     path: "/auth/logout",
-    status: 307,
+    method: "GET",
+    status: 405
+  },
+  {
+    path: "/auth/logout",
+    method: "POST",
+    status: 303,
     requestHeaders: { "x-forwarded-proto": "https" },
     headers: [
       { name: "set-cookie", includes: "jht_access_token=;" },

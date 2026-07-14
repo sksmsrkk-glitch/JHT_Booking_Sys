@@ -40,7 +40,7 @@ npm run verify:v1
 1. Open `/auth/login`.
 2. Sign in with a Supabase email/password account.
 3. The app creates a server-issued HttpOnly session cookie.
-4. Use `Sign Out` or `/auth/logout` to clear the cookie.
+4. Use the `Log Out` button, which submits `POST /auth/logout`, to clear both session cookies.
 
 If login succeeds but pages show a role error:
 
