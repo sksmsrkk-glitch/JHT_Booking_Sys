@@ -288,6 +288,9 @@ const DEFAULT_CASE_FIELDS: QuoteCaseFields = {
   termsAndConditions: ""
 };
 
+// 엑셀 샘플은 USD 원가와 KRW 원가가 함께 있으므로 통화별 환율을 분리해서 적용합니다.
+const EXCEL_SAMPLE_USD_TO_KRW = "1380.5";
+
 const EXCEL_SAMPLE_CASE_FIELDS: QuoteCaseFields = {
   tourName: "6D 5N SEOUL + SKI RESORT [PRIVATE TOUR]",
   currency: "USD",
@@ -431,8 +434,8 @@ function makeExcelSampleItem(
     snapshotSupplierName,
     snapshotCostCurrency,
     snapshotUnitCostAmount,
-    exchangeRateMode: "global",
-    exchangeRateToKrw: "1",
+    exchangeRateMode: "item",
+    exchangeRateToKrw: snapshotCostCurrency === "KRW" ? "1" : EXCEL_SAMPLE_USD_TO_KRW,
     calculationPreset,
     pricingUnit,
     quantity,
@@ -849,7 +852,12 @@ export function QuoteCaseCreateForm({
             <p>Search supplier items by keyword, then apply global or item-level FX and margin rules.</p>
           </div>
           <div className="inline-actions compact-actions">
-            <button className="button-secondary" onClick={loadExcelQuotationSample} type="button">
+            <button
+              aria-describedby={sampleNotice ? "excel-sample-load-status" : undefined}
+              className="button-secondary"
+              onClick={loadExcelQuotationSample}
+              type="button"
+            >
               Load Excel Sample
             </button>
             <button className="button-secondary" onClick={() => addItemRow()} type="button">
@@ -857,7 +865,17 @@ export function QuoteCaseCreateForm({
             </button>
           </div>
         </div>
-        {sampleNotice ? <p className="subtext">{sampleNotice}</p> : null}
+        {sampleNotice ? (
+          <div
+            aria-live="polite"
+            className="quote-sample-load-status"
+            id="excel-sample-load-status"
+            role="status"
+          >
+            <strong>Excel sample loaded</strong>
+            <span>{sampleNotice}</span>
+          </div>
+        ) : null}
         <div className="quote-global-controls">
           <label>
             Global FX to KRW
@@ -1496,28 +1514,34 @@ export function QuoteCaseCreateForm({
   }
 
   function loadExcelQuotationSample() {
+    const loadId = Date.now();
     setMessage("");
-    setCaseFields(EXCEL_SAMPLE_CASE_FIELDS);
-    setGlobalExchangeRate("1");
+    setExchangeRateNotice("");
+    setCaseFields({ ...EXCEL_SAMPLE_CASE_FIELDS });
+    setGlobalExchangeRate(EXCEL_SAMPLE_USD_TO_KRW);
     setGlobalMarginRate("0.15");
-    setItemRows(EXCEL_SAMPLE_ITEMS.map((row) => ({ ...row })));
-    setItineraryRows(EXCEL_SAMPLE_ITINERARY.map((row) => ({ ...row })));
+    // 매번 새로운 key를 사용해 브라우저 자동완성이나 이전 행의 로컬 상태가 샘플을 가리지 않게 합니다.
+    setItemRows(EXCEL_SAMPLE_ITEMS.map((row) => ({ ...row, id: `${row.id}-${loadId}` })));
+    setItineraryRows(EXCEL_SAMPLE_ITINERARY.map((row) => ({ ...row, id: `${row.id}-${loadId}` })));
     setExchangeRateRows([
       {
         ...DEFAULT_EXCHANGE_RATE_ROW,
-        id: "fx-sample-th",
+        id: `fx-sample-th-${loadId}`,
         countryCode: "TH",
         countryName: "Thailand",
         baseCurrency: "USD",
         quoteCurrency: "KRW",
-        rate: "1",
+        rate: EXCEL_SAMPLE_USD_TO_KRW,
         effectiveDate: "2026-10-12",
         source: "excel_sample",
         notes: "Thailand private tour quotation FX snapshot"
       }
     ]);
     setSearches({});
-    setSampleNotice("Excel quotation sample loaded from the attached JHT quotation files. Review, adjust, then create the quote case.");
+    setSampleNotice(
+      `${EXCEL_SAMPLE_ITEMS.length} quote items and ${EXCEL_SAMPLE_ITINERARY.length} itinerary days are ready. ` +
+        `USD 1 = KRW ${Number(EXCEL_SAMPLE_USD_TO_KRW).toLocaleString("en-US")} is applied; review the data before saving.`
+    );
   }
 
   function addExchangeRateRow() {

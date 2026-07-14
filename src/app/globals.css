@@ -2174,6 +2174,31 @@ table {
   font-size: 22px;
 }
 
+.quote-sample-load-status {
+  align-items: center;
+  background: #ecfdf3;
+  border: 1px solid #86efac;
+  border-radius: 6px;
+  color: #166534;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 13px;
+  gap: 6px 12px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+}
+
+.quote-sample-load-status strong,
+.quote-sample-load-status span {
+  line-height: 1.4;
+}
+
+html.dark .quote-sample-load-status {
+  background: #123423;
+  border-color: #247a4b;
+  color: #bbf7d0;
+}
+
 .quote-category-band {
   align-items: center;
   display: flex;
