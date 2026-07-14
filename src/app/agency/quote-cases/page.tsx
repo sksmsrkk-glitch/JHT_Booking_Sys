@@ -155,7 +155,7 @@ function QuoteDatabase({ quoteCases }: { quoteCases: AgencyQuoteListItem[] }) {
               <strong>
                 {quoteCase.publicTotalAmount === null
                   ? "Not set"
-                  : `${quoteCase.currency} ${quoteCase.publicTotalAmount.toLocaleString()}`}
+                  : `${quoteCase.currency} ${quoteCase.publicTotalAmount.toLocaleString("en-US")}`}
               </strong>
             </div>
             <div className="partner-database-actions">
@@ -236,5 +236,5 @@ function formatLabel(value: string) {
 
 function formatMoney(currency: string, amount: number) {
   if (!amount) return "-";
-  return `${currency} ${amount.toLocaleString()}`;
+  return `${currency} ${amount.toLocaleString("en-US")}`;
 }

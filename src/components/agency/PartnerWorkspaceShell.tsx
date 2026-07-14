@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -53,8 +53,19 @@ const partnerNavSections: Array<{ title: string; items: PartnerNavItem[] }> = [
 export function PartnerWorkspaceShell({ children }: PartnerWorkspaceShellProps) {
   const pathname = usePathname();
 
+  useEffect(() => {
+    const previousLanguage = document.documentElement.lang;
+    document.documentElement.lang = "en-US";
+    document.documentElement.dataset.portalLocale = "en-US";
+
+    return () => {
+      document.documentElement.lang = previousLanguage || "en";
+      delete document.documentElement.dataset.portalLocale;
+    };
+  }, []);
+
   return (
-    <div className="partner-workspace">
+    <div className="partner-workspace" lang="en-US">
       <aside className="partner-workspace-sidebar" aria-label="Partner portal workspace navigation">
         <div className="partner-workspace-brand">
           <span>JHT Partner</span>

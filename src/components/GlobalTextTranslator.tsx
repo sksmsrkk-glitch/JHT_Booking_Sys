@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import type { Locale } from "@/lib/i18n";
 
 const textMap: Record<string, string> = {
@@ -163,8 +164,12 @@ const placeholderMap: Record<string, string> = {
 };
 
 export function GlobalTextTranslator({ locale }: { locale: Locale }) {
+  const pathname = usePathname();
+  const isAgencySurface = pathname === "/agency" || pathname.startsWith("/agency/");
+
   useEffect(() => {
-    if (locale !== "ko") return;
+    // 파트너 포털은 영어 전용이므로 관리자 KOR 설정의 전역 DOM 번역을 적용하지 않습니다.
+    if (locale !== "ko" || isAgencySurface) return;
 
     const translate = () => {
       translateTextNodes(document.body);
@@ -175,7 +180,7 @@ export function GlobalTextTranslator({ locale }: { locale: Locale }) {
     const observer = new MutationObserver(translate);
     observer.observe(document.body, { childList: true, subtree: true });
     return () => observer.disconnect();
-  }, [locale]);
+  }, [isAgencySurface, locale]);
 
   return null;
 }

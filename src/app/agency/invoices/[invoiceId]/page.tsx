@@ -69,15 +69,15 @@ export default async function AgencyInvoiceDetailPage({ params }: { params: Page
       <section className="metric-row">
         <article className="metric-card">
           <span>Total</span>
-          <strong>{invoice.totalAmount.toLocaleString()}</strong>
+          <strong>{invoice.totalAmount.toLocaleString("en-US")}</strong>
         </article>
         <article className="metric-card">
           <span>Paid</span>
-          <strong>{invoice.confirmedPaymentTotal.toLocaleString()}</strong>
+          <strong>{invoice.confirmedPaymentTotal.toLocaleString("en-US")}</strong>
         </article>
         <article className="metric-card">
           <span>Remaining</span>
-          <strong>{remainingAmount.toLocaleString()}</strong>
+          <strong>{remainingAmount.toLocaleString("en-US")}</strong>
         </article>
       </section>
 
@@ -128,7 +128,7 @@ export default async function AgencyInvoiceDetailPage({ params }: { params: Page
               <dt>Deposit</dt>
               <dd>
                 {invoice.depositRequired
-                  ? `${invoice.currency} ${(invoice.depositAmount ?? 0).toLocaleString()}`
+                  ? `${invoice.currency} ${(invoice.depositAmount ?? 0).toLocaleString("en-US")}`
                   : "Not required"}
               </dd>
             </div>
@@ -143,13 +143,13 @@ export default async function AgencyInvoiceDetailPage({ params }: { params: Page
             <div>
               <dt>Confirmed Paid</dt>
               <dd>
-                {invoice.currency} {invoice.confirmedPaymentTotal.toLocaleString()}
+                {invoice.currency} {invoice.confirmedPaymentTotal.toLocaleString("en-US")}
               </dd>
             </div>
             <div>
               <dt>Remaining</dt>
               <dd>
-                {invoice.currency} {remainingAmount.toLocaleString()}
+                {invoice.currency} {remainingAmount.toLocaleString("en-US")}
               </dd>
             </div>
           </dl>
@@ -191,7 +191,7 @@ export default async function AgencyInvoiceDetailPage({ params }: { params: Page
                       <span className={`status-dot status-${payment.status}`}>{formatLabel(payment.status)}</span>
                     </td>
                     <td>
-                      {payment.currency} {payment.amount.toLocaleString()}
+                      {payment.currency} {payment.amount.toLocaleString("en-US")}
                     </td>
                     <td>{payment.receivedAt ? formatDateTime(payment.receivedAt) : "Not set"}</td>
                   </tr>

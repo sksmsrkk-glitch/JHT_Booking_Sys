@@ -80,7 +80,7 @@ export default async function AgencyQuoteDetailPage({ params }: { params: PagePa
               <dt>Public Total</dt>
               <dd>
                 {latestVersion
-                  ? `${latestVersion.currency} ${latestVersion.publicTotalAmount.toLocaleString()}`
+                  ? `${latestVersion.currency} ${latestVersion.publicTotalAmount.toLocaleString("en-US")}`
                   : "Not set"}
               </dd>
             </div>
@@ -180,7 +180,7 @@ function FinalQuotation({
         <div className="quote-total-box">
           <span>Total Quotation</span>
           <strong>
-            {version.currency} {version.publicTotalAmount.toLocaleString()}
+            {version.currency} {version.publicTotalAmount.toLocaleString("en-US")}
           </strong>
         </div>
       </div>

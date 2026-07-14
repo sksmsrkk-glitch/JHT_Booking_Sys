@@ -28,18 +28,18 @@ type RefreshedSession = {
  * 반복해서 로그인 화면으로 돌아가지 않도록 합니다.
  */
 export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
   if (process.env.NODE_ENV !== "production" && ["on", "true", "1"].includes(process.env.JHT_DEMO_MODE ?? "")) {
-    return NextResponse.next();
+    return continueRequest(request);
   }
 
-  const path = request.nextUrl.pathname;
   const protectedAgencyPath = path.startsWith("/agency") && !PUBLIC_AGENCY_PATHS.has(path);
   const protectedAdminPath = path.startsWith("/admin") && !PUBLIC_ADMIN_PATHS.has(path);
-  if (!protectedAgencyPath && !protectedAdminPath) return NextResponse.next();
+  if (!protectedAgencyPath && !protectedAdminPath) return continueRequest(request);
 
   const accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value ?? "";
   const refreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value ?? "";
-  if (accessToken && !isAccessTokenStale(accessToken)) return NextResponse.next();
+  if (accessToken && !isAccessTokenStale(accessToken)) return continueRequest(request);
 
   if (refreshToken) {
     const refreshed = await refreshSupabaseSession(refreshToken);
@@ -47,6 +47,10 @@ export async function middleware(request: NextRequest) {
   }
 
   return redirectToLogin(request, protectedAgencyPath);
+}
+
+function continueRequest(request: NextRequest) {
+  return NextResponse.next({ request: { headers: buildSurfaceRequestHeaders(request) } });
 }
 
 async function refreshSupabaseSession(refreshToken: string): Promise<RefreshedSession | null> {
@@ -86,7 +90,7 @@ async function refreshSupabaseSession(refreshToken: string): Promise<RefreshedSe
 }
 
 function continueWithRefreshedSession(request: NextRequest, session: RefreshedSession) {
-  const requestHeaders = new Headers(request.headers);
+  const requestHeaders = buildSurfaceRequestHeaders(request);
   requestHeaders.set("cookie", buildForwardedCookieHeader(request, session));
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   const secure = isHttpsRequest(request);
@@ -106,6 +110,16 @@ function continueWithRefreshedSession(request: NextRequest, session: RefreshedSe
     secure
   });
   return response;
+}
+
+function buildSurfaceRequestHeaders(request: NextRequest) {
+  const requestHeaders = new Headers(request.headers);
+  if (request.nextUrl.pathname === "/agency" || request.nextUrl.pathname.startsWith("/agency/")) {
+    // 파트너 포털은 해외 사용자 전용이므로 관리자 언어 쿠키와 무관하게 영어로 렌더링합니다.
+    requestHeaders.set("x-jht-locale", "en");
+    requestHeaders.set("x-jht-surface", "agency");
+  }
+  return requestHeaders;
 }
 
 function buildForwardedCookieHeader(request: NextRequest, session: RefreshedSession) {

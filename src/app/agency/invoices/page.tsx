@@ -210,5 +210,5 @@ function formatLabel(value: string) {
 
 function formatMoney(currency: string, amount: number) {
   if (!amount) return "-";
-  return `${currency} ${amount.toLocaleString()}`;
+  return `${currency} ${amount.toLocaleString("en-US")}`;
 }
