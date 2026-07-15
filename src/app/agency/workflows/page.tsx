@@ -2,11 +2,16 @@ import type { Route } from "next";
 import Link from "next/link";
 import type { WorkflowThreadSummary } from "@/features/workflow/types";
 import { getPageAuthorization } from "@/lib/api/page-session";
+import { PaginationControls } from "@/components/PaginationControls";
+import { buildPaginationMeta, type PaginationMeta } from "@/lib/api/pagination";
 
 export const dynamic = "force-dynamic";
 
-export default async function AgencyWorkflowsPage() {
-  const loadState = await loadWorkflows();
+type SearchParams = Promise<{ page?: string; pageSize?: string }>;
+
+export default async function AgencyWorkflowsPage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams;
+  const loadState = await loadWorkflows(params);
   const workflows = loadState.workflows;
 
   return (
@@ -36,12 +41,13 @@ export default async function AgencyWorkflowsPage() {
         </section>
       ) : null}
 
-      <WorkflowDatabase workflows={workflows} />
+      <WorkflowDatabase pagination={loadState.pagination} workflows={workflows} />
+      <PaginationControls action="/agency/workflows" pagination={loadState.pagination} />
     </>
   );
 }
 
-function WorkflowDatabase({ workflows }: { workflows: WorkflowThreadSummary[] }) {
+function WorkflowDatabase({ workflows, pagination }: { workflows: WorkflowThreadSummary[]; pagination: PaginationMeta }) {
   if (workflows.length === 0) {
     return (
       <section className="empty-state">
@@ -70,7 +76,7 @@ function WorkflowDatabase({ workflows }: { workflows: WorkflowThreadSummary[] })
       <div className="partner-database-metrics" aria-label="Communication metrics">
         <div>
           <span>Threads</span>
-          <strong>{workflows.length}</strong>
+          <strong>{pagination.total}</strong>
         </div>
         <div>
           <span>Waiting JHT</span>
@@ -126,9 +132,17 @@ function WorkflowDatabase({ workflows }: { workflows: WorkflowThreadSummary[] })
   );
 }
 
-async function loadWorkflows(): Promise<{ workflows: WorkflowThreadSummary[]; previewMode: boolean; error?: string }> {
+async function loadWorkflows(params: { page?: string; pageSize?: string }): Promise<{
+  workflows: WorkflowThreadSummary[];
+  pagination: PaginationMeta;
+  previewMode: boolean;
+  error?: string;
+}> {
   const { headerStore, authorization } = await getPageAuthorization();
-  const response = await fetch(buildInternalApiUrl("/api/workflows", headerStore), {
+  const url = buildInternalApiUrl("/api/workflows", headerStore);
+  if (params.page) url.searchParams.set("page", params.page);
+  if (params.pageSize) url.searchParams.set("pageSize", params.pageSize);
+  const response = await fetch(url, {
     headers: authorization ? { authorization } : {},
     cache: "no-store"
   });
@@ -136,11 +150,16 @@ async function loadWorkflows(): Promise<{ workflows: WorkflowThreadSummary[]; pr
   if (!response.ok) {
     return {
       workflows: [],
+      pagination: buildPaginationMeta({ page: 1, pageSize: 20 }, 0, 0),
       previewMode: false,
       error: payload.error ?? "An active partner session is required."
     };
   }
-  return { workflows: payload.data ?? [], previewMode: Boolean(!authorization || payload.data?.[0]?.preview) };
+  return {
+    workflows: payload.data ?? [],
+    pagination: payload.pagination,
+    previewMode: Boolean(!authorization || payload.data?.[0]?.preview)
+  };
 }
 
 function buildInternalApiUrl(path: string, headerStore: Headers) {

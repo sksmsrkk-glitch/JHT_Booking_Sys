@@ -23,16 +23,21 @@ export async function GET(request: Request) {
       status: url.searchParams.get("status") ?? "active"
     });
     if (countries.length === 0 && isDemoModeEnabled()) {
-      return ok(filterDefaultCountries(url.searchParams.get("q")));
+      return ok(filterDefaultCountries(url.searchParams.get("q")), { headers: countryCacheHeaders });
     }
-    return ok(countries);
+    // 국가 공통 마스터는 공개 참조 데이터이므로 CDN에서 짧게 캐시하고 장애 시 이전 값을 허용합니다.
+    return ok(countries, { headers: countryCacheHeaders });
   } catch (error) {
     if (isDemoModeEnabled()) {
-      return ok(filterDefaultCountries(new URL(request.url).searchParams.get("q")));
+      return ok(filterDefaultCountries(new URL(request.url).searchParams.get("q")), { headers: countryCacheHeaders });
     }
     return fail(error);
   }
 }
+
+const countryCacheHeaders = {
+  "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=86400"
+};
 
 export async function POST(request: Request) {
   try {

@@ -3,18 +3,22 @@ import Link from "next/link";
 import { getPageAuthorization } from "@/lib/api/page-session";
 import type { AgencyQuoteListItem } from "@/features/agency-portal/types";
 import { QuoteRequestActions } from "@/components/agency/QuoteRequestActions";
+import { PaginationControls } from "@/components/PaginationControls";
+import { buildPaginationMeta, type PaginationMeta } from "@/lib/api/pagination";
 
 export const dynamic = "force-dynamic";
 
 type LoadState =
-  | { status: "ready"; quoteCases: AgencyQuoteListItem[]; isPreview?: boolean }
+  | { status: "ready"; quoteCases: AgencyQuoteListItem[]; pagination: PaginationMeta; isPreview?: boolean }
   | { status: "auth-required"; message: string }
   | { status: "error"; message: string };
 
 const agencyRoute = "/agency" as Route;
+type SearchParams = Promise<{ page?: string; pageSize?: string }>;
 
-export default async function AgencyQuoteCasesPage() {
-  const loadState = await loadQuoteCases();
+export default async function AgencyQuoteCasesPage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams;
+  const loadState = await loadQuoteCases(params);
 
   return (
     <>
@@ -46,7 +50,12 @@ export default async function AgencyQuoteCasesPage() {
         </section>
       ) : null}
 
-      {loadState.status === "ready" ? <QuoteDatabase quoteCases={loadState.quoteCases} /> : null}
+      {loadState.status === "ready" ? (
+        <>
+          <QuoteDatabase pagination={loadState.pagination} quoteCases={loadState.quoteCases} />
+          <PaginationControls action="/agency/quote-cases" pagination={loadState.pagination} />
+        </>
+      ) : null}
 
       <section className="notice">
         <h2>Customer-safe quote boundary</h2>
@@ -60,7 +69,7 @@ export default async function AgencyQuoteCasesPage() {
   );
 }
 
-function QuoteDatabase({ quoteCases }: { quoteCases: AgencyQuoteListItem[] }) {
+function QuoteDatabase({ quoteCases, pagination }: { quoteCases: AgencyQuoteListItem[]; pagination: PaginationMeta }) {
   if (quoteCases.length === 0) {
     return (
       <section className="empty-state">
@@ -93,7 +102,7 @@ function QuoteDatabase({ quoteCases }: { quoteCases: AgencyQuoteListItem[] }) {
       <div className="partner-database-metrics" aria-label="Quote metrics">
         <div>
           <span>All quotes</span>
-          <strong>{quoteCases.length}</strong>
+          <strong>{pagination.total}</strong>
         </div>
         <div>
           <span>Sent or accepted</span>
@@ -168,13 +177,21 @@ function QuoteDatabase({ quoteCases }: { quoteCases: AgencyQuoteListItem[] }) {
   );
 }
 
-async function loadQuoteCases(): Promise<LoadState> {
+async function loadQuoteCases(params: { page?: string; pageSize?: string }): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
-    return { status: "ready", quoteCases: demoQuoteCases, isPreview: true };
+    return {
+      status: "ready",
+      quoteCases: demoQuoteCases,
+      pagination: buildPaginationMeta({ page: 1, pageSize: 20 }, demoQuoteCases.length, demoQuoteCases.length),
+      isPreview: true
+    };
   }
 
-  const response = await fetch(buildInternalApiUrl("/api/agency/quote-cases", headerStore), {
+  const url = buildInternalApiUrl("/api/agency/quote-cases", headerStore);
+  if (params.page) url.searchParams.set("page", params.page);
+  if (params.pageSize) url.searchParams.set("pageSize", params.pageSize);
+  const response = await fetch(url, {
     headers: { authorization },
     cache: "no-store"
   });
@@ -182,7 +199,12 @@ async function loadQuoteCases(): Promise<LoadState> {
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
-      return { status: "ready", quoteCases: demoQuoteCases, isPreview: true };
+      return {
+        status: "ready",
+        quoteCases: demoQuoteCases,
+        pagination: buildPaginationMeta({ page: 1, pageSize: 20 }, demoQuoteCases.length, demoQuoteCases.length),
+        isPreview: true
+      };
     }
     return {
       status: "error",
@@ -190,7 +212,7 @@ async function loadQuoteCases(): Promise<LoadState> {
     };
   }
 
-  return { status: "ready", quoteCases: payload.data ?? [] };
+  return { status: "ready", quoteCases: payload.data ?? [], pagination: payload.pagination };
 }
 
 const demoQuoteCases: AgencyQuoteListItem[] = [

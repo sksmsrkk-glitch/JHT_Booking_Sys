@@ -83,7 +83,7 @@ export async function POST(request: Request, context: RouteContext) {
     // 파트너가 쓰면 내부 대기, 내부가 답하면 파트너 대기 상태가 됩니다.
     const actionTitle = optionalString(body.actionTitle);
     const actionCategory = normalizeSetValue(body.actionCategory, ACTION_CATEGORIES, "other");
-    const { data: appendResult, error: appendError } = await supabase.rpc("append_workflow_message", {
+    const { data: appendResult, error: appendError } = await supabase.rpc("append_workflow_message_v2", {
       p_thread_id: thread.id,
       p_sender_type: actor.type,
       p_sender_profile_id: actor.profileId,
@@ -94,6 +94,7 @@ export async function POST(request: Request, context: RouteContext) {
       p_body: text,
       p_visibility: visibility,
       p_next_status: nextStatus,
+      p_metadata: {},
       p_action_title: actionTitle,
       p_action_category: actionCategory,
       p_action_details: optionalString(body.actionDetails)

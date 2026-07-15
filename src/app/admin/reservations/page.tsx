@@ -3,8 +3,10 @@ import Link from "next/link";
 import { getPageAuthorization } from "@/lib/api/page-session";
 import { RESERVATION_STATUSES } from "@/features/reservation/queries";
 import { demoReservations } from "@/features/reservation/demo-data";
-import type { ReservationListItem } from "@/features/reservation/types";
+import type { ReservationDashboardData, ReservationListItem } from "@/features/reservation/types";
 import { ReservationActions } from "@/components/admin/ReservationActions";
+import { PaginationControls } from "@/components/PaginationControls";
+import { buildPaginationMeta, type PaginationMeta } from "@/lib/api/pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -14,12 +16,23 @@ type SearchParams = Promise<{
   month?: string;
   year?: string;
   monthNumber?: string;
+  page?: string;
   pageSize?: string;
   sortBy?: string;
 }>;
 
 type LoadState =
-  | { status: "ready"; reservations: ReservationListItem[]; isPreview: boolean; previewReason?: string }
+  | {
+      status: "ready";
+      reservations: ReservationListItem[];
+      calendarReservations: ReservationListItem[];
+      dashboard: ReservationDashboardData;
+      pagination: PaginationMeta;
+      calendarPagination: PaginationMeta;
+      month: string;
+      isPreview: boolean;
+      previewReason?: string;
+    }
   | { status: "auth-required"; message: string }
   | { status: "error"; message: string };
 
@@ -104,9 +117,13 @@ export default async function AdminReservationsPage({ searchParams }: { searchPa
         <ReservationWorkspace
           filters={filters}
           isPreview={loadState.isPreview}
-          month={filters.month}
+          month={loadState.month}
           previewReason={loadState.previewReason}
           reservations={loadState.reservations}
+          calendarReservations={loadState.calendarReservations}
+          dashboard={loadState.dashboard}
+          pagination={loadState.pagination}
+          calendarPagination={loadState.calendarPagination}
         />
       ) : null}
 
@@ -127,15 +144,23 @@ function ReservationWorkspace({
   isPreview,
   month,
   previewReason,
-  reservations
+  reservations,
+  calendarReservations,
+  dashboard,
+  pagination,
+  calendarPagination
 }: {
-  filters: { q?: string; status?: string; month?: string; pageSize: number; sortBy: string };
+  filters: { q?: string; status?: string; month?: string; page: number; pageSize: number; sortBy: string };
   isPreview?: boolean;
   month?: string;
   previewReason?: string;
   reservations: ReservationListItem[];
+  calendarReservations: ReservationListItem[];
+  dashboard: ReservationDashboardData;
+  pagination: PaginationMeta;
+  calendarPagination: PaginationMeta;
 }) {
-  if (reservations.length === 0) {
+  if (dashboard.metrics.totalGroups === 0) {
     return (
       <section className="empty-state">
         <h2>No reservations found</h2>
@@ -144,10 +169,8 @@ function ReservationWorkspace({
     );
   }
 
-  const visibleMonth = resolveVisibleMonth(month, reservations);
+  const visibleMonth = resolveVisibleMonth(month, calendarReservations);
   const weeks = buildMonthWeeks(visibleMonth);
-  const reservationsInMonth = reservations.filter((reservation) => overlapsMonth(reservation, visibleMonth));
-  const unscheduledReservations = reservations.filter((reservation) => !reservation.tourStartDate && !reservation.tourEndDate);
 
   return (
     <>
@@ -160,56 +183,60 @@ function ReservationWorkspace({
           </p>
         </section>
       ) : null}
-      <ReservationDashboard reservations={reservations} visibleMonth={visibleMonth} />
-      <GroupStatusCalendar filters={filters} reservations={reservationsInMonth} visibleMonth={visibleMonth} weeks={weeks} />
-      {unscheduledReservations.length > 0 ? (
+      <ReservationDashboard dashboard={dashboard} />
+      <GroupStatusCalendar filters={filters} reservations={calendarReservations} visibleMonth={visibleMonth} weeks={weeks} />
+      {calendarPagination.hasNext ? (
+        <section className="notice warning">
+          <h2>Calendar display limit</h2>
+          <p>
+            Showing {calendarReservations.length} of {calendarPagination.total} groups in this month. Narrow the search or
+            status filter to inspect every group.
+          </p>
+        </section>
+      ) : null}
+      {dashboard.metrics.unscheduledGroups > 0 ? (
         <section className="notice warning">
           <h2>Unscheduled Reservations</h2>
           <p>
-            {unscheduledReservations.length} reservations do not have tour dates yet, so they cannot be placed on the
+            {dashboard.metrics.unscheduledGroups} reservations do not have tour dates yet, so they cannot be placed on the
             group status calendar.
           </p>
         </section>
       ) : null}
-      <ReservationOperationsTable filters={filters} reservations={reservations} />
+      <ReservationOperationsTable filters={filters} pagination={pagination} reservations={reservations} />
+      <PaginationControls
+        action="/admin/reservations"
+        pagination={pagination}
+        searchParams={{ q: filters.q, status: filters.status, month: filters.month, sortBy: filters.sortBy }}
+      />
     </>
   );
 }
 
-function ReservationDashboard({
-  reservations,
-  visibleMonth
-}: {
-  reservations: ReservationListItem[];
-  visibleMonth: Date;
-}) {
-  const active = reservations.filter((reservation) => !["completed", "cancelled"].includes(reservation.status)).length;
-  const pax = reservations.reduce((sum, reservation) => sum + resolvePaxNumber(reservation), 0);
-  const incomplete = reservations.filter((reservation) => !getReservationReadiness(reservation).complete);
-
+function ReservationDashboard({ dashboard }: { dashboard: ReservationDashboardData }) {
   return (
     <section className="reservation-dashboard">
       <div className="metric-row">
         <article className="metric-card">
           <span>Active groups</span>
-          <strong>{active}</strong>
+          <strong>{dashboard.metrics.activeGroups}</strong>
         </article>
         <article className="metric-card">
           <span>Total pax</span>
-          <strong>{pax || "-"}</strong>
+          <strong>{dashboard.metrics.totalPax || "-"}</strong>
         </article>
         <Link className="metric-card metric-card-link danger-metric" href={"/admin/reservations/incomplete" as Route}>
           <span>Incomplete groups</span>
-          <strong>{incomplete.length}</strong>
+          <strong>{dashboard.metrics.incompleteGroups}</strong>
         </Link>
       </div>
 
       <div className="reservation-summary-grid">
-        <SummaryPanel rows={summarizeByMonth(reservations)} title="Monthly" />
-        <SummaryPanel rows={summarizeByWeek(reservations, visibleMonth)} title="Weekly" />
-        <SummaryPanel rows={summarizeByYear(reservations)} title="Yearly" />
-        <SummaryPanel rows={summarizeByPartner(reservations)} title="Partner" />
-        <SummaryPanel rows={summarizeByCountry(reservations)} title="Country" />
+        <SummaryPanel rows={dashboard.summaries.monthly} title="Monthly" />
+        <SummaryPanel rows={dashboard.summaries.weekly} title="Weekly" />
+        <SummaryPanel rows={dashboard.summaries.yearly} title="Yearly" />
+        <SummaryPanel rows={dashboard.summaries.partner} title="Partner" />
+        <SummaryPanel rows={dashboard.summaries.country} title="Country" />
       </div>
     </section>
   );
@@ -430,15 +457,13 @@ function LegacyGroupStatusCalendar({
 
 function ReservationOperationsTable({
   filters,
+  pagination,
   reservations
 }: {
-  filters: { q?: string; status?: string; month?: string; pageSize: number; sortBy: string };
+  filters: { q?: string; status?: string; month?: string; page: number; pageSize: number; sortBy: string };
+  pagination: PaginationMeta;
   reservations: ReservationListItem[];
 }) {
-  const sortedReservations = sortReservations(reservations, filters.sortBy);
-  const visibleReservations = sortedReservations.slice(0, filters.pageSize);
-  const hiddenCount = Math.max(sortedReservations.length - visibleReservations.length, 0);
-
   return (
     <section className="section-block">
       <div className="section-heading">
@@ -468,6 +493,7 @@ function ReservationOperationsTable({
               <option value="100">100 rows</option>
             </select>
           </label>
+          <input name="page" type="hidden" value="1" />
           <button className="button-primary mini-button" type="submit">
             Apply
           </button>
@@ -488,7 +514,7 @@ function ReservationOperationsTable({
             </tr>
           </thead>
           <tbody>
-            {visibleReservations.map((reservation) => (
+            {reservations.map((reservation) => (
               <tr key={reservation.id}>
                 <td>
                   <Link className="strong-link" href={`/admin/reservations/${reservation.id}` as Route}>
@@ -524,8 +550,7 @@ function ReservationOperationsTable({
         </table>
       </section>
       <p className="subtext list-result-summary">
-        Showing {visibleReservations.length} of {sortedReservations.length} groups
-        {hiddenCount > 0 ? `, ${hiddenCount} hidden by the current row limit.` : "."}
+        Showing {reservations.length} of {pagination.total} groups on page {pagination.page}.
       </p>
     </section>
   );
@@ -724,6 +749,12 @@ function getWeekBarSpan(reservation: ReservationListItem, week: CalendarWeek) {
 }
 
 function getReservationReadiness(reservation: ReservationListItem) {
+  if (typeof reservation.operationReady === "boolean") {
+    return {
+      complete: reservation.operationReady,
+      missing: reservation.operationMissing ?? []
+    };
+  }
   const doneTasks = reservation.operationTaskSummary.filter((task) => ["done", "completed"].includes(task.status));
   const missing = REQUIRED_OPERATION_ACTIONS.filter(
     (action) => !doneTasks.some((task) => action.matches(task))
@@ -853,6 +884,7 @@ function normalizeReservationPageFilters(filters: {
   month?: string;
   year?: string;
   monthNumber?: string;
+  page?: string;
   pageSize?: string;
   sortBy?: string;
 }) {
@@ -866,10 +898,21 @@ function normalizeReservationPageFilters(filters: {
   return {
     q: filters.q,
     status: filters.status,
-    month: normalizedMonth && /^\d{4}-\d{2}$/.test(normalizedMonth) ? normalizedMonth : undefined,
+    month: normalizedMonth && /^\d{4}-\d{2}$/.test(normalizedMonth) ? normalizedMonth : currentCalendarMonth(),
+    page: normalizePositiveInteger(filters.page, 1),
     pageSize,
     sortBy
   };
+}
+
+function normalizePositiveInteger(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function currentCalendarMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function normalizePageSize(value: string | undefined) {
@@ -911,61 +954,120 @@ function formatCalendarMonth(month: Date) {
   return `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
 }
 
-async function loadReservations(filters: { q?: string; status?: string }): Promise<LoadState> {
+async function loadReservations(filters: {
+  q?: string;
+  status?: string;
+  month?: string;
+  page: number;
+  pageSize: number;
+  sortBy: string;
+}): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
-    return {
-      status: "ready",
-      reservations: filterDemoReservations(filters),
-      isPreview: true,
-      previewReason:
-        "Internal API access requires a Supabase internal-role JWT. Showing dummy group-status data so the reservation dashboard can be reviewed without login."
-    };
+    return buildDemoReservationState(filters, "Internal API access requires a Supabase internal-role JWT. Showing dummy group-status data so the reservation dashboard can be reviewed without login.");
   }
 
-  const response = await fetch(buildInternalApiUrl("/api/reservations", filters, headerStore), {
-    headers: { authorization },
-    cache: "no-store"
-  });
-  const payload = await response.json();
+  const [listResponse, dashboardResponse] = await Promise.all([
+    fetch(buildInternalApiUrl("/api/reservations", filters, headerStore, true), {
+      headers: { authorization },
+      cache: "no-store"
+    }),
+    fetch(buildInternalApiUrl("/api/reservations/dashboard", filters, headerStore, false), {
+      headers: { authorization },
+      cache: "no-store"
+    })
+  ]);
+  const [listPayload, dashboardPayload] = await Promise.all([listResponse.json(), dashboardResponse.json()]);
 
-  if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
-      return {
-        status: "ready",
-        reservations: filterDemoReservations(filters),
-        isPreview: true,
-        previewReason:
-          "The live reservation API rejected the current session. Showing dummy group-status data for preview."
-      };
+  if (!listResponse.ok || !dashboardResponse.ok) {
+    if ([listResponse.status, dashboardResponse.status].some((status) => status === 401 || status === 403)) {
+      return buildDemoReservationState(
+        filters,
+        "The live reservation API rejected the current session. Showing dummy group-status data for preview."
+      );
     }
     return {
       status: "error",
-      message: payload.error ?? "Unknown reservation API error"
+      message: listPayload.error ?? dashboardPayload.error ?? "Unknown reservation API error"
     };
   }
 
-  const reservations = payload.data ?? [];
-  if (reservations.length === 0) {
-    return {
-      status: "ready",
-      reservations: filterDemoReservations(filters),
-      isPreview: true,
-      previewReason:
-        "The live database returned no reservation rows yet. Showing dummy group-status data until confirmed groups are created from accepted quotations."
-    };
-  }
-
-  return { status: "ready", reservations, isPreview: false };
+  return {
+    status: "ready",
+    reservations: listPayload.data ?? [],
+    calendarReservations: dashboardPayload.data?.calendar ?? [],
+    dashboard: dashboardPayload.data,
+    pagination: listPayload.pagination,
+    calendarPagination: dashboardPayload.data?.calendarPagination,
+    month: dashboardPayload.data?.month ?? filters.month,
+    isPreview: false
+  };
 }
 
-function buildInternalApiUrl(path: string, filters: { q?: string; status?: string }, headerStore: Headers) {
+function buildInternalApiUrl(
+  path: string,
+  filters: { q?: string; status?: string; month?: string; page: number; pageSize: number; sortBy: string },
+  headerStore: Headers,
+  includeListControls: boolean
+) {
   const protocol = headerStore.get("x-forwarded-proto") ?? "http";
   const host = headerStore.get("host") ?? "localhost:3000";
   const url = new URL(path, `${protocol}://${host}`);
   if (filters.q) url.searchParams.set("q", filters.q);
   if (filters.status) url.searchParams.set("status", filters.status);
+  if (filters.month) url.searchParams.set("month", filters.month);
+  if (includeListControls) {
+    url.searchParams.set("page", String(filters.page));
+    url.searchParams.set("pageSize", String(filters.pageSize));
+    url.searchParams.set("sortBy", filters.sortBy);
+  }
   return url;
+}
+
+function buildDemoReservationState(
+  filters: { q?: string; status?: string; month?: string; page: number; pageSize: number; sortBy: string },
+  previewReason: string
+): LoadState {
+  const filtered = filterDemoReservations(filters);
+  const visibleMonth = resolveVisibleMonth(filters.month, filtered);
+  const calendarReservations = filtered.filter((reservation) => overlapsMonth(reservation, visibleMonth));
+  const sorted = sortReservations(filtered, filters.sortBy);
+  const from = (filters.page - 1) * filters.pageSize;
+  const reservations = sorted.slice(from, from + filters.pageSize);
+  return {
+    status: "ready",
+    reservations,
+    calendarReservations,
+    dashboard: buildDemoDashboard(filtered, visibleMonth),
+    pagination: buildPaginationMeta({ page: filters.page, pageSize: filters.pageSize }, filtered.length, reservations.length),
+    calendarPagination: buildPaginationMeta(
+      { page: 1, pageSize: 250 },
+      calendarReservations.length,
+      calendarReservations.length
+    ),
+    month: formatCalendarMonth(visibleMonth),
+    isPreview: true,
+    previewReason
+  };
+}
+
+function buildDemoDashboard(reservations: ReservationListItem[], visibleMonth: Date): ReservationDashboardData {
+  return {
+    metrics: {
+      totalGroups: reservations.length,
+      activeGroups: reservations.filter((reservation) => !["completed", "cancelled"].includes(reservation.status)).length,
+      totalPax: reservations.reduce((sum, reservation) => sum + resolvePaxNumber(reservation), 0),
+      incompleteGroups: reservations.filter((reservation) => !getReservationReadiness(reservation).complete).length,
+      unscheduledGroups: reservations.filter((reservation) => !reservation.tourStartDate && !reservation.tourEndDate).length
+    },
+    summaries: {
+      monthly: summarizeByMonth(reservations),
+      weekly: summarizeByWeek(reservations, visibleMonth),
+      yearly: summarizeByYear(reservations),
+      partner: summarizeByPartner(reservations),
+      country: summarizeByCountry(reservations)
+    }
+  };
 }
 
 function filterDemoReservations(filters: { q?: string; status?: string }) {

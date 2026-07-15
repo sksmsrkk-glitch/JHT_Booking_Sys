@@ -1,10 +1,10 @@
-import { writeAuditLog } from "@/lib/api/audit";
 import { requireAgencyUser } from "@/lib/api/auth";
 import { isDemoModeEnabled } from "@/lib/api/guards";
-import { created, fail, HttpError, ok, optionalPositiveInteger, optionalString, readJson, requireString } from "@/lib/api/http";
+import { created, fail, HttpError, okPaginated, optionalPositiveInteger, optionalString, readJson, requireString } from "@/lib/api/http";
+import { buildPaginationMeta, paginationRange, parsePagination } from "@/lib/api/pagination";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
-import { ensureWorkflowThread, getWorkflowThreadByCode } from "@/features/workflow/queries";
 import { makeWorkflowCode } from "@/lib/domain/workflow-code.mjs";
+import { instrumentApiRoute } from "@/lib/api/telemetry";
 
 const ALLOWED_INQUIRY_TYPES = [
   "new_inquiry",
@@ -15,23 +15,26 @@ const ALLOWED_INQUIRY_TYPES = [
   "existing_product_inquiry"
 ];
 
-export async function GET(request: Request) {
+export const GET = instrumentApiRoute("GET /api/agency/inquiries", async (request: Request) => {
   try {
+    const pagination = parsePagination(new URL(request.url).searchParams);
+    const { from, to } = paginationRange(pagination);
     const supabase = createRequestSupabaseClient(request);
     const agencyUser = await requireAgencyUser(supabase);
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from("agency_inquiries")
-      .select("id, inquiry_type, title, tour_code, arrival_date, departure_date, period_text, nights_count, flight_details, requested_start_date, requested_end_date, pax_count, tour_type, status, related_quote_case_id, created_at")
+      .select("id, inquiry_type, title, tour_code, arrival_date, departure_date, period_text, nights_count, flight_details, requested_start_date, requested_end_date, pax_count, tour_type, status, related_quote_case_id, created_at", { count: "exact" })
       .eq("agency_account_id", agencyUser.agencyAccountId)
       .order("created_at", { ascending: false })
-      .limit(100);
+      .range(from, to);
 
     if (error) throw new HttpError(500, error.message);
-    return ok(data);
+    const items = data ?? [];
+    return okPaginated(items, buildPaginationMeta(pagination, count, items.length));
   } catch (error) {
     return fail(error);
   }
-}
+});
 
 export async function POST(request: Request) {
   try {
@@ -79,69 +82,38 @@ export async function POST(request: Request) {
     if (relatedTourCode) await assertWorkflowBelongsToAgency(supabase, relatedTourCode, agencyUser.agencyAccountId);
     const tourCode = relatedTourCode ?? makeWorkflowCode({ countryCode: agencyAccount.country_code ?? "XX", agencyName: agencyAccount.name });
 
-    const { data, error } = await supabase
-      .from("agency_inquiries")
-      .insert({
-        agency_account_id: agencyUser.agencyAccountId,
-        submitted_by_agency_user_id: agencyUser.agencyUserId,
-        inquiry_type: inquiryType,
-        title,
-        tour_code: tourCode,
-        arrival_date: optionalString(body.arrivalDate),
-        departure_date: optionalString(body.departureDate),
-        period_text: optionalString(body.periodText),
-        nights_count: optionalPositiveInteger(body.nightsCount, "nightsCount"),
-        flight_details: flightDetails,
-        requested_start_date: optionalString(body.arrivalDate) ?? optionalString(body.requestedStartDate),
-        requested_end_date: optionalString(body.departureDate) ?? optionalString(body.requestedEndDate),
-        pax_count: optionalPositiveInteger(body.paxCount, "paxCount"),
-        preferred_language: optionalString(body.preferredLanguage),
-        tour_type: optionalString(body.tourType),
-        source_channel: "portal",
-        request_payload: {
-          ...requestPayload,
-          tourCode,
-          relatedTourCode,
-          countryCode: agencyAccount.country_code,
-          countryName: requestPayload.countryName ?? null,
-          agencyName: agencyAccount.name,
-          billingCurrency: agencyAccount.billing_currency
-        }
-      })
-      .select("id, inquiry_type, title, tour_code, status, created_at")
-      .single();
-
+    const canonicalPayload = {
+      ...requestPayload,
+      tourCode,
+      relatedTourCode,
+      countryCode: agencyAccount.country_code,
+      countryName: requestPayload.countryName ?? null,
+      agencyName: agencyAccount.name,
+      billingCurrency: agencyAccount.billing_currency
+    };
+    // 문의, workflow, 첫 메시지, 감사 로그를 인증 사용자를 재검증하는 DB 함수에서 함께 저장합니다.
+    const { data: result, error } = await supabase.rpc("submit_agency_inquiry_atomic", {
+      p_agency_account_id: agencyUser.agencyAccountId,
+      p_agency_user_id: agencyUser.agencyUserId,
+      p_inquiry_type: inquiryType,
+      p_title: title,
+      p_tour_code: tourCode,
+      p_arrival_date: optionalString(body.arrivalDate),
+      p_departure_date: optionalString(body.departureDate),
+      p_period_text: optionalString(body.periodText),
+      p_nights_count: optionalPositiveInteger(body.nightsCount, "nightsCount"),
+      p_flight_details: flightDetails,
+      p_pax_count: optionalPositiveInteger(body.paxCount, "paxCount"),
+      p_preferred_language: optionalString(body.preferredLanguage),
+      p_tour_type: optionalString(body.tourType),
+      p_request_payload: canonicalPayload,
+      p_message_body: buildInquiryMessage(body, requestPayload),
+      p_idempotency_key: request.headers.get("idempotency-key")?.trim() || null
+    });
     if (error) throw new HttpError(500, error.message);
-    const existingThread = await getWorkflowThreadByCode(supabase, tourCode);
-    if (!existingThread) {
-      await ensureWorkflowThread(supabase, {
-        workflowCode: tourCode,
-        title,
-        agencyAccountId: agencyUser.agencyAccountId,
-        agencyInquiryId: data.id,
-        createdBy: null
-      });
-    }
-    await appendInquiryMessage(supabase, {
-      workflowCode: tourCode,
-      agencyUser,
-      inquiryId: data.id,
-      inquiryType,
-      title,
-      body: buildInquiryMessage(body, requestPayload)
-    });
-    await writeAuditLog(supabase, {
-      actorProfileId: null,
-      action: "agency_inquiry.submitted",
-      entityTable: "agency_inquiries",
-      entityId: data.id,
-      afterData: {
-        agencyAccountId: agencyUser.agencyAccountId,
-        agencyUserId: agencyUser.agencyUserId,
-        inquiry: data
-      }
-    });
-    return created({ ...data, tourCode: data.tour_code });
+    const inquiry = result?.inquiry;
+    if (!inquiry?.id) throw new HttpError(500, "Inquiry was not returned");
+    return created({ ...inquiry, tourCode: inquiry.tour_code, existing: Boolean(result?.existing) });
   } catch (error) {
     return fail(error);
   }
@@ -156,36 +128,6 @@ async function assertWorkflowBelongsToAgency(supabase: any, workflowCode: string
     .maybeSingle();
   if (error) throw new HttpError(500, error.message);
   if (!data) throw new HttpError(404, "Related tour code was not found for this partner account");
-}
-
-async function appendInquiryMessage(supabase: any, input: any) {
-  const { data: thread, error: threadError } = await supabase
-    .from("workflow_threads")
-    .select("id")
-    .eq("workflow_code", input.workflowCode)
-    .single();
-  if (threadError) throw new HttpError(500, threadError.message);
-  const { data: message, error: messageError } = await supabase
-    .from("workflow_messages")
-    .insert({
-      workflow_thread_id: thread.id,
-      sender_type: "agency",
-      sender_agency_user_id: input.agencyUser.agencyUserId,
-      sender_name: input.agencyUser.name,
-      sender_email: input.agencyUser.email,
-      message_type: input.inquiryType === "new_inquiry" ? "new_inquiry" : input.inquiryType === "cancellation_request" ? "cancellation" : "quote_revision",
-      body: input.body,
-      visibility: "partner_visible",
-      metadata: { agency_inquiry_id: input.inquiryId }
-    })
-    .select("created_at")
-    .single();
-  if (messageError) throw new HttpError(500, messageError.message);
-  const { error: updateError } = await supabase
-    .from("workflow_threads")
-    .update({ status: "waiting_internal", last_message_at: message.created_at })
-    .eq("id", thread.id);
-  if (updateError) throw new HttpError(500, updateError.message);
 }
 
 function buildInquiryMessage(body: Record<string, unknown>, requestPayload: Record<string, unknown>) {

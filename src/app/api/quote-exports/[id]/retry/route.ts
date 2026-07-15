@@ -20,7 +20,12 @@ export async function POST(request: Request, context: RouteContext) {
 
     if (beforeError) throw new HttpError(500, beforeError.message);
 
-    const update = buildRetryUpdate(before);
+    const update = {
+      ...buildRetryUpdate(before),
+      locked_at: null,
+      locked_by: null,
+      lease_expires_at: null
+    };
     const { data, error } = await supabase
       .from("quote_exports")
       .update(update)

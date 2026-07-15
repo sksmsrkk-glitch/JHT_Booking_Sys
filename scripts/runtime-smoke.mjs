@@ -8,7 +8,8 @@ const baseUrl = `http://127.0.0.1:${port}`;
 const requestTimeoutMs = Number(process.env.SMOKE_REQUEST_TIMEOUT_MS ?? 15000);
 const nextCliPath = "node_modules/next/dist/bin/next";
 const apiRoot = resolve("src/app/api");
-const handlerMethodPattern = /\bexport\s+async\s+function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*\(/g;
+const handlerMethodPattern =
+  /\bexport\s+(?:async\s+function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*\(|const\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*=\s*instrumentApiRoute\([^,]+,\s*async\s*\()/g;
 const smokeUuid = "00000000-0000-4000-8000-000000000001";
 const mutationSmokePayload = {
   action: "approve",
@@ -315,7 +316,7 @@ function findExportedHandlers(source) {
   const handlers = [];
   let match;
   while ((match = handlerMethodPattern.exec(source)) !== null) {
-    const method = match[1];
+    const method = match[1] ?? match[2];
     const bodyStart = findFunctionBodyStart(source, handlerMethodPattern.lastIndex - 1);
     if (bodyStart === -1) {
       handlers.push({ method, body: "" });

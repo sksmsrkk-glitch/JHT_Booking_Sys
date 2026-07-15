@@ -4,16 +4,20 @@ import { getPageAuthorization } from "@/lib/api/page-session";
 import { INVOICE_STATUSES } from "@/features/finance/queries";
 import type { InvoiceListItem } from "@/features/finance/types";
 import { demoFinanceInvoices } from "@/features/finance/demo-invoices";
+import { PaginationControls } from "@/components/PaginationControls";
+import { buildPaginationMeta, type PaginationMeta } from "@/lib/api/pagination";
 
 export const dynamic = "force-dynamic";
 
 type SearchParams = Promise<{
   q?: string;
   status?: string;
+  page?: string;
+  pageSize?: string;
 }>;
 
 type LoadState =
-  | { status: "ready"; invoices: InvoiceListItem[]; isPreview?: boolean }
+  | { status: "ready"; invoices: InvoiceListItem[]; pagination: PaginationMeta; isPreview?: boolean }
   | { status: "auth-required"; message: string }
   | { status: "error"; message: string };
 
@@ -45,6 +49,8 @@ export default async function AdminFinancePage({ searchParams }: { searchParams:
           Search
           <input type="search" name="q" defaultValue={filters.q ?? ""} placeholder="Invoice number" />
         </label>
+        <input name="page" type="hidden" value="1" />
+        <input name="pageSize" type="hidden" value={filters.pageSize ?? "20"} />
         <label>
           Status
           <select name="status" defaultValue={filters.status ?? ""}>
@@ -96,7 +102,16 @@ export default async function AdminFinancePage({ searchParams }: { searchParams:
         </section>
       ) : null}
 
-      {loadState.status === "ready" ? <InvoiceTable invoices={loadState.invoices} /> : null}
+      {loadState.status === "ready" ? (
+        <>
+          <InvoiceTable invoices={loadState.invoices} />
+          <PaginationControls
+            action="/admin/finance/invoices"
+            pagination={loadState.pagination}
+            searchParams={{ q: filters.q, status: filters.status }}
+          />
+        </>
+      ) : null}
 
       <section className="notice">
         <h2>Boundary Guardrails</h2>
@@ -127,7 +142,7 @@ function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
     <>
       <section className="metric-row">
         <article className="metric-card">
-          <span>Invoices</span>
+          <span>Visible invoices</span>
           <strong>{invoices.length}</strong>
         </article>
         <article className="metric-card">
@@ -203,10 +218,10 @@ function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
   );
 }
 
-async function loadInvoices(filters: { q?: string; status?: string }): Promise<LoadState> {
+async function loadInvoices(filters: { q?: string; status?: string; page?: string; pageSize?: string }): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
-    return { status: "ready", invoices: demoFinanceInvoices, isPreview: true };
+    return { status: "ready", invoices: demoFinanceInvoices, pagination: previewPagination(demoFinanceInvoices.length), isPreview: true };
   }
 
   const response = await fetch(buildInternalApiUrl("/api/finance/invoices", filters, headerStore), {
@@ -217,7 +232,7 @@ async function loadInvoices(filters: { q?: string; status?: string }): Promise<L
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
-      return { status: "ready", invoices: demoFinanceInvoices, isPreview: true };
+      return { status: "ready", invoices: demoFinanceInvoices, pagination: previewPagination(demoFinanceInvoices.length), isPreview: true };
     }
     return {
       status: "error",
@@ -225,16 +240,22 @@ async function loadInvoices(filters: { q?: string; status?: string }): Promise<L
     };
   }
 
-  return { status: "ready", invoices: payload.data ?? [] };
+  return { status: "ready", invoices: payload.data ?? [], pagination: payload.pagination };
 }
 
-function buildInternalApiUrl(path: string, filters: { q?: string; status?: string }, headerStore: Headers) {
+function buildInternalApiUrl(path: string, filters: { q?: string; status?: string; page?: string; pageSize?: string }, headerStore: Headers) {
   const protocol = headerStore.get("x-forwarded-proto") ?? "http";
   const host = headerStore.get("host") ?? "localhost:3000";
   const url = new URL(path, `${protocol}://${host}`);
   if (filters.q) url.searchParams.set("q", filters.q);
   if (filters.status) url.searchParams.set("status", filters.status);
+  if (filters.page) url.searchParams.set("page", filters.page);
+  if (filters.pageSize) url.searchParams.set("pageSize", filters.pageSize);
   return url;
+}
+
+function previewPagination(total: number) {
+  return buildPaginationMeta({ page: 1, pageSize: 20 }, total, total);
 }
 
 function formatLabel(value: string) {

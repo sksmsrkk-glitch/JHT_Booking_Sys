@@ -126,6 +126,13 @@ export const READINESS_ENV_CHECKS = [
     group: "Security"
   },
   {
+    key: "api_slow_request_ms",
+    label: "Slow API warning threshold",
+    envName: "API_SLOW_REQUEST_MS",
+    required: false,
+    group: "Operations"
+  },
+  {
     key: "signup_rate_limit_secret",
     label: "Partner sign-up rate-limit hash secret",
     envName: "SIGNUP_RATE_LIMIT_SECRET",

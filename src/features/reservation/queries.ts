@@ -1,5 +1,6 @@
 import type {
   ReservationDetail,
+  ReservationDashboardData,
   ReservationFilters,
   ReservationListItem,
   ReservationOperationTaskItem,
@@ -10,10 +11,20 @@ import type {
   ReservationSupplierOption,
   ReservationStatusHistoryItem
 } from "./types";
+import {
+  buildPaginationMeta,
+  paginationRange,
+  type PaginatedResult,
+  type PaginationInput
+} from "@/lib/api/pagination";
 
 type SupabaseClientLike = {
   from: (table: string) => any;
+  rpc: (name: string, args?: Record<string, unknown>) => any;
 };
+
+const reservationListColumns =
+  "id, reservation_code, status, tour_start_date, tour_end_date, confirmed_at, cancelled_at, operation_ready, operation_missing, agency_account_id, quote_case_id, created_at, agency_accounts(name), quote_cases(case_code, tour_name, estimated_pax), operation_tasks(id, team, task_type, status), rooming_lists(id)";
 
 /*
  * 예약 조회 레이어입니다.
@@ -42,9 +53,7 @@ export async function listReservations(
 
   let query = supabase
     .from("reservations")
-    .select(
-      "id, reservation_code, status, tour_start_date, tour_end_date, confirmed_at, cancelled_at, agency_account_id, quote_case_id, created_at, agency_accounts(name), quote_cases(case_code, tour_name, estimated_pax), operation_tasks(id, team, task_type, status), rooming_lists(id)"
-    )
+    .select(reservationListColumns)
     .limit(100);
 
   if (status) {
@@ -65,6 +74,77 @@ export async function listReservations(
   }
 
   return (data ?? []).map(mapReservationListItem);
+}
+
+/** 운영 목록은 정렬과 검색을 DB에서 수행하고 현재 페이지 행만 반환합니다. */
+export async function listReservationPage(
+  supabase: SupabaseClientLike,
+  filters: ReservationFilters & { sortBy?: string },
+  pagination: PaginationInput
+): Promise<PaginatedResult<ReservationListItem>> {
+  const q = normalizeSearchTerm(filters.q);
+  const status = normalizeEnum(filters.status, RESERVATION_STATUSES);
+  const { from, to } = paginationRange(pagination);
+  let query = supabase.from("reservations").select(reservationListColumns, { count: "exact" });
+
+  if (status) query = query.eq("status", status);
+  if (filters.agencyAccountId) query = query.eq("agency_account_id", filters.agencyAccountId);
+  if (q) query = applyReservationSearch(query, q, await resolveReservationSearchScope(supabase, q));
+
+  query = applyReservationSort(query, filters.sortBy).range(from, to);
+  const { data, error, count } = await query;
+  if (error) throw new Error(error.message);
+
+  const items = (data ?? []).map(mapReservationListItem);
+  return { items, pagination: buildPaginationMeta(pagination, count, items.length) };
+}
+
+/** 선택한 달력 범위만 읽고 렌더링 상한을 둬 한 달에 단체가 급증해도 브라우저를 보호합니다. */
+export async function listReservationCalendar(
+  supabase: SupabaseClientLike,
+  filters: ReservationFilters,
+  range: { start: string; end: string; maxItems?: number }
+): Promise<PaginatedResult<ReservationListItem>> {
+  const q = normalizeSearchTerm(filters.q);
+  const status = normalizeEnum(filters.status, RESERVATION_STATUSES);
+  const pageSize = Math.min(Math.max(range.maxItems ?? 250, 1), 500);
+  let query = supabase
+    .from("reservations")
+    .select(reservationListColumns, { count: "exact" })
+    .or(
+      `and(tour_start_date.lte.${range.end},tour_end_date.gte.${range.start}),` +
+        `and(tour_start_date.is.null,tour_end_date.gte.${range.start},tour_end_date.lte.${range.end}),` +
+        `and(tour_end_date.is.null,tour_start_date.gte.${range.start},tour_start_date.lte.${range.end})`
+    );
+
+  if (status) query = query.eq("status", status);
+  if (filters.agencyAccountId) query = query.eq("agency_account_id", filters.agencyAccountId);
+  if (q) query = applyReservationSearch(query, q, await resolveReservationSearchScope(supabase, q));
+
+  const { data, error, count } = await query
+    .order("tour_start_date", { ascending: true, nullsFirst: false })
+    .range(0, pageSize - 1);
+  if (error) throw new Error(error.message);
+
+  const items = (data ?? []).map(mapReservationListItem);
+  return {
+    items,
+    pagination: buildPaginationMeta({ page: 1, pageSize }, count, items.length)
+  };
+}
+
+/** 대시보드 집계는 DB 함수에서 완료해 전체 예약 행을 Node 서버로 전송하지 않습니다. */
+export async function getReservationDashboard(
+  supabase: SupabaseClientLike,
+  filters: ReservationFilters & { monthStart: string }
+): Promise<ReservationDashboardData> {
+  const { data, error } = await supabase.rpc("get_reservation_dashboard", {
+    p_q: normalizeSearchTerm(filters.q) || null,
+    p_status: normalizeEnum(filters.status, RESERVATION_STATUSES),
+    p_month_start: filters.monthStart
+  });
+  if (error) throw new Error(error.message);
+  return normalizeReservationDashboard(data);
 }
 
 export async function getReservationDetail(
@@ -213,7 +293,70 @@ function mapReservationListItem(row: any): ReservationListItem {
       : [],
     taskCount: Array.isArray(row.operation_tasks) ? row.operation_tasks.length : 0,
     roomingListCount: Array.isArray(row.rooming_lists) ? row.rooming_lists.length : 0,
+    operationReady: Boolean(row.operation_ready),
+    operationMissing: Array.isArray(row.operation_missing) ? row.operation_missing.map(String) : [],
     createdAt: row.created_at
+  };
+}
+
+function applyReservationSort(query: any, sortBy: string | undefined) {
+  if (sortBy === "start_desc") return query.order("tour_start_date", { ascending: false, nullsFirst: false });
+  if (sortBy === "incomplete_first") {
+    return query
+      .order("operation_ready", { ascending: true })
+      .order("tour_start_date", { ascending: true, nullsFirst: false });
+  }
+  if (sortBy === "status") {
+    return query.order("status", { ascending: true }).order("tour_start_date", { ascending: true, nullsFirst: false });
+  }
+  if (sortBy === "created_desc") return query.order("created_at", { ascending: false });
+  return query.order("tour_start_date", { ascending: true, nullsFirst: false });
+}
+
+function applyReservationSearch(query: any, q: string, scope: { quoteCaseIds: string[]; agencyAccountIds: string[] }) {
+  const clauses = [`reservation_code.ilike.%${q}%`];
+  if (scope.quoteCaseIds.length > 0) clauses.push(`quote_case_id.in.(${scope.quoteCaseIds.join(",")})`);
+  if (scope.agencyAccountIds.length > 0) clauses.push(`agency_account_id.in.(${scope.agencyAccountIds.join(",")})`);
+  return query.or(clauses.join(","));
+}
+
+async function resolveReservationSearchScope(supabase: SupabaseClientLike, q: string) {
+  const [{ data: quoteCases, error: quoteError }, { data: agencies, error: agencyError }] = await Promise.all([
+    supabase.from("quote_cases").select("id").or(`case_code.ilike.%${q}%,tour_name.ilike.%${q}%`).limit(250),
+    supabase.from("agency_accounts").select("id").ilike("name", `%${q}%`).limit(250)
+  ]);
+  if (quoteError) throw new Error(quoteError.message);
+  if (agencyError) throw new Error(agencyError.message);
+  return {
+    quoteCaseIds: (quoteCases ?? []).map((row: any) => String(row.id)),
+    agencyAccountIds: (agencies ?? []).map((row: any) => String(row.id))
+  };
+}
+
+function normalizeReservationDashboard(value: any): ReservationDashboardData {
+  const metrics = value?.metrics ?? {};
+  const summaries = value?.summaries ?? {};
+  const rows = (items: unknown) =>
+    (Array.isArray(items) ? items : []).map((item: any) => ({
+      label: String(item.label ?? "Unspecified"),
+      groups: Number(item.groups ?? 0),
+      pax: Number(item.pax ?? 0)
+    }));
+  return {
+    metrics: {
+      totalGroups: Number(metrics.totalGroups ?? 0),
+      activeGroups: Number(metrics.activeGroups ?? 0),
+      totalPax: Number(metrics.totalPax ?? 0),
+      incompleteGroups: Number(metrics.incompleteGroups ?? 0),
+      unscheduledGroups: Number(metrics.unscheduledGroups ?? 0)
+    },
+    summaries: {
+      monthly: rows(summaries.monthly),
+      weekly: rows(summaries.weekly),
+      yearly: rows(summaries.yearly),
+      partner: rows(summaries.partner),
+      country: rows(summaries.country)
+    }
   };
 }
 

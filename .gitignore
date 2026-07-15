@@ -9,5 +9,7 @@ dev-server*.log
 .env.*.local
 supabase/.branches/
 supabase/.temp/
+playwright-report/
+test-results/
 
 .vercel

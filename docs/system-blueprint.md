@@ -1711,3 +1711,38 @@ System implementation:
 - Submitted report lines upsert into `expenses` through `source_guide_expense_report_line_id`, preventing duplicate settlement costs.
 - Settlement profit analysis compares invoice final revenue against guide-entered actual costs, extra revenues, shopping commissions, and payments.
 - Agency users never query guide expense reports, `expenses`, or settlement internals.
+
+## 17. 대규모 운영 확장 설계
+
+### 17.1 읽기 경로
+
+- 핵심 목록 API는 기본 20, 최대 100행 pagination을 사용한다.
+- 검색과 정렬은 DB에서 실행하고 화면에서 전체 데이터를 다시 필터링하지 않는다.
+- 예약 KPI는 `get_reservation_dashboard`가 전체 필터 집합을 집계하며 현재 페이지 행을 합산하지 않는다.
+- 월 달력은 선택 월만 조회한다.
+- `202607150001_scalability_query_indexes.sql`의 복합/trigram 인덱스가 목록 접근 경로를 지원한다.
+
+### 17.2 쓰기 경로
+
+- 파트너 문의: `submit_agency_inquiry_atomic`
+- Notion CSV staging: `stage_notion_csv_batch_atomic`
+- 인보이스 버전 발행: `create_invoice_version_atomic`
+- workflow 메시지와 action: `append_workflow_message_v2`
+
+모든 사용자 재시도 요청은 `idempotency-key`로 중복을 방지한다. 애플리케이션에서 실패 후 delete하는 보상 로직보다 DB 트랜잭션을 우선한다.
+
+### 17.3 Worker 경계
+
+```mermaid
+flowchart LR
+  Queue["quote_exports queued"] --> Claim["claim_quote_export_jobs"]
+  Claim --> Node["Node worker"]
+  Claim -. "향후 임계치 충족" .-> Java["Java worker"]
+  Node --> Finish["finish_quote_export_job"]
+  Java --> Finish
+  Finish --> Done["completed / failed"]
+```
+
+claim은 `FOR UPDATE SKIP LOCKED`와 만료 가능한 lease를 사용한다. 따라서 여러 worker를 수평 확장해도 동일 작업을 동시에 처리하지 않는다. Java는 웹 CRUD 대체재가 아니라 무거운 비동기 작업의 선택적 실행 엔진이다.
+
+상세 성능 예산과 전환 조건은 `docs/performance-scalability.md`, `docs/java-hybrid-decision.md`를 따른다.

@@ -12,6 +12,7 @@
     "tunnel:cloudflare": "cloudflared tunnel --url http://localhost:3100",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.mjs",
+    "test:e2e": "playwright test",
     "verify:env": "node scripts/verify-env.mjs",
     "verify:schema": "node scripts/verify-schema.mjs",
     "verify:seed": "node scripts/verify-seed.mjs",
@@ -27,6 +28,7 @@
     "convert:notion-md": "node scripts/convert-notion-markdown-export.mjs",
     "seed:hosted-demo-auth": "node scripts/seed-hosted-demo-auth.mjs",
     "smoke:runtime": "node scripts/runtime-smoke.mjs",
+    "smoke:load": "node scripts/load-smoke.mjs",
     "verify": "npm run test && npm run typecheck",
     "verify:v1": "npm run verify:env && npm run verify:schema && npm run verify:seed && npm run verify:api-guards && npm run verify:api-body-order && npm run verify:api-responses && npm run verify:api-contract && npm run verify:repo-safety && npm run verify:security-config && npm run verify:launch-runbook && npm run verify:page-smoke && npm run verify:app-route-smoke && npm run test && npm run typecheck && npm run build && npm run smoke:runtime"
   },
@@ -40,6 +42,7 @@
     "postcss": "^8.5.10"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/node": "^22.15.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

@@ -3,7 +3,8 @@ import { relative, resolve, sep } from "node:path";
 
 const apiRoot = resolve("src/app/api");
 const contractPath = resolve("docs/api-contract.md");
-const httpMethodPattern = /\bexport\s+async\s+function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*\(/g;
+const httpMethodPattern =
+  /\bexport\s+(?:async\s+function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*\(|const\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*=\s*instrumentApiRoute\([^,]+,\s*async\s*\()/g;
 const documentedApiPattern = /`(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/api\/[^` ]+)`/g;
 
 const documentedApis = readDocumentedApis();
@@ -41,7 +42,7 @@ function readImplementedApis() {
     const source = readFileSync(filePath, "utf8");
     let match;
     while ((match = httpMethodPattern.exec(source)) !== null) {
-      entries.add(normalizeImplementedEntry(`${match[1]} ${routePath}`));
+      entries.add(normalizeImplementedEntry(`${match[1] ?? match[2]} ${routePath}`));
     }
   }
   return entries;

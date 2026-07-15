@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { sanitizeApiLogPayload } from "@/lib/domain/api-log.mjs";
+import type { PaginationMeta } from "./pagination";
 
 // 운영/회계/파트너 데이터는 화면마다 최신 상태가 중요하므로 API JSON 응답은 기본적으로 캐시하지 않습니다.
 const noStoreHeaders = { "Cache-Control": "no-store" };
@@ -43,6 +44,10 @@ export class HttpError extends Error {
 
 export function ok(data: unknown, init?: ResponseInit) {
   return jsonResponse({ data }, init);
+}
+
+export function okPaginated(data: unknown[], pagination: PaginationMeta, init?: ResponseInit) {
+  return jsonResponse({ data, pagination }, init);
 }
 
 export function created(data: unknown) {

@@ -1,27 +1,35 @@
-import { listReservations } from "@/features/reservation/queries";
+import { listReservationPage } from "@/features/reservation/queries";
 import { requireInternalUser } from "@/lib/api/auth";
-import { fail, ok } from "@/lib/api/http";
+import { fail, ok, okPaginated } from "@/lib/api/http";
 import { writeAuditLog } from "@/lib/api/audit";
 import { created, HttpError, readJson, requireUuid } from "@/lib/api/http";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
+import { parsePagination } from "@/lib/api/pagination";
+import { instrumentApiRoute } from "@/lib/api/telemetry";
 
-export async function GET(request: Request) {
+export const GET = instrumentApiRoute("GET /api/reservations", async (request: Request) => {
   try {
     const supabase = createRequestSupabaseClient(request);
     await requireInternalUser(supabase);
 
     const url = new URL(request.url);
-    const reservations = await listReservations(supabase, {
-      q: url.searchParams.get("q") ?? undefined,
-      status: url.searchParams.get("status") ?? undefined,
-      agencyAccountId: url.searchParams.get("agencyAccountId") ?? undefined
-    });
+    const pagination = parsePagination(url.searchParams);
+    const reservations = await listReservationPage(
+      supabase,
+      {
+        q: url.searchParams.get("q") ?? undefined,
+        status: url.searchParams.get("status") ?? undefined,
+        agencyAccountId: url.searchParams.get("agencyAccountId") ?? undefined,
+        sortBy: url.searchParams.get("sortBy") ?? undefined
+      },
+      pagination
+    );
 
-    return ok(reservations);
+    return okPaginated(reservations.items, reservations.pagination);
   } catch (error) {
     return fail(error);
   }
-}
+});
 
 export async function POST(request: Request) {
   try {

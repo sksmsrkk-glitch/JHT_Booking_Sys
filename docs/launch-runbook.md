@@ -64,6 +64,12 @@ If Supabase CLI is unavailable, apply the SQL files in this order through the Su
 21. `supabase/migrations/202607130001_partner_auth_lifecycle.sql`
 22. `supabase/migrations/202607130002_canonical_workflow_code.sql`
 23. `supabase/migrations/202607130003_account_recovery.sql`
+24. `supabase/migrations/202607150001_scalability_query_indexes.sql`
+25. `supabase/migrations/202607150002_reservation_readiness_dashboard.sql`
+26. `supabase/migrations/202607150003_atomic_writes_idempotency.sql`
+27. `supabase/migrations/202607150004_atomic_partner_inquiry.sql`
+28. `supabase/migrations/202607150005_hybrid_worker_contract.sql`
+29. `supabase/migrations/202607150006_worker_atomic_finish_audit.sql`
 
 After migration, open `/admin/readiness` with an internal admin account and confirm database smoke checks are ready.
 
@@ -242,3 +248,18 @@ The v1 handoff is ready when all of these are true:
 - Failed jobs are visible in `/admin/automation/failed-jobs`.
 - API traces are visible in `/admin/audit/api-logs`.
 - Agency Portal boundary QA passes with a real agency user.
+
+## 12. Scalability And Worker Acceptance
+
+프로덕션 배포 전 다음 확장성 항목을 추가 확인한다.
+
+1. `202607150001`부터 `202607150006`까지의 migration이 대상 Supabase에 적용되었는지 확인한다.
+2. `npx supabase db lint --linked` 또는 안전한 staging local lint를 통과시킨다.
+3. staging에서 `npm run test:e2e`를 데스크톱과 모바일 프로젝트 모두 실행한다.
+4. 테스트 JWT로 `npm run smoke:load`를 실행하고 인증 API p95가 750ms 이하인지 확인한다.
+5. 동일 `idempotency-key`로 문의, CSV staging, 인보이스 요청을 재시도했을 때 동일 ID가 반환되는지 확인한다.
+6. quote export worker 두 개를 동시에 실행했을 때 같은 job ID를 claim하지 않는지 확인한다.
+7. worker가 강제 종료된 경우 lease 만료 후 job이 다시 claim되는지 확인한다.
+8. 운영 secret에 `API_SLOW_REQUEST_MS`, `AUTOMATION_SECRET`, Storage credential이 설정되었는지 확인한다.
+
+Java worker는 `docs/java-hybrid-decision.md`의 트리거를 충족하고 staging canary 비교가 끝나기 전에는 배포하지 않는다.

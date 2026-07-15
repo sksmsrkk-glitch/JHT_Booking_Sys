@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { buildCurrencyOptions, DEFAULT_COUNTRY_REFERENCES, mergeCountryReferences } from "@/features/countries/defaults";
 import type { CountryReference } from "@/features/countries/types";
 
@@ -24,6 +24,7 @@ export function InquiryCreateForm() {
   const [billingCurrency, setBillingCurrency] = useState("MYR");
   const [agencyName, setAgencyName] = useState("Agency");
   const [hasAgencyContext, setHasAgencyContext] = useState(false);
+  const idempotencyKeyRef = useRef<string | null>(null);
   const selectedCountry = countryOptions.find((country) => country.countryCode === selectedCountryCode);
   const currencyOptions = useMemo(() => buildCurrencyOptions(countryOptions, selectedCountry?.defaultCurrency ?? billingCurrency), [
     billingCurrency,
@@ -67,10 +68,11 @@ export function InquiryCreateForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formElement = event.currentTarget;
     setIsSubmitting(true);
     setMessage("");
 
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     const countryCode = selectedCountryCode;
     const normalizedBillingCurrency = String(form.get("billingCurrency") ?? billingCurrency).trim().toUpperCase() || "KRW";
     const flightDetails = [
@@ -121,22 +123,31 @@ export function InquiryCreateForm() {
       }
     };
 
-    const response = await fetch("/api/agency/inquiries", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    const result = await response.json();
+    const idempotencyKey = idempotencyKeyRef.current ?? crypto.randomUUID();
+    idempotencyKeyRef.current = idempotencyKey;
+    try {
+      const response = await fetch("/api/agency/inquiries", {
+        method: "POST",
+        headers: { "content-type": "application/json", "idempotency-key": idempotencyKey },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
 
-    if (!response.ok) {
-      setMessage(result.error ?? "Inquiry submission failed");
+      if (!response.ok) {
+        setMessage(result.error ?? "Inquiry submission failed");
+        setIsSubmitting(false);
+        return;
+      }
+
+      idempotencyKeyRef.current = null;
+      setMessage(`Inquiry submitted. Tour code: ${result.data?.tourCode ?? result.data?.tour_code ?? "Created"}`);
+      formElement.reset();
       setIsSubmitting(false);
-      return;
+    } catch {
+      // 네트워크 오류 재시도 시 같은 키를 유지해 이미 저장된 문의가 중복 생성되지 않게 합니다.
+      setMessage("Network error while submitting the inquiry. Please retry.");
+      setIsSubmitting(false);
     }
-
-    setMessage(`Inquiry submitted. Tour code: ${result.data?.tourCode ?? result.data?.tour_code ?? "Created"}`);
-    event.currentTarget.reset();
-    setIsSubmitting(false);
   }
 
   return (

@@ -1,29 +1,32 @@
 import { requireInternalUser } from "@/lib/api/auth";
 import { writeAuditLog } from "@/lib/api/audit";
-import { created, fail, HttpError, ok, readJson, requireArray, requireString, requireUuid } from "@/lib/api/http";
+import { created, fail, HttpError, ok, okPaginated, readJson, requireArray, requireString, requireUuid } from "@/lib/api/http";
+import { parsePagination } from "@/lib/api/pagination";
 import { makeShareId } from "@/lib/domain/ids";
 import { makeWorkflowCode } from "@/lib/domain/workflow-code.mjs";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
-import { listQuoteCases } from "@/features/quotation/queries";
+import { listQuoteCasePage } from "@/features/quotation/queries";
 import { calculateQuoteItemInput, roundMoney, toQuoteItemRow, type QuoteItemInput } from "@/features/quotation/input";
+import { instrumentApiRoute } from "@/lib/api/telemetry";
 
-export async function GET(request: Request) {
+export const GET = instrumentApiRoute("GET /api/quote-cases", async (request: Request) => {
   try {
     const supabase = createRequestSupabaseClient(request);
     await requireInternalUser(supabase);
 
     const url = new URL(request.url);
-    const quoteCases = await listQuoteCases(supabase, {
+    const pagination = parsePagination(url.searchParams);
+    const quoteCases = await listQuoteCasePage(supabase, {
       q: url.searchParams.get("q") ?? undefined,
       status: url.searchParams.get("status") ?? undefined,
       agencyAccountId: url.searchParams.get("agencyAccountId") ?? undefined
-    });
+    }, pagination);
 
-    return ok(quoteCases);
+    return okPaginated(quoteCases.items, quoteCases.pagination);
   } catch (error) {
     return fail(error);
   }
-}
+});
 
 export async function POST(request: Request) {
   let supabase: ReturnType<typeof createRequestSupabaseClient> | null = null;

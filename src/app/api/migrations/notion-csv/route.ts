@@ -1,5 +1,4 @@
 import { requireInternalUser } from "@/lib/api/auth";
-import { writeAuditLog } from "@/lib/api/audit";
 import { created, fail, HttpError, readJson, requireArray, requireString } from "@/lib/api/http";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
@@ -15,9 +14,9 @@ const ALLOWED_TARGET_TABLES = [
 
 export async function POST(request: Request) {
   try {
-    const body = await readJson<Record<string, unknown>>(request);
     const supabase = createRequestSupabaseClient(request);
     const internalUser = await requireInternalUser(supabase);
+    const body = await readJson<Record<string, unknown>>(request);
     const targetTable = requireString(body.targetTable, "targetTable");
 
     if (!ALLOWED_TARGET_TABLES.includes(targetTable)) {
@@ -29,40 +28,19 @@ export async function POST(request: Request) {
       throw new HttpError(400, "rows must not be empty");
     }
 
-    const { data: batch, error: batchError } = await supabase
-      .from("migration_batches")
-      .insert({
-        source_name: requireString(body.sourceName, "sourceName"),
-        source_kind: "notion_csv",
-        target_table: targetTable,
-        status: "uploaded",
-        uploaded_by: internalUser.profileId
-      })
-      .select("id, source_name, target_table, status, created_at")
-      .single();
-
-    if (batchError) throw new HttpError(500, batchError.message);
-
-    const stagingRows = rows.map((row, index) => ({
-      migration_batch_id: batch.id,
-      row_no: index + 1,
-      raw_payload: row,
-      mapped_payload: {},
-      validation_status: "pending"
-    }));
-
-    const { error: rowError } = await supabase.from("staging_rows").insert(stagingRows);
-    if (rowError) throw new HttpError(500, rowError.message);
-
-    await writeAuditLog(supabase, {
-      actorProfileId: internalUser.profileId,
-      action: "notion_csv.staged",
-      entityTable: "migration_batches",
-      entityId: batch.id,
-      afterData: { targetTable, rowCount: rows.length }
+    // 배치, staging 행, 감사 로그를 DB 함수 안의 단일 트랜잭션으로 기록합니다.
+    // 같은 멱등성 키로 재시도하면 이미 생성된 배치를 그대로 반환합니다.
+    const idempotencyKey = request.headers.get("idempotency-key")?.trim() || null;
+    const { data: result, error: stagingError } = await supabase.rpc("stage_notion_csv_batch_atomic", {
+      p_source_name: requireString(body.sourceName, "sourceName"),
+      p_target_table: targetTable,
+      p_rows: rows,
+      p_uploaded_by: internalUser.profileId,
+      p_idempotency_key: idempotencyKey
     });
+    if (stagingError) throw new HttpError(500, stagingError.message);
 
-    return created({ batch, rowCount: rows.length });
+    return created(result);
   } catch (error) {
     return fail(error);
   }

@@ -7,6 +7,8 @@ import { DomesticSupplierCreateForm } from "@/components/admin/MasterDataCreateF
 import { CostMasterQuickCreateForm, CostMasterSearchPanel } from "@/components/admin/DomesticSupplierCostMasterForms";
 import { DomesticSupplierExcelActions } from "@/components/admin/DomesticSupplierExcelActions";
 import type { CompanyListItem } from "@/features/company/types";
+import { PaginationControls } from "@/components/PaginationControls";
+import type { PaginationMeta } from "@/lib/api/pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -17,12 +19,14 @@ type SearchParams = Promise<{
   costKind?: string;
   menuRows?: string;
   attractionRows?: string;
+  page?: string;
+  pageSize?: string;
 }>;
 
 const adminRoute = "/admin" as Route;
 
 type LoadState =
-  | { status: "ready"; suppliers: SupplierListItem[]; companies: CompanyListItem[] }
+  | { status: "ready"; suppliers: SupplierListItem[]; companies: CompanyListItem[]; pagination: PaginationMeta }
   | { status: "auth-required"; message: string }
   | { status: "error"; message: string };
 
@@ -64,6 +68,8 @@ export default async function DomesticSuppliersPage({
             placeholder="Supplier, region, keyword"
           />
         </label>
+        <input name="page" type="hidden" value="1" />
+        <input name="pageSize" type="hidden" value={filters.pageSize ?? "20"} />
         <label>
           Category
           <select name="category" defaultValue={filters.category ?? ""}>
@@ -141,7 +147,16 @@ export default async function DomesticSuppliersPage({
         </section>
       ) : null}
 
-      {loadState.status === "ready" ? <SupplierTable suppliers={loadState.suppliers} /> : null}
+      {loadState.status === "ready" ? (
+        <>
+          <SupplierTable suppliers={loadState.suppliers} />
+          <PaginationControls
+            action="/admin/domestic-suppliers"
+            pagination={loadState.pagination}
+            searchParams={{ q: filters.q, category: filters.category, status: selectedStatus }}
+          />
+        </>
+      ) : null}
     </>
   );
 }
@@ -196,7 +211,7 @@ function SupplierTable({ suppliers }: { suppliers: SupplierListItem[] }) {
   );
 }
 
-async function loadSuppliers(filters: { q?: string; category?: string; status?: string }): Promise<LoadState> {
+async function loadSuppliers(filters: { q?: string; category?: string; status?: string; page?: string; pageSize?: string }): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
     return {
@@ -226,12 +241,17 @@ async function loadSuppliers(filters: { q?: string; category?: string; status?: 
     };
   }
 
-  return { status: "ready", suppliers: supplierPayload.data ?? [], companies: companyPayload.data ?? [] };
+  return {
+    status: "ready",
+    suppliers: supplierPayload.data ?? [],
+    companies: companyPayload.data ?? [],
+    pagination: supplierPayload.pagination
+  };
 }
 
 function buildInternalApiUrl(
   path: string,
-  filters: { q?: string; category?: string; status?: string },
+  filters: { q?: string; category?: string; status?: string; page?: string; pageSize?: string },
   headerStore: Headers
 ) {
   const protocol = headerStore.get("x-forwarded-proto") ?? "http";
@@ -240,6 +260,8 @@ function buildInternalApiUrl(
   if (filters.q) url.searchParams.set("q", filters.q);
   if (filters.category) url.searchParams.set("category", filters.category);
   if (filters.status) url.searchParams.set("status", filters.status);
+  if (filters.page) url.searchParams.set("page", filters.page);
+  if (filters.pageSize) url.searchParams.set("pageSize", filters.pageSize);
   return url;
 }
 

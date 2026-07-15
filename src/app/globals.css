@@ -5920,3 +5920,71 @@ html.dark .jht-calendar-month-grid button {
     grid-column: 1;
   }
 }
+
+/* 대용량 목록은 같은 위치에서 건수, 페이지, 표시 행 수를 조절합니다. */
+.pagination-controls {
+  align-items: center;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #d8e0ea);
+  border-radius: 6px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin: 12px 0 24px;
+  min-height: 58px;
+  padding: 9px 12px;
+}
+
+.pagination-summary,
+.pagination-actions,
+.pagination-size-form {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.pagination-summary {
+  color: var(--muted, #5a6a7d);
+  font-size: 0.82rem;
+}
+
+.pagination-summary strong {
+  color: var(--text, #1f2937);
+}
+
+.pagination-summary span {
+  border-left: 1px solid var(--border, #d8e0ea);
+  padding-left: 8px;
+}
+
+.pagination-size-form label {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  font-size: 0.78rem;
+  gap: 6px;
+}
+
+.pagination-size-form select {
+  height: 36px;
+  min-width: 70px;
+  padding-block: 0;
+}
+
+.disabled-control {
+  cursor: default;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  .pagination-controls,
+  .pagination-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pagination-size-form {
+    justify-content: space-between;
+  }
+}

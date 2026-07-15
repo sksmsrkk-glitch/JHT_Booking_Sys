@@ -3,18 +3,22 @@ import Link from "next/link";
 import { getPageAuthorization } from "@/lib/api/page-session";
 import type { AgencyInvoiceListItem } from "@/features/agency-portal/types";
 import { demoAgencyInvoices } from "@/features/finance/demo-invoices";
+import { PaginationControls } from "@/components/PaginationControls";
+import { buildPaginationMeta, type PaginationMeta } from "@/lib/api/pagination";
 
 export const dynamic = "force-dynamic";
 
 type LoadState =
-  | { status: "ready"; invoices: AgencyInvoiceListItem[]; isPreview?: boolean }
+  | { status: "ready"; invoices: AgencyInvoiceListItem[]; pagination: PaginationMeta; isPreview?: boolean }
   | { status: "auth-required"; message: string }
   | { status: "error"; message: string };
 
 const agencyRoute = "/agency" as Route;
+type SearchParams = Promise<{ page?: string; pageSize?: string }>;
 
-export default async function AgencyInvoicesPage() {
-  const loadState = await loadInvoices();
+export default async function AgencyInvoicesPage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams;
+  const loadState = await loadInvoices(params);
 
   return (
     <>
@@ -45,7 +49,12 @@ export default async function AgencyInvoicesPage() {
         </section>
       ) : null}
 
-      {loadState.status === "ready" ? <InvoiceDatabase invoices={loadState.invoices} /> : null}
+      {loadState.status === "ready" ? (
+        <>
+          <InvoiceDatabase invoices={loadState.invoices} pagination={loadState.pagination} />
+          <PaginationControls action="/agency/invoices" pagination={loadState.pagination} />
+        </>
+      ) : null}
 
       <section className="notice">
         <h2>Invoice boundary</h2>
@@ -59,7 +68,7 @@ export default async function AgencyInvoicesPage() {
   );
 }
 
-function InvoiceDatabase({ invoices }: { invoices: AgencyInvoiceListItem[] }) {
+function InvoiceDatabase({ invoices, pagination }: { invoices: AgencyInvoiceListItem[]; pagination: PaginationMeta }) {
   if (invoices.length === 0) {
     return (
       <section className="empty-state">
@@ -92,7 +101,7 @@ function InvoiceDatabase({ invoices }: { invoices: AgencyInvoiceListItem[] }) {
       <div className="partner-database-metrics" aria-label="Invoice metrics">
         <div>
           <span>Invoices</span>
-          <strong>{invoices.length}</strong>
+          <strong>{pagination.total}</strong>
         </div>
         <div>
           <span>Receivable</span>
@@ -170,13 +179,21 @@ function InvoiceDatabase({ invoices }: { invoices: AgencyInvoiceListItem[] }) {
   );
 }
 
-async function loadInvoices(): Promise<LoadState> {
+async function loadInvoices(params: { page?: string; pageSize?: string }): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
-    return { status: "ready", invoices: demoAgencyInvoices, isPreview: true };
+    return {
+      status: "ready",
+      invoices: demoAgencyInvoices,
+      pagination: buildPaginationMeta({ page: 1, pageSize: 20 }, demoAgencyInvoices.length, demoAgencyInvoices.length),
+      isPreview: true
+    };
   }
 
-  const response = await fetch(buildInternalApiUrl("/api/agency/invoices", headerStore), {
+  const url = buildInternalApiUrl("/api/agency/invoices", headerStore);
+  if (params.page) url.searchParams.set("page", params.page);
+  if (params.pageSize) url.searchParams.set("pageSize", params.pageSize);
+  const response = await fetch(url, {
     headers: { authorization },
     cache: "no-store"
   });
@@ -184,7 +201,12 @@ async function loadInvoices(): Promise<LoadState> {
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
-      return { status: "ready", invoices: demoAgencyInvoices, isPreview: true };
+      return {
+        status: "ready",
+        invoices: demoAgencyInvoices,
+        pagination: buildPaginationMeta({ page: 1, pageSize: 20 }, demoAgencyInvoices.length, demoAgencyInvoices.length),
+        isPreview: true
+      };
     }
     return {
       status: "error",
@@ -192,7 +214,7 @@ async function loadInvoices(): Promise<LoadState> {
     };
   }
 
-  return { status: "ready", invoices: payload.data ?? [] };
+  return { status: "ready", invoices: payload.data ?? [], pagination: payload.pagination };
 }
 
 function buildInternalApiUrl(path: string, headerStore: Headers) {

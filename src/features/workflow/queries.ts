@@ -1,5 +1,11 @@
 import { filterWorkflowSummaries, hasWorkflowFilters, type WorkflowFilters } from "./filters";
 import type { WorkflowActionItem, WorkflowMessage, WorkflowThreadDetail, WorkflowThreadSummary } from "./types";
+import {
+  buildPaginationMeta,
+  paginationRange,
+  type PaginatedResult,
+  type PaginationInput
+} from "@/lib/api/pagination";
 
 /*
  * workflow thread는 정호여행사 시스템의 "업무 원장"입니다.
@@ -86,6 +92,49 @@ export async function listWorkflowThreads(
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   return filterWorkflowSummaries((data ?? []).map(mapWorkflowThread), filters);
+}
+
+export async function listWorkflowThreadPage(
+  supabase: SupabaseClientLike,
+  options: { agencyAccountId?: string; filters?: WorkflowFilters; pagination: PaginationInput }
+): Promise<PaginatedResult<WorkflowThreadSummary>> {
+  const filters = options.filters ?? {};
+  const { from, to } = paginationRange(options.pagination);
+  let agencyIds: string[] | null = null;
+
+  if (filters.partner) {
+    const partnerSearch = escapeLikePattern(filters.partner.trim());
+    const { data: agencies, error: agencyError } = await supabase
+      .from("agency_accounts")
+      .select("id")
+      .ilike("name", `%${partnerSearch}%`)
+      .limit(100);
+    if (agencyError) throw new Error(agencyError.message);
+    const matchedAgencyIds = (agencies ?? []).map((agency: any) => String(agency.id));
+    if (matchedAgencyIds.length === 0) {
+      return { items: [], pagination: buildPaginationMeta(options.pagination, 0, 0) };
+    }
+    agencyIds = matchedAgencyIds;
+  }
+
+  let query = supabase
+    .from("workflow_threads")
+    .select("id, workflow_code, title, status, agency_account_id, agency_inquiry_id, quote_case_id, reservation_id, current_invoice_id, last_message_at, created_at, agency_accounts(name)", { count: "exact" })
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (options.agencyAccountId) query = query.eq("agency_account_id", options.agencyAccountId);
+  if (agencyIds) query = query.in("agency_account_id", agencyIds);
+  if (filters.tourCode) query = query.ilike("workflow_code", `%${escapeLikePattern(filters.tourCode)}%`);
+  if (filters.group) query = query.ilike("title", `%${escapeLikePattern(filters.group)}%`);
+  if (filters.from) query = query.gte("last_message_at", `${filters.from}T00:00:00.000Z`);
+  if (filters.to) query = query.lte("last_message_at", `${filters.to}T23:59:59.999Z`);
+
+  const { data, error, count } = await query;
+  if (error) throw new Error(error.message);
+  const items = (data ?? []).map(mapWorkflowThread);
+  return { items, pagination: buildPaginationMeta(options.pagination, count, items.length) };
 }
 
 export async function ensureWorkflowThread(

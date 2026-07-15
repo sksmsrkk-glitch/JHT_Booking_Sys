@@ -5,10 +5,19 @@ import type {
   SupplierListFilters,
   SupplierListItem
 } from "./types";
+import {
+  buildPaginationMeta,
+  paginationRange,
+  type PaginatedResult,
+  type PaginationInput
+} from "@/lib/api/pagination";
 
 type SupabaseClientLike = {
   from: (table: string) => any;
 };
+
+const supplierListColumns =
+  "id, category, name_ko, name_en, region_level1, region_level2, phone, website, status, updated_at, supplier_contacts(id), supplier_products(id)";
 
 export const SUPPLIER_CATEGORIES: SupplierCategory[] = [
   "hotel",
@@ -47,9 +56,7 @@ export async function listDomesticSuppliers(
 
   let query = supabase
     .from("domestic_suppliers")
-    .select(
-      "id, category, name_ko, name_en, region_level1, region_level2, phone, website, status, updated_at, supplier_contacts(id), supplier_products(id)"
-    )
+    .select(supplierListColumns)
     .eq("status", status)
     .limit(100);
 
@@ -69,6 +76,36 @@ export async function listDomesticSuppliers(
   }
 
   return (data ?? []).map(mapSupplierListItem);
+}
+
+export async function listDomesticSupplierPage(
+  supabase: SupabaseClientLike,
+  filters: SupplierListFilters,
+  pagination: PaginationInput
+): Promise<PaginatedResult<SupplierListItem>> {
+  const q = normalizeSearchTerm(filters.q);
+  const category = normalizeEnum(filters.category, SUPPLIER_CATEGORIES);
+  const status = normalizeEnum(filters.status, RECORD_STATUSES) ?? "active";
+  const { from, to } = paginationRange(pagination);
+
+  let query = supabase
+    .from("domestic_suppliers")
+    .select(supplierListColumns, { count: "exact" })
+    .eq("status", status)
+    .order("name_ko", { ascending: true })
+    .range(from, to);
+
+  if (category) query = query.eq("category", category);
+  if (q) {
+    query = query.or(
+      `name_ko.ilike.%${q}%,name_en.ilike.%${q}%,search_keywords.ilike.%${q}%,region_level1.ilike.%${q}%,region_level2.ilike.%${q}%`
+    );
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw new Error(error.message);
+  const items = (data ?? []).map(mapSupplierListItem);
+  return { items, pagination: buildPaginationMeta(pagination, count, items.length) };
 }
 
 export async function getDomesticSupplierDetail(

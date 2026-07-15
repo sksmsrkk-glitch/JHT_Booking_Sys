@@ -7,10 +7,19 @@ import type {
   SettlementFilters,
   SettlementListItem
 } from "./types";
+import {
+  buildPaginationMeta,
+  paginationRange,
+  type PaginatedResult,
+  type PaginationInput
+} from "@/lib/api/pagination";
 
 type SupabaseClientLike = {
   from: (table: string) => any;
 };
+
+const invoiceListColumns =
+  "id, reservation_id, invoice_no, tour_code, version_no, status, currency, total_amount, issued_at, due_date, payment_deadline, collection_timing, collection_status, deposit_required, deposit_amount, storage_path, created_at, reservations(reservation_code, quote_cases(tour_name), agency_accounts(name), expenses(id), settlements(status, final_profit_amount)), payments(id, status, amount)";
 
 /*
  * 회계/정산 조회 레이어입니다.
@@ -33,9 +42,7 @@ export async function listInvoices(
 
   let query = supabase
     .from("invoices")
-    .select(
-      "id, reservation_id, invoice_no, tour_code, version_no, status, currency, total_amount, issued_at, due_date, payment_deadline, collection_timing, collection_status, deposit_required, deposit_amount, storage_path, created_at, reservations(reservation_code, quote_cases(tour_name), agency_accounts(name), expenses(id), settlements(status, final_profit_amount)), payments(id, status, amount)"
-    )
+    .select(invoiceListColumns)
     .limit(150);
 
   if (status) query = query.eq("status", status);
@@ -47,6 +54,30 @@ export async function listInvoices(
   }
 
   return (data ?? []).map(mapInvoiceListItem);
+}
+
+export async function listInvoicePage(
+  supabase: SupabaseClientLike,
+  filters: InvoiceFilters,
+  pagination: PaginationInput
+): Promise<PaginatedResult<InvoiceListItem>> {
+  const status = normalizeEnum(filters.status, INVOICE_STATUSES);
+  const q = normalizeSearchTerm(filters.q);
+  const { from, to } = paginationRange(pagination);
+
+  let query = supabase
+    .from("invoices")
+    .select(invoiceListColumns, { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (status) query = query.eq("status", status);
+  if (q) query = query.or(`invoice_no.ilike.%${q}%,tour_code.ilike.%${q}%`);
+
+  const { data, error, count } = await query;
+  if (error) throw new Error(error.message);
+  const items = (data ?? []).map(mapInvoiceListItem);
+  return { items, pagination: buildPaginationMeta(pagination, count, items.length) };
 }
 
 export async function getInvoiceDetail(

@@ -1,11 +1,12 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { NOTION_CSV_TARGET_TABLES } from "@/features/migration/queries";
 
 export function NotionCsvStagingForm() {
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const idempotencyKeyRef = useRef<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -26,9 +27,12 @@ export function NotionCsvStagingForm() {
     }
 
     try {
+      // 네트워크 오류 뒤 같은 제출을 재시도하더라도 서버에는 한 배치만 생성됩니다.
+      const idempotencyKey = idempotencyKeyRef.current ?? crypto.randomUUID();
+      idempotencyKeyRef.current = idempotencyKey;
       const response = await fetch("/api/migrations/notion-csv", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "idempotency-key": idempotencyKey },
         body: JSON.stringify({
           sourceName: form.get("sourceName"),
           targetTable: form.get("targetTable"),
@@ -44,6 +48,7 @@ export function NotionCsvStagingForm() {
       }
 
       setMessage(`Staged ${result.data?.rowCount ?? 0} rows.`);
+      idempotencyKeyRef.current = null;
       formElement.reset();
       window.location.reload();
     } catch {

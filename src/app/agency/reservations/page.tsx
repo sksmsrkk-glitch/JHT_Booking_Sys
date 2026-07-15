@@ -2,18 +2,22 @@ import type { Route } from "next";
 import Link from "next/link";
 import { getPageAuthorization } from "@/lib/api/page-session";
 import type { AgencyReservationListItem } from "@/features/agency-portal/types";
+import { PaginationControls } from "@/components/PaginationControls";
+import { buildPaginationMeta, type PaginationMeta } from "@/lib/api/pagination";
 
 export const dynamic = "force-dynamic";
 
 type LoadState =
-  | { status: "ready"; reservations: AgencyReservationListItem[]; isPreview?: boolean }
+  | { status: "ready"; reservations: AgencyReservationListItem[]; pagination: PaginationMeta; isPreview?: boolean }
   | { status: "auth-required"; message: string }
   | { status: "error"; message: string };
 
 const agencyRoute = "/agency" as Route;
+type SearchParams = Promise<{ page?: string; pageSize?: string }>;
 
-export default async function AgencyReservationsPage() {
-  const loadState = await loadReservations();
+export default async function AgencyReservationsPage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams;
+  const loadState = await loadReservations(params);
 
   return (
     <>
@@ -56,7 +60,12 @@ export default async function AgencyReservationsPage() {
         </section>
       ) : null}
 
-      {loadState.status === "ready" ? <ReservationDatabase reservations={loadState.reservations} /> : null}
+      {loadState.status === "ready" ? (
+        <>
+          <ReservationDatabase pagination={loadState.pagination} reservations={loadState.reservations} />
+          <PaginationControls action="/agency/reservations" pagination={loadState.pagination} />
+        </>
+      ) : null}
 
       <section className="notice">
         <h2>Reservation boundary</h2>
@@ -70,7 +79,7 @@ export default async function AgencyReservationsPage() {
   );
 }
 
-function ReservationDatabase({ reservations }: { reservations: AgencyReservationListItem[] }) {
+function ReservationDatabase({ reservations, pagination }: { reservations: AgencyReservationListItem[]; pagination: PaginationMeta }) {
   if (reservations.length === 0) {
     return (
       <section className="empty-state">
@@ -100,7 +109,7 @@ function ReservationDatabase({ reservations }: { reservations: AgencyReservation
       <div className="partner-database-metrics" aria-label="Reservation metrics">
         <div>
           <span>Reservations</span>
-          <strong>{reservations.length}</strong>
+          <strong>{pagination.total}</strong>
         </div>
         <div>
           <span>Confirmed</span>
@@ -164,13 +173,21 @@ function ReservationDatabase({ reservations }: { reservations: AgencyReservation
   );
 }
 
-async function loadReservations(): Promise<LoadState> {
+async function loadReservations(params: { page?: string; pageSize?: string }): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
-    return { status: "ready", reservations: demoReservations, isPreview: true };
+    return {
+      status: "ready",
+      reservations: demoReservations,
+      pagination: buildPaginationMeta({ page: 1, pageSize: 20 }, demoReservations.length, demoReservations.length),
+      isPreview: true
+    };
   }
 
-  const response = await fetch(buildInternalApiUrl("/api/agency/reservations", headerStore), {
+  const url = buildInternalApiUrl("/api/agency/reservations", headerStore);
+  if (params.page) url.searchParams.set("page", params.page);
+  if (params.pageSize) url.searchParams.set("pageSize", params.pageSize);
+  const response = await fetch(url, {
     headers: { authorization },
     cache: "no-store"
   });
@@ -178,7 +195,12 @@ async function loadReservations(): Promise<LoadState> {
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
-      return { status: "ready", reservations: demoReservations, isPreview: true };
+      return {
+        status: "ready",
+        reservations: demoReservations,
+        pagination: buildPaginationMeta({ page: 1, pageSize: 20 }, demoReservations.length, demoReservations.length),
+        isPreview: true
+      };
     }
     return {
       status: "error",
@@ -186,7 +208,7 @@ async function loadReservations(): Promise<LoadState> {
     };
   }
 
-  return { status: "ready", reservations: payload.data ?? [] };
+  return { status: "ready", reservations: payload.data ?? [], pagination: payload.pagination };
 }
 
 const demoReservations: AgencyReservationListItem[] = [

@@ -1,10 +1,12 @@
 import type { Route } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { filterWorkflowSummaries, getWorkflowDateKey, normalizeWorkflowFilters, type WorkflowFilters } from "@/features/workflow/filters";
+import { getWorkflowDateKey, normalizeWorkflowFilters, type WorkflowFilters } from "@/features/workflow/filters";
 import type { WorkflowThreadSummary } from "@/features/workflow/types";
 import { getPageAuthorization } from "@/lib/api/page-session";
 import { normalizeLocale } from "@/lib/i18n";
+import { PaginationControls } from "@/components/PaginationControls";
+import type { PaginationMeta } from "@/lib/api/pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -14,14 +16,17 @@ type SearchParams = Promise<{
   partner?: string;
   tourCode?: string;
   group?: string;
+  page?: string;
+  pageSize?: string;
 }>;
 
 export default async function AdminWorkflowsPage({ searchParams }: { searchParams: SearchParams }) {
   const cookieStore = await cookies();
   const locale = normalizeLocale(cookieStore.get("jht_locale")?.value);
-  const filters = normalizeWorkflowFilters(await searchParams);
-  const loadState = await loadWorkflows();
-  const workflows = filterWorkflowSummaries(loadState.workflows, filters);
+  const rawSearchParams = await searchParams;
+  const filters = normalizeWorkflowFilters(rawSearchParams);
+  const loadState = await loadWorkflows(filters, rawSearchParams);
+  const workflows = loadState.workflows;
 
   return (
     <>
@@ -58,8 +63,13 @@ export default async function AdminWorkflowsPage({ searchParams }: { searchParam
         </section>
       ) : null}
 
-      <WorkflowFilterBar filters={filters} locale={locale} totalCount={loadState.workflows.length} visibleCount={workflows.length} />
+      <WorkflowFilterBar filters={filters} locale={locale} totalCount={loadState.pagination.total} visibleCount={workflows.length} />
       <WorkflowList locale={locale} workflows={workflows} />
+      <PaginationControls
+        action="/admin/workflows"
+        pagination={loadState.pagination}
+        searchParams={{ ...filters }}
+      />
     </>
   );
 }
@@ -99,6 +109,8 @@ function WorkflowFilterBar({
           <input name="group" placeholder={locale === "ko" ? "단체명 검색" : "Group name"} defaultValue={filters.group ?? ""} />
         </label>
         <div className="workflow-filter-actions">
+          <input name="page" type="hidden" value="1" />
+          <input name="pageSize" type="hidden" value="20" />
           <button className="button-primary" type="submit">
             {locale === "ko" ? "검색" : "Search"}
           </button>
@@ -169,9 +181,12 @@ function WorkflowList({ locale, workflows }: { locale: "en" | "ko"; workflows: W
   );
 }
 
-async function loadWorkflows(): Promise<{ workflows: WorkflowThreadSummary[]; previewMode: boolean; error?: string }> {
+async function loadWorkflows(
+  filters: WorkflowFilters,
+  rawSearchParams: { page?: string; pageSize?: string }
+): Promise<{ workflows: WorkflowThreadSummary[]; pagination: PaginationMeta; previewMode: boolean; error?: string }> {
   const { headerStore, authorization } = await getPageAuthorization();
-  const response = await fetch(buildInternalApiUrl("/api/workflows", headerStore), {
+  const response = await fetch(buildInternalApiUrl("/api/workflows", filters, rawSearchParams, headerStore), {
     headers: authorization ? { authorization } : {},
     cache: "no-store"
   });
@@ -179,17 +194,33 @@ async function loadWorkflows(): Promise<{ workflows: WorkflowThreadSummary[]; pr
   if (!response.ok) {
     return {
       workflows: [],
+      pagination: payload.pagination ?? { page: 1, pageSize: 20, total: 0, totalPages: 1, hasNext: false, hasPrevious: false },
       previewMode: false,
       error: payload.error ?? "An active internal session is required."
     };
   }
-  return { workflows: payload.data ?? [], previewMode: Boolean(!authorization || payload.data?.[0]?.preview) };
+  return {
+    workflows: payload.data ?? [],
+    pagination: payload.pagination,
+    previewMode: Boolean(!authorization || payload.data?.[0]?.preview)
+  };
 }
 
-function buildInternalApiUrl(path: string, headerStore: Headers) {
+function buildInternalApiUrl(
+  path: string,
+  filters: WorkflowFilters,
+  pagination: { page?: string; pageSize?: string },
+  headerStore: Headers
+) {
   const protocol = headerStore.get("x-forwarded-proto") ?? "http";
   const host = headerStore.get("host") ?? "localhost:3000";
-  return new URL(path, `${protocol}://${host}`);
+  const url = new URL(path, `${protocol}://${host}`);
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) url.searchParams.set(key, value);
+  });
+  if (pagination.page) url.searchParams.set("page", pagination.page);
+  if (pagination.pageSize) url.searchParams.set("pageSize", pagination.pageSize);
+  return url;
 }
 
 function formatLabel(value: string) {

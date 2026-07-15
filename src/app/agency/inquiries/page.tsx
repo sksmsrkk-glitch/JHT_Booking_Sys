@@ -3,18 +3,22 @@ import Link from "next/link";
 import { getPageAuthorization } from "@/lib/api/page-session";
 import type { AgencyInquirySummary } from "@/features/agency/types";
 import { InquiryCreateForm } from "@/components/agency/InquiryCreateForm";
+import { PaginationControls } from "@/components/PaginationControls";
+import { buildPaginationMeta, type PaginationMeta } from "@/lib/api/pagination";
 
 export const dynamic = "force-dynamic";
 
 type LoadState =
-  | { status: "ready"; inquiries: AgencyInquirySummary[]; isPreview?: boolean }
+  | { status: "ready"; inquiries: AgencyInquirySummary[]; pagination: PaginationMeta; isPreview?: boolean }
   | { status: "auth-required"; message: string }
   | { status: "error"; message: string };
 
 const agencyRoute = "/agency" as Route;
+type SearchParams = Promise<{ page?: string; pageSize?: string }>;
 
-export default async function AgencyInquiriesPage() {
-  const loadState = await loadInquiries();
+export default async function AgencyInquiriesPage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams;
+  const loadState = await loadInquiries(params);
 
   return (
     <>
@@ -58,7 +62,12 @@ export default async function AgencyInquiriesPage() {
         </section>
       ) : null}
 
-      {loadState.status === "ready" ? <InquiryDatabase inquiries={loadState.inquiries} /> : null}
+      {loadState.status === "ready" ? (
+        <>
+          <InquiryDatabase inquiries={loadState.inquiries} pagination={loadState.pagination} />
+          <PaginationControls action="/agency/inquiries" pagination={loadState.pagination} />
+        </>
+      ) : null}
 
       <section className="notice">
         <h2>Boundary Guardrails</h2>
@@ -72,7 +81,7 @@ export default async function AgencyInquiriesPage() {
   );
 }
 
-function InquiryDatabase({ inquiries }: { inquiries: AgencyInquirySummary[] }) {
+function InquiryDatabase({ inquiries, pagination }: { inquiries: AgencyInquirySummary[]; pagination: PaginationMeta }) {
   if (inquiries.length === 0) {
     return (
       <section className="empty-state">
@@ -102,7 +111,7 @@ function InquiryDatabase({ inquiries }: { inquiries: AgencyInquirySummary[] }) {
       <div className="partner-database-metrics" aria-label="Inquiry metrics">
         <div>
           <span>Requests</span>
-          <strong>{inquiries.length}</strong>
+          <strong>{pagination.total}</strong>
         </div>
         <div>
           <span>Revision or booking</span>
@@ -163,17 +172,21 @@ function InquiryDatabase({ inquiries }: { inquiries: AgencyInquirySummary[] }) {
   );
 }
 
-async function loadInquiries(): Promise<LoadState> {
+async function loadInquiries(params: { page?: string; pageSize?: string }): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
     return {
       status: "ready",
       inquiries: demoAgencyInquiries,
+      pagination: buildPaginationMeta({ page: 1, pageSize: 20 }, demoAgencyInquiries.length, demoAgencyInquiries.length),
       isPreview: true
     };
   }
 
-  const response = await fetch(buildInternalApiUrl("/api/agency/inquiries", headerStore), {
+  const url = buildInternalApiUrl("/api/agency/inquiries", headerStore);
+  if (params.page) url.searchParams.set("page", params.page);
+  if (params.pageSize) url.searchParams.set("pageSize", params.pageSize);
+  const response = await fetch(url, {
     headers: { authorization },
     cache: "no-store"
   });
@@ -182,7 +195,13 @@ async function loadInquiries(): Promise<LoadState> {
   if (!response.ok) {
     return {
       status: response.status === 401 || response.status === 403 ? "ready" : "error",
-      ...(response.status === 401 || response.status === 403 ? { inquiries: demoAgencyInquiries, isPreview: true } : {}),
+      ...(response.status === 401 || response.status === 403
+        ? {
+            inquiries: demoAgencyInquiries,
+            pagination: buildPaginationMeta({ page: 1, pageSize: 20 }, demoAgencyInquiries.length, demoAgencyInquiries.length),
+            isPreview: true
+          }
+        : {}),
       message: payload.error ?? "Unknown inquiry API error"
     } as LoadState;
   }
@@ -201,7 +220,7 @@ async function loadInquiries(): Promise<LoadState> {
     createdAt: row.created_at
   }));
 
-  return { status: "ready", inquiries };
+  return { status: "ready", inquiries, pagination: payload.pagination };
 }
 
 const demoAgencyInquiries = [

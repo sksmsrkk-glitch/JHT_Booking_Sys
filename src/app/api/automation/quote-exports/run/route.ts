@@ -1,4 +1,3 @@
-import { writeAuditLog } from "@/lib/api/audit";
 import { requireAutomationSecret } from "@/lib/api/guards";
 import { writeApiLog } from "@/lib/api/api-log";
 import { fail, HttpError, ok } from "@/lib/api/http";
@@ -12,20 +11,20 @@ export async function POST(request: Request) {
   try {
     requireAutomationSecret(request);
     const supabase = createServiceSupabaseClient();
+    const workerId = request.headers.get("x-worker-id")?.trim() || `node-${crypto.randomUUID()}`;
 
-    const { data: exports, error } = await supabase
-      .from("quote_exports")
-      .select("id, quote_version_id, storage_path, status, created_at")
-      .eq("export_type", "xlsx")
-      .eq("status", "queued")
-      .order("created_at", { ascending: true })
-      .limit(10);
+    // SKIP LOCKED + lease를 사용하는 DB claim으로 Node/Java worker의 중복 처리를 막습니다.
+    const { data: exports, error } = await supabase.rpc("claim_quote_export_jobs", {
+      p_worker_id: workerId,
+      p_limit: 10,
+      p_lease_seconds: 300
+    });
 
     if (error) throw new HttpError(500, error.message);
 
     const results = [];
     for (const exportRow of exports ?? []) {
-      results.push(await processExport(supabase, exportRow));
+      results.push(await processExport(supabase, exportRow, workerId));
     }
 
     const responsePayload = {
@@ -49,9 +48,7 @@ export async function POST(request: Request) {
   }
 }
 
-async function processExport(supabase: any, exportRow: any) {
-  await updateExport(supabase, exportRow.id, { status: "processing", error_message: null });
-
+async function processExport(supabase: any, exportRow: any, workerId: string) {
   try {
     const snapshot = await loadQuoteVersionSnapshot(supabase, exportRow.quote_version_id);
     const workbook = buildQuoteExportWorkbook(snapshot);
@@ -64,34 +61,12 @@ async function processExport(supabase: any, exportRow: any) {
 
     if (uploadError) throw new Error(uploadError.message);
 
-    const completed = await updateExport(supabase, exportRow.id, {
-      status: "completed",
-      storage_path: storagePath,
-      error_message: null
-    });
-
-    await writeAuditLog(supabase, {
-      action: "quote_export.completed",
-      entityTable: "quote_exports",
-      entityId: exportRow.id,
-      afterData: {
-        storageBucket: EXPORT_STORAGE_BUCKET,
-        storagePath,
-        quoteVersionId: exportRow.quote_version_id,
-        workbookBytes: workbook.length
-      }
-    });
+    const completed = await finishExport(supabase, exportRow.id, workerId, "completed", storagePath, null);
 
     return { id: exportRow.id, status: "completed", storagePath: completed.storage_path };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown export error";
-    await updateExport(supabase, exportRow.id, { status: "failed", error_message: message });
-    await writeAuditLog(supabase, {
-      action: "quote_export.failed",
-      entityTable: "quote_exports",
-      entityId: exportRow.id,
-      afterData: { quoteVersionId: exportRow.quote_version_id, error: message }
-    });
+    await finishExport(supabase, exportRow.id, workerId, "failed", null, message);
     return { id: exportRow.id, status: "failed", error: message };
   }
 }
@@ -150,13 +125,21 @@ async function loadQuoteVersionSnapshot(supabase: any, quoteVersionId: string) {
   };
 }
 
-async function updateExport(supabase: any, id: string, patch: Record<string, unknown>) {
-  const { data, error } = await supabase
-    .from("quote_exports")
-    .update(patch)
-    .eq("id", id)
-    .select("id, quote_version_id, storage_path, status, error_message, created_at")
-    .single();
+async function finishExport(
+  supabase: any,
+  id: string,
+  workerId: string,
+  status: "completed" | "failed",
+  storagePath: string | null,
+  errorMessage: string | null
+) {
+  const { data, error } = await supabase.rpc("finish_quote_export_job", {
+    p_job_id: id,
+    p_worker_id: workerId,
+    p_status: status,
+    p_storage_path: storagePath,
+    p_error_message: errorMessage
+  });
 
   if (error) throw new Error(error.message);
   return data;

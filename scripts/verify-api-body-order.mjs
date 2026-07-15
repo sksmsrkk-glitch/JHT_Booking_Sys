@@ -2,7 +2,8 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 
 const apiRoot = resolve("src/app/api");
-const handlerMethodPattern = /\bexport\s+async\s+function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*\(/g;
+const handlerMethodPattern =
+  /\bexport\s+(?:async\s+function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*\(|const\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*=\s*instrumentApiRoute\([^,]+,\s*async\s*\()/g;
 const guardPattern =
   /\b(requireInternalUser|requireAgencyUser|requireFinanceUser|requireAdminUser|requireAutomationSecret|requireWebhookSecret|requireBootstrapSecret)\s*\(/g;
 const bodyParserPattern = /\brequest\s*\.\s*(json|formData|text|arrayBuffer|blob)\s*\(/g;
@@ -47,7 +48,7 @@ function findExportedHandlers(source) {
   const handlers = [];
   let match;
   while ((match = handlerMethodPattern.exec(source)) !== null) {
-    const method = match[1];
+    const method = match[1] ?? match[2];
     const bodyStart = findFunctionBodyStart(source, handlerMethodPattern.lastIndex - 1);
     if (bodyStart === -1) {
       handlers.push({ method, body: "" });

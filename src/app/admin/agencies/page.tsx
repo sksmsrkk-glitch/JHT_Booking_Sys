@@ -6,6 +6,8 @@ import type { AgencyListItem, AgencySignupApplication } from "@/features/agency/
 import { AgencyCreateForm } from "@/components/admin/MasterDataCreateForms";
 import { AgencySignupApplicationActions } from "@/components/admin/AgencyGovernanceActions";
 import type { CompanyListItem } from "@/features/company/types";
+import { PaginationControls } from "@/components/PaginationControls";
+import type { PaginationMeta } from "@/lib/api/pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +16,12 @@ type SearchParams = Promise<{
   country?: string;
   status?: string;
   applicationStatus?: string;
+  page?: string;
+  pageSize?: string;
 }>;
 
 type LoadState =
-  | { status: "ready"; agencies: AgencyListItem[]; companies: CompanyListItem[]; applications: AgencySignupApplication[] }
+  | { status: "ready"; agencies: AgencyListItem[]; companies: CompanyListItem[]; applications: AgencySignupApplication[]; pagination: PaginationMeta }
   | { status: "auth-required"; message: string }
   | { status: "error"; message: string };
 
@@ -54,6 +58,8 @@ export default async function AdminAgenciesPage({ searchParams }: { searchParams
             placeholder="Agency, domain, country"
           />
         </label>
+        <input name="page" type="hidden" value="1" />
+        <input name="pageSize" type="hidden" value={filters.pageSize ?? "20"} />
         <label>
           Country
           <input name="country" defaultValue={filters.country ?? ""} placeholder="MY, VN, JP" />
@@ -99,7 +105,21 @@ export default async function AdminAgenciesPage({ searchParams }: { searchParams
         </section>
       ) : null}
 
-      {loadState.status === "ready" ? <AgencyTable agencies={loadState.agencies} /> : null}
+      {loadState.status === "ready" ? (
+        <>
+          <AgencyTable agencies={loadState.agencies} />
+          <PaginationControls
+            action="/admin/agencies"
+            pagination={loadState.pagination}
+            searchParams={{
+              q: filters.q,
+              country: filters.country,
+              status: selectedStatus,
+              applicationStatus: filters.applicationStatus
+            }}
+          />
+        </>
+      ) : null}
     </>
   );
 }
@@ -245,7 +265,7 @@ function AgencyTable({ agencies }: { agencies: AgencyListItem[] }) {
   );
 }
 
-async function loadAgencies(filters: { q?: string; country?: string; status?: string; applicationStatus?: string }): Promise<LoadState> {
+async function loadAgencies(filters: { q?: string; country?: string; status?: string; applicationStatus?: string; page?: string; pageSize?: string }): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
     return {
@@ -287,13 +307,14 @@ async function loadAgencies(filters: { q?: string; country?: string; status?: st
     status: "ready",
     agencies: agencyPayload.data ?? [],
     companies: companyPayload.data ?? [],
-    applications: applicationPayload.data ?? []
+    applications: applicationPayload.data ?? [],
+    pagination: agencyPayload.pagination
   };
 }
 
 function buildInternalApiUrl(
   path: string,
-  filters: { q?: string; country?: string; status?: string },
+  filters: { q?: string; country?: string; status?: string; page?: string; pageSize?: string },
   headerStore: Headers
 ) {
   const protocol = headerStore.get("x-forwarded-proto") ?? "http";
@@ -302,6 +323,8 @@ function buildInternalApiUrl(
   if (filters.q) url.searchParams.set("q", filters.q);
   if (filters.country) url.searchParams.set("country", filters.country);
   if (filters.status) url.searchParams.set("status", filters.status);
+  if (filters.page) url.searchParams.set("page", filters.page);
+  if (filters.pageSize) url.searchParams.set("pageSize", filters.pageSize);
   return url;
 }
 

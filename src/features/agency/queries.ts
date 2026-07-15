@@ -6,10 +6,19 @@ import type {
   AgencyListItem,
   AgencyRecordStatus
 } from "./types";
+import {
+  buildPaginationMeta,
+  paginationRange,
+  type PaginatedResult,
+  type PaginationInput
+} from "@/lib/api/pagination";
 
 type SupabaseClientLike = {
   from: (table: string) => any;
 };
+
+const agencyListColumns =
+  "id, name, country_code, email_domain, billing_currency, phone, website, status, lifecycle_status, created_at, updated_at, last_login_at, agency_contacts(id), agency_users(id), agency_inquiries(id)";
 
 export const AGENCY_RECORD_STATUSES: AgencyRecordStatus[] = ["active", "inactive", "archived"];
 
@@ -23,9 +32,7 @@ export async function listAgencyAccounts(
 
   let query = supabase
     .from("agency_accounts")
-    .select(
-      "id, name, country_code, email_domain, billing_currency, phone, website, status, lifecycle_status, created_at, updated_at, last_login_at, agency_contacts(id), agency_users(id), agency_inquiries(id)"
-    )
+    .select(agencyListColumns)
     .eq("status", status)
     .limit(100);
 
@@ -43,6 +50,32 @@ export async function listAgencyAccounts(
   }
 
   return (data ?? []).map(mapAgencyListItem);
+}
+
+export async function listAgencyAccountPage(
+  supabase: SupabaseClientLike,
+  filters: AgencyListFilters,
+  pagination: PaginationInput
+): Promise<PaginatedResult<AgencyListItem>> {
+  const q = normalizeSearchTerm(filters.q);
+  const status = normalizeEnum(filters.status, AGENCY_RECORD_STATUSES) ?? "active";
+  const country = normalizeCode(filters.country);
+  const { from, to } = paginationRange(pagination);
+
+  let query = supabase
+    .from("agency_accounts")
+    .select(agencyListColumns, { count: "exact" })
+    .eq("status", status)
+    .order("name", { ascending: true })
+    .range(from, to);
+
+  if (q) query = query.or(`name.ilike.%${q}%,email_domain.ilike.%${q}%,country_code.ilike.%${q}%`);
+  if (country) query = query.eq("country_code", country);
+
+  const { data, error, count } = await query;
+  if (error) throw new Error(error.message);
+  const items = (data ?? []).map(mapAgencyListItem);
+  return { items, pagination: buildPaginationMeta(pagination, count, items.length) };
 }
 
 export async function getAgencyAccountDetail(

@@ -15,7 +15,32 @@ export type ReservationListItem = {
   operationTaskSummary: ReservationOperationTaskSummary[];
   taskCount: number;
   roomingListCount: number;
+  operationReady?: boolean;
+  operationMissing?: string[];
   createdAt: string;
+};
+
+export type ReservationSummaryRow = {
+  label: string;
+  groups: number;
+  pax: number;
+};
+
+export type ReservationDashboardData = {
+  metrics: {
+    totalGroups: number;
+    activeGroups: number;
+    totalPax: number;
+    incompleteGroups: number;
+    unscheduledGroups: number;
+  };
+  summaries: {
+    monthly: ReservationSummaryRow[];
+    weekly: ReservationSummaryRow[];
+    yearly: ReservationSummaryRow[];
+    partner: ReservationSummaryRow[];
+    country: ReservationSummaryRow[];
+  };
 };
 
 export type ReservationOperationTaskSummary = {

@@ -1,26 +1,29 @@
-import { listAgencyAccounts } from "@/features/agency/queries";
+import { listAgencyAccountPage } from "@/features/agency/queries";
 import { requireInternalUser } from "@/lib/api/auth";
 import { writeAuditLog } from "@/lib/api/audit";
-import { created, fail, HttpError, ok, readJson, requireString, requireUuid } from "@/lib/api/http";
+import { created, fail, HttpError, okPaginated, readJson, requireString, requireUuid } from "@/lib/api/http";
+import { parsePagination } from "@/lib/api/pagination";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
+import { instrumentApiRoute } from "@/lib/api/telemetry";
 
-export async function GET(request: Request) {
+export const GET = instrumentApiRoute("GET /api/agencies", async (request: Request) => {
   try {
     const supabase = createRequestSupabaseClient(request);
     await requireInternalUser(supabase);
 
     const url = new URL(request.url);
-    const agencies = await listAgencyAccounts(supabase, {
+    const pagination = parsePagination(url.searchParams);
+    const agencies = await listAgencyAccountPage(supabase, {
       q: url.searchParams.get("q") ?? undefined,
       country: url.searchParams.get("country") ?? undefined,
       status: url.searchParams.get("status") ?? undefined
-    });
+    }, pagination);
 
-    return ok(agencies);
+    return okPaginated(agencies.items, agencies.pagination);
   } catch (error) {
     return fail(error);
   }
-}
+});
 
 export async function POST(request: Request) {
   try {

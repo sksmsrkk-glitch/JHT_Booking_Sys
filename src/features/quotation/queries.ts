@@ -10,10 +10,19 @@ import type {
   QuoteRouteSegmentDetail,
   QuoteVersionDetail
 } from "./types";
+import {
+  buildPaginationMeta,
+  paginationRange,
+  type PaginatedResult,
+  type PaginationInput
+} from "@/lib/api/pagination";
 
 type SupabaseClientLike = {
   from: (table: string) => any;
 };
+
+const quoteCaseListColumns =
+  "id, case_code, share_id, tour_name, tour_type, status, currency, estimated_pax, start_date, end_date, agency_account_id, created_at, agency_accounts(name), quote_versions(id, version_no, status, public_total_amount, created_at)";
 
 export const QUOTE_STATUSES = [
   "new",
@@ -35,9 +44,7 @@ export async function listQuoteCases(
 
   let query = supabase
     .from("quote_cases")
-    .select(
-      "id, case_code, share_id, tour_name, tour_type, status, currency, estimated_pax, start_date, end_date, agency_account_id, created_at, agency_accounts(name), quote_versions(id, version_no, status, public_total_amount, created_at)"
-    )
+    .select(quoteCaseListColumns)
     .limit(100);
 
   if (status) {
@@ -58,6 +65,31 @@ export async function listQuoteCases(
   }
 
   return (data ?? []).map(mapQuoteCaseListItem);
+}
+
+export async function listQuoteCasePage(
+  supabase: SupabaseClientLike,
+  filters: QuoteCaseFilters,
+  pagination: PaginationInput
+): Promise<PaginatedResult<QuoteCaseListItem>> {
+  const q = normalizeSearchTerm(filters.q);
+  const status = normalizeEnum(filters.status, QUOTE_STATUSES);
+  const { from, to } = paginationRange(pagination);
+
+  let query = supabase
+    .from("quote_cases")
+    .select(quoteCaseListColumns, { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (status) query = query.eq("status", status);
+  if (filters.agencyAccountId) query = query.eq("agency_account_id", filters.agencyAccountId);
+  if (q) query = query.or(`case_code.ilike.%${q}%,tour_name.ilike.%${q}%,share_id.ilike.%${q}%`);
+
+  const { data, error, count } = await query;
+  if (error) throw new Error(error.message);
+  const items = (data ?? []).map(mapQuoteCaseListItem);
+  return { items, pagination: buildPaginationMeta(pagination, count, items.length) };
 }
 
 export async function getQuoteCaseDetail(

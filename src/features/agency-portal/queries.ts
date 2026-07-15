@@ -11,6 +11,12 @@ import type {
   AgencyRoomingListItem
 } from "./types";
 import { convertKrwToQuoteCurrency } from "@/lib/domain/currency.mjs";
+import {
+  buildPaginationMeta,
+  paginationRange,
+  type PaginatedResult,
+  type PaginationInput
+} from "@/lib/api/pagination";
 
 type SupabaseClientLike = {
   from: (table: string) => any;
@@ -34,6 +40,29 @@ export async function listAgencyQuoteCases(
   return (data ?? []).map(mapAgencyQuoteListItem);
 }
 
+/** 파트너 견적 목록은 RLS 범위 안에서 개수와 행을 함께 조회해 대량 데이터에도 일정한 응답 크기를 유지합니다. */
+export async function listAgencyQuoteCasePage(
+  supabase: SupabaseClientLike,
+  agencyAccountId: string,
+  pagination: PaginationInput
+): Promise<PaginatedResult<AgencyQuoteListItem>> {
+  const { from, to } = paginationRange(pagination);
+  const { data, error, count } = await supabase
+    .from("quote_cases")
+    .select(
+      "id, case_code, share_id, tour_name, tour_type, status, currency, estimated_pax, start_date, end_date, created_at, quote_versions(id, version_no, status, currency, exchange_rate_to_krw, public_total_amount, sent_at, accepted_at)",
+      { count: "exact" }
+    )
+    .eq("agency_account_id", agencyAccountId)
+    .in("status", ["sent", "revision_requested", "accepted", "expired"])
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (error) throw new Error(error.message);
+  const items = (data ?? []).map(mapAgencyQuoteListItem);
+  return { items, pagination: buildPaginationMeta(pagination, count, items.length) };
+}
+
 export async function listAgencyReservations(
   supabase: SupabaseClientLike,
   agencyAccountId: string
@@ -49,6 +78,28 @@ export async function listAgencyReservations(
 
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapAgencyReservationListItem);
+}
+
+/** 예약 목록의 연관 건수는 목록 페이지에 필요한 최소 정보만 조회합니다. */
+export async function listAgencyReservationPage(
+  supabase: SupabaseClientLike,
+  agencyAccountId: string,
+  pagination: PaginationInput
+): Promise<PaginatedResult<AgencyReservationListItem>> {
+  const { from, to } = paginationRange(pagination);
+  const { data, error, count } = await supabase
+    .from("reservations")
+    .select(
+      "id, reservation_code, status, tour_start_date, tour_end_date, quote_case_id, created_at, quote_cases(case_code, tour_name), reservation_status_history(id), rooming_lists(id)",
+      { count: "exact" }
+    )
+    .eq("agency_account_id", agencyAccountId)
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (error) throw new Error(error.message);
+  const items = (data ?? []).map(mapAgencyReservationListItem);
+  return { items, pagination: buildPaginationMeta(pagination, count, items.length) };
 }
 
 export async function getAgencyReservationDetail(
@@ -122,6 +173,29 @@ export async function listAgencyInvoices(
 
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapAgencyInvoiceListItem);
+}
+
+/** 발행된 파트너 인보이스만 페이지 단위로 반환하며 내부 정산 데이터는 조회하지 않습니다. */
+export async function listAgencyInvoicePage(
+  supabase: SupabaseClientLike,
+  agencyAccountId: string,
+  pagination: PaginationInput
+): Promise<PaginatedResult<AgencyInvoiceListItem>> {
+  const { from, to } = paginationRange(pagination);
+  const { data, error, count } = await supabase
+    .from("invoices")
+    .select(
+      "id, invoice_no, tour_code, version_no, reservation_id, status, currency, total_amount, issued_at, due_date, payment_deadline, collection_timing, collection_status, deposit_required, deposit_amount, storage_path, created_at, reservations!inner(id, reservation_code, agency_account_id, quote_cases(tour_name), agency_accounts(name)), payments(id, status, amount)",
+      { count: "exact" }
+    )
+    .eq("reservations.agency_account_id", agencyAccountId)
+    .in("status", ["issued", "partially_paid", "paid", "overdue"])
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (error) throw new Error(error.message);
+  const items = (data ?? []).map(mapAgencyInvoiceListItem);
+  return { items, pagination: buildPaginationMeta(pagination, count, items.length) };
 }
 
 export async function getAgencyInvoiceDetail(

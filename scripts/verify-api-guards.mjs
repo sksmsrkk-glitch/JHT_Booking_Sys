@@ -23,7 +23,8 @@ const guardPatterns = [
   { name: "invoice export loader guard", pattern: /\bloadInvoiceForExport\s*\(/ }
 ];
 
-const httpMethodPattern = /\bexport\s+async\s+function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*\(/g;
+const httpMethodPattern =
+  /\bexport\s+(?:async\s+function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*\(|const\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*=\s*instrumentApiRoute\([^,]+,\s*async\s*\()/g;
 const failures = [];
 let routeCount = 0;
 let handlerCount = 0;
@@ -88,7 +89,7 @@ function findExportedHandlers(source) {
   const handlers = [];
   let match;
   while ((match = httpMethodPattern.exec(source)) !== null) {
-    const method = match[1];
+    const method = match[1] ?? match[2];
     const bodyStart = findFunctionBodyStart(source, httpMethodPattern.lastIndex - 1);
     if (bodyStart === -1) {
       handlers.push({ method, body: "" });

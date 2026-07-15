@@ -1136,6 +1136,18 @@ DB 적용 후에는 반드시 다음 화면을 직접 확인합니다.
 - 원본 입력값은 가능한 보존하되, 내부 표준 코드와 매핑합니다.
 - import 결과는 audit 가능한 batch 단위로 관리합니다.
 
+## 14. 대규모 사용자와 성능 확장
+
+현재 핵심 목록은 서버 pagination, DB 검색·집계, 전용 인덱스를 사용합니다. 파트너 문의, Notion CSV staging, 인보이스 발행은 멱등성 키와 PostgreSQL 단일 트랜잭션으로 보호됩니다. API는 request ID와 server timing을 제공하며 Playwright E2E와 부하 smoke로 성능 예산을 검증합니다.
+
+Java는 현재 CRUD에 사용하지 않습니다. 최종 빌드의 인증 API 300요청/동시성15 측정에서 오류 0, p95 211.2ms로 목표 안에 있기 때문입니다. 대신 quote export 작업은 lease와 `FOR UPDATE SKIP LOCKED` 기반의 언어 중립 worker 계약을 사용하므로, 대량 Excel/PDF/정산 작업이 임계치를 넘으면 웹 코드를 변경하지 않고 Java worker를 추가할 수 있습니다.
+
+자세한 운영 기준:
+
+- [성능·확장성 운영 가이드](docs/performance-scalability.md)
+- [Java 하이브리드 결정 기록](docs/java-hybrid-decision.md)
+- [상세 아키텍처](docs/architecture.md)
+
 ## 현재 구현 요약
 
 현재 저장소에는 다음 주요 기능의 1차 구현이 포함되어 있습니다.
@@ -1167,3 +1179,5 @@ DB 적용 후에는 반드시 다음 화면을 직접 확인합니다.
 - [환율 공통 관리](docs/exchange-rate-management.md)
 - [Notion Markdown Export 변환기](docs/notion-markdown-import.md)
 - [런칭 런북](docs/launch-runbook.md)
+- [성능·확장성 운영 가이드](docs/performance-scalability.md)
+- [Java 하이브리드 결정 기록](docs/java-hybrid-decision.md)

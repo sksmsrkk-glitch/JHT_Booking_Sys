@@ -66,6 +66,7 @@
 - `POST /api/quote-versions/:id/itinerary-days`
 - `PATCH /api/quote-versions/:id/status`
 - `GET /api/reservations`
+- `GET /api/reservations/dashboard`
 - `POST /api/reservations`
 - `GET /api/reservations/:id`
 - `PATCH /api/reservations/:id`
@@ -215,6 +216,29 @@
 - The login `next` value is accepted only when it is a same-portal absolute path (`/admin/...` for internal accounts or `/agency/...` for partner accounts); external and cross-portal redirects fall back to the portal home.
 - API routes accept either an `Authorization: Bearer ...` header or the `jht_access_token` cookie.
 - `POST /auth/logout` clears both session cookies. Logout is intentionally not exposed as GET so Next.js link prefetch cannot terminate an active session.
+
+## Pagination And Performance
+
+- High-volume list endpoints accept `page` and `pageSize`; `pageSize` defaults to 20 and is capped at 100.
+- Paginated responses use `{ data, pagination }`. Pagination includes `page`, `pageSize`, `total`, `totalPages`, `hasPrevious`, and `hasNext`.
+- Search, status filters, ordering, and counts are applied in PostgreSQL before `.range(from, to)`.
+- `GET /api/reservations/dashboard` returns full-filter DB aggregates separately from the paginated reservation rows.
+- Instrumented endpoints return `x-request-id` and `Server-Timing`. Requests slower than `API_SLOW_REQUEST_MS` emit a sanitized structured warning.
+- Authenticated operational and finance responses remain `no-store`. `GET /api/countries` is public reference data with a five-minute shared cache and stale-while-revalidate fallback.
+
+## Transaction And Idempotency
+
+- `POST /api/agency/inquiries` accepts `idempotency-key` and atomically creates the inquiry, workflow thread when needed, first message, and audit record through `submit_agency_inquiry_atomic`.
+- `POST /api/migrations/notion-csv` accepts `idempotency-key` and atomically creates the migration batch, all staging rows, and audit record through `stage_notion_csv_batch_atomic`.
+- `POST /api/finance/invoices` accepts `idempotency-key`. `create_invoice_version_atomic` serializes version assignment per reservation and atomically writes invoice lines, the workflow link, and audit record.
+- A client must retain the same key after a network error and generate a new key only after a successful response or a deliberate new business action.
+
+## Worker Contract
+
+- The quote export worker claims jobs with `claim_quote_export_jobs(workerId, limit, leaseSeconds)`.
+- Claims use `FOR UPDATE SKIP LOCKED`; expired processing leases can be reclaimed.
+- A worker completes a job with `finish_quote_export_job(jobId, workerId, status, storagePath, errorMessage)`. The final state and audit record are committed in the same database transaction.
+- Worker RPC execution is restricted to `service_role`. The contract is shared by the current Node worker and any future Java worker.
 
 ## Local Demo Seed
 

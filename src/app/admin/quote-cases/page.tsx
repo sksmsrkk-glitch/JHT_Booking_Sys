@@ -6,16 +6,20 @@ import type { QuoteCaseListItem } from "@/features/quotation/types";
 import { QuoteCaseCreateForm } from "@/components/admin/QuoteCaseCreateForm";
 import type { AgencyListItem } from "@/features/agency/types";
 import type { CompanyListItem } from "@/features/company/types";
+import { PaginationControls } from "@/components/PaginationControls";
+import type { PaginationMeta } from "@/lib/api/pagination";
 
 export const dynamic = "force-dynamic";
 
 type SearchParams = Promise<{
   q?: string;
   status?: string;
+  page?: string;
+  pageSize?: string;
 }>;
 
 type LoadState =
-  | { status: "ready"; quoteCases: QuoteCaseListItem[]; agencies: AgencyListItem[]; companies: CompanyListItem[] }
+  | { status: "ready"; quoteCases: QuoteCaseListItem[]; agencies: AgencyListItem[]; companies: CompanyListItem[]; pagination: PaginationMeta }
   | { status: "auth-required"; message: string }
   | { status: "error"; message: string };
 
@@ -47,6 +51,8 @@ export default async function AdminQuoteCasesPage({ searchParams }: { searchPara
           Search
           <input type="search" name="q" defaultValue={filters.q ?? ""} placeholder="Case code, tour, share id" />
         </label>
+        <input name="page" type="hidden" value="1" />
+        <input name="pageSize" type="hidden" value={filters.pageSize ?? "20"} />
         <label>
           Status
           <select name="status" defaultValue={filters.status ?? ""}>
@@ -105,7 +111,16 @@ export default async function AdminQuoteCasesPage({ searchParams }: { searchPara
         </section>
       ) : null}
 
-      {loadState.status === "ready" ? <QuoteCaseTable quoteCases={loadState.quoteCases} /> : null}
+      {loadState.status === "ready" ? (
+        <>
+          <QuoteCaseTable quoteCases={loadState.quoteCases} />
+          <PaginationControls
+            action="/admin/quote-cases"
+            pagination={loadState.pagination}
+            searchParams={{ q: filters.q, status: filters.status }}
+          />
+        </>
+      ) : null}
 
       <section className="notice">
         <h2>Boundary Guardrails</h2>
@@ -177,7 +192,7 @@ function QuoteCaseTable({ quoteCases }: { quoteCases: QuoteCaseListItem[] }) {
   );
 }
 
-async function loadQuoteCases(filters: { q?: string; status?: string }): Promise<LoadState> {
+async function loadQuoteCases(filters: { q?: string; status?: string; page?: string; pageSize?: string }): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
     return {
@@ -219,16 +234,19 @@ async function loadQuoteCases(filters: { q?: string; status?: string }): Promise
     status: "ready",
     quoteCases: quotePayload.data ?? [],
     agencies: agencyPayload.data ?? [],
-    companies: companyPayload.data ?? []
+    companies: companyPayload.data ?? [],
+    pagination: quotePayload.pagination
   };
 }
 
-function buildInternalApiUrl(path: string, filters: { q?: string; status?: string }, headerStore: Headers) {
+function buildInternalApiUrl(path: string, filters: { q?: string; status?: string; page?: string; pageSize?: string }, headerStore: Headers) {
   const protocol = headerStore.get("x-forwarded-proto") ?? "http";
   const host = headerStore.get("host") ?? "localhost:3000";
   const url = new URL(path, `${protocol}://${host}`);
   if (filters.q) url.searchParams.set("q", filters.q);
   if (filters.status) url.searchParams.set("status", filters.status);
+  if (filters.page) url.searchParams.set("page", filters.page);
+  if (filters.pageSize) url.searchParams.set("pageSize", filters.pageSize);
   return url;
 }
 
