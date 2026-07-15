@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 
 export function SupplierMessageActions({
@@ -36,7 +38,7 @@ export function SupplierMessageActions({
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   async function queueSend() {
@@ -51,7 +53,7 @@ export function SupplierMessageActions({
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

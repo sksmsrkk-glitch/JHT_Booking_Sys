@@ -4,12 +4,15 @@ import type {
   AgencyInvoiceListItem,
   AgencyPaymentSummary,
   AgencyPassengerItem,
+  AgencyQuoteDetail,
   AgencyQuoteListItem,
+  AgencyQuotePresentationBlock,
   AgencyReservationDetail,
   AgencyReservationListItem,
   AgencyReservationStatusHistoryItem,
   AgencyRoomingListItem
 } from "./types";
+import type { AgencyInquirySummary } from "@/features/agency/types";
 import { convertKrwToQuoteCurrency } from "@/lib/domain/currency.mjs";
 import {
   buildPaginationMeta,
@@ -40,6 +43,44 @@ export async function listAgencyQuoteCases(
   return (data ?? []).map(mapAgencyQuoteListItem);
 }
 
+export type AgencyInquiryListItem = AgencyInquirySummary & {
+  tourCode: string | null;
+  periodText: string | null;
+};
+
+export async function listAgencyInquiryPage(
+  supabase: SupabaseClientLike,
+  agencyAccountId: string,
+  pagination: PaginationInput
+): Promise<PaginatedResult<AgencyInquiryListItem>> {
+  const { from, to } = paginationRange(pagination);
+  const { data, error, count } = await supabase
+    .from("agency_inquiries")
+    .select(
+      "id, inquiry_type, title, tour_code, period_text, requested_start_date, requested_end_date, pax_count, tour_type, status, created_at",
+      { count: "exact" }
+    )
+    .eq("agency_account_id", agencyAccountId)
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (error) throw new Error(error.message);
+  const items = (data ?? []).map((row: any) => ({
+    id: row.id,
+    tourCode: row.tour_code ?? null,
+    inquiryType: row.inquiry_type,
+    title: row.title,
+    requestedStartDate: row.requested_start_date ?? null,
+    requestedEndDate: row.requested_end_date ?? null,
+    periodText: row.period_text ?? null,
+    paxCount: row.pax_count ?? null,
+    tourType: row.tour_type ?? null,
+    status: row.status,
+    createdAt: row.created_at
+  }));
+  return { items, pagination: buildPaginationMeta(pagination, count, items.length) };
+}
+
 /** 파트너 견적 목록은 RLS 범위 안에서 개수와 행을 함께 조회해 대량 데이터에도 일정한 응답 크기를 유지합니다. */
 export async function listAgencyQuoteCasePage(
   supabase: SupabaseClientLike,
@@ -61,6 +102,42 @@ export async function listAgencyQuoteCasePage(
   if (error) throw new Error(error.message);
   const items = (data ?? []).map(mapAgencyQuoteListItem);
   return { items, pagination: buildPaginationMeta(pagination, count, items.length) };
+}
+
+/** 파트너에게 공개 가능한 견적 버전과 일정만 조회하며 내부 원가와 마진은 선택하지 않습니다. */
+export async function getAgencyQuoteCaseDetail(
+  supabase: SupabaseClientLike,
+  agencyAccountId: string,
+  shareId: string
+): Promise<AgencyQuoteDetail | null> {
+  const { data: quoteCase, error: caseError } = await supabase
+    .from("quote_cases")
+    .select("id, case_code, share_id, tour_name, tour_type, status, currency, estimated_pax, start_date, end_date, created_at")
+    .eq("share_id", shareId)
+    .eq("agency_account_id", agencyAccountId)
+    .maybeSingle();
+
+  if (caseError) throw new Error(caseError.message);
+  if (!quoteCase) return null;
+
+  const [{ data: versions, error: versionError }, { data: inquiries, error: inquiryError }] = await Promise.all([
+    supabase
+      .from("quote_versions")
+      .select("id, version_no, status, currency, exchange_rate_to_krw, agency_visible_summary, public_fare_options, public_total_amount, terms_and_conditions, sent_at, accepted_at, quote_itinerary_days(id, day_no, service_date, title, meal_summary, public_description, route_segments(id, seq, origin_label, destination_label, travel_minutes, distance_meters, provider)), quote_presentation_blocks(id, quote_itinerary_day_id, block_type, display_context, title, description, image_storage_path, image_url, alt_text, sort_order, metadata)")
+      .eq("quote_case_id", quoteCase.id)
+      .in("status", ["sent", "accepted", "superseded"])
+      .order("version_no", { ascending: false }),
+    supabase
+      .from("agency_inquiries")
+      .select("id, inquiry_type, title, status, request_payload, created_at")
+      .eq("related_quote_case_id", quoteCase.id)
+      .eq("agency_account_id", agencyAccountId)
+      .order("created_at", { ascending: false })
+  ]);
+
+  if (versionError) throw new Error(versionError.message);
+  if (inquiryError) throw new Error(inquiryError.message);
+  return mapAgencyQuoteDetail({ ...quoteCase, versions: versions ?? [], request_timeline: inquiries ?? [] });
 }
 
 export async function listAgencyReservations(
@@ -260,6 +337,83 @@ function mapAgencyQuoteListItem(row: any): AgencyQuoteListItem {
     sentAt: latestVersion?.sent_at ?? null,
     acceptedAt: latestVersion?.accepted_at ?? null,
     createdAt: row.created_at
+  };
+}
+
+function mapAgencyQuoteDetail(row: any): AgencyQuoteDetail {
+  const mapBlock = (block: any): AgencyQuotePresentationBlock => ({
+    id: block.id,
+    quoteItineraryDayId: block.quote_itinerary_day_id ?? null,
+    blockType: block.block_type,
+    displayContext: block.display_context,
+    title: block.title ?? null,
+    description: block.description ?? null,
+    imageStoragePath: block.image_storage_path ?? null,
+    imageUrl: block.image_url ?? null,
+    altText: block.alt_text ?? null,
+    sortOrder: block.sort_order,
+    metadata: block.metadata ?? {}
+  });
+
+  return {
+    id: row.id,
+    caseCode: row.case_code,
+    shareId: row.share_id,
+    tourName: row.tour_name,
+    tourType: row.tour_type ?? null,
+    status: row.status,
+    currency: row.currency,
+    estimatedPax: row.estimated_pax ?? null,
+    startDate: row.start_date ?? null,
+    endDate: row.end_date ?? null,
+    createdAt: row.created_at,
+    requestTimeline: (row.request_timeline ?? []).map((request: any) => ({
+      id: request.id,
+      inquiryType: request.inquiry_type,
+      title: request.title,
+      status: request.status,
+      requestPayload: request.request_payload ?? {},
+      createdAt: request.created_at
+    })),
+    versions: (row.versions ?? []).map((version: any) => {
+      const presentationBlocks: AgencyQuotePresentationBlock[] = (version.quote_presentation_blocks ?? []).map(mapBlock);
+      const currency = version.currency ?? row.currency;
+      return {
+        id: version.id,
+        versionNo: version.version_no,
+        status: version.status,
+        currency,
+        agencyVisibleSummary: version.agency_visible_summary ?? {},
+        publicFareOptions: Array.isArray(version.public_fare_options) ? version.public_fare_options : [],
+        publicTotalAmount: convertKrwToQuoteCurrency(
+          Number(version.public_total_amount ?? 0),
+          Number(version.exchange_rate_to_krw ?? 1),
+          currency
+        ),
+        termsAndConditions: version.terms_and_conditions ?? null,
+        sentAt: version.sent_at ?? null,
+        acceptedAt: version.accepted_at ?? null,
+        presentationBlocks,
+        itineraryDays: (version.quote_itinerary_days ?? []).map((day: any) => ({
+          id: day.id,
+          dayNo: day.day_no,
+          serviceDate: day.service_date ?? null,
+          title: day.title ?? null,
+          mealSummary: day.meal_summary ?? {},
+          publicDescription: day.public_description ?? null,
+          presentationBlocks: presentationBlocks.filter((block) => block.quoteItineraryDayId === day.id),
+          routeSegments: (day.route_segments ?? []).map((segment: any) => ({
+            id: segment.id,
+            seq: segment.seq,
+            originLabel: segment.origin_label,
+            destinationLabel: segment.destination_label,
+            travelMinutes: segment.travel_minutes ?? null,
+            distanceMeters: segment.distance_meters ?? null,
+            provider: segment.provider
+          }))
+        }))
+      };
+    })
   };
 }
 

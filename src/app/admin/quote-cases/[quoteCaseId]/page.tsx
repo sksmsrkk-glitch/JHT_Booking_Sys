@@ -10,9 +10,11 @@ import { QuoteVersionPublicSummaryForm } from "@/components/admin/QuoteVersionPu
 import { ReservationCreateFromQuoteAction } from "@/components/admin/ReservationCreateFromQuoteAction";
 import { QuoteVersionStatusActions } from "@/components/admin/QuoteVersionStatusActions";
 import { RouteSegmentCreateForm } from "@/components/admin/RouteSegmentCreateForm";
+import { searchCostItems } from "@/features/costing/queries";
 import type { CostSearchItem } from "@/features/costing/types";
+import { getQuoteCaseDetail } from "@/features/quotation/queries";
 import type { QuoteCaseDetail, QuotePresentationBlockDetail, QuoteVersionDetail } from "@/features/quotation/types";
-import { getPageAuthorization } from "@/lib/api/page-session";
+import { classifyPageDataError, getInternalPageContext } from "@/lib/api/server-page-context";
 
 export const dynamic = "force-dynamic";
 
@@ -506,42 +508,17 @@ function PresentationBlockGrid({ blocks }: { blocks: QuotePresentationBlockDetai
 }
 
 async function loadQuoteCase(quoteCaseId: string): Promise<LoadState> {
-  const { headerStore, authorization } = await getPageAuthorization();
-  if (!authorization) {
-    return {
-      status: "auth-required",
-      message: "This page reads quote detail through the internal API, which requires an internal role."
-    };
+  try {
+    const { supabase } = await getInternalPageContext();
+    const [quoteCase, costItems] = await Promise.all([
+      getQuoteCaseDetail(supabase, quoteCaseId),
+      searchCostItems(supabase, { limit: 80 })
+    ]);
+    if (!quoteCase) return { status: "not-found", message: "Quote case not found" };
+    return { status: "ready", quoteCase, costItems };
+  } catch (error) {
+    return classifyPageDataError(error);
   }
-
-  const [quoteResponse, costResponse] = await Promise.all([
-    fetch(buildInternalApiUrl(`/api/quote-cases/${quoteCaseId}`, headerStore), {
-      headers: { authorization },
-      cache: "no-store"
-    }),
-    fetch(buildInternalApiUrl("/api/cost-items/search?limit=80", headerStore), {
-      headers: { authorization },
-      cache: "no-store"
-    })
-  ]);
-  const [quotePayload, costPayload] = await Promise.all([quoteResponse.json(), costResponse.json()]);
-
-  if (!quoteResponse.ok || !costResponse.ok) {
-    if (quoteResponse.status === 404) return { status: "not-found", message: quotePayload.error ?? "Quote case not found" };
-    const failedResponse = !quoteResponse.ok ? quoteResponse : costResponse;
-    return {
-      status: failedResponse.status === 401 || failedResponse.status === 403 ? "auth-required" : "error",
-      message: quotePayload.error ?? costPayload.error ?? "Unknown quote detail API error"
-    };
-  }
-
-  return { status: "ready", quoteCase: quotePayload.data, costItems: costPayload.data ?? [] };
-}
-
-function buildInternalApiUrl(path: string, headerStore: Headers) {
-  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
-  const host = headerStore.get("host") ?? "localhost:3000";
-  return new URL(path, `${protocol}://${host}`);
 }
 
 function formatDateRange(start: string | null, end: string | null) {

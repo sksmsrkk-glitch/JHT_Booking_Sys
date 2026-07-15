@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 import type { ReservationPassengerItem, ReservationRoomingListItem } from "@/features/reservation/types";
 
@@ -42,7 +44,7 @@ export function RoomAssignmentCreateForm({
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 import { parseRoomingListText } from "@/lib/domain/rooming-list.mjs";
 
@@ -60,7 +62,7 @@ export function RoomingListUploadForm({
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

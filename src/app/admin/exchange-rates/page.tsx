@@ -4,9 +4,11 @@ import { CountryReferenceCreateForm } from "@/components/admin/CountryReferenceC
 import { ExchangeRateCreateForm } from "@/components/admin/ExchangeRateCreateForm";
 import { ExchangeRateFilterForm } from "@/components/admin/ExchangeRateFilterForm";
 import { mergeCountryReferences } from "@/features/countries/defaults";
+import { listCountryReferences } from "@/features/countries/queries";
 import type { CountryReference } from "@/features/countries/types";
+import { listExchangeRates } from "@/features/exchange-rates/queries";
 import type { ExchangeRateListItem } from "@/features/exchange-rates/types";
-import { getPageAuthorization } from "@/lib/api/page-session";
+import { classifyPageDataError, getInternalPageContext } from "@/lib/api/server-page-context";
 
 export const dynamic = "force-dynamic";
 
@@ -178,44 +180,16 @@ function ExchangeRateTable({ rates }: { rates: ExchangeRateListItem[] }) {
 }
 
 async function loadExchangeRates(filters: { countryCode?: string; baseCurrency?: string; status?: string }): Promise<LoadState> {
-  const { authorization, headerStore } = await getPageAuthorization();
-  if (!authorization) {
-    return {
-      status: "auth-required",
-      message: "This page reads exchange rates through the internal API, which requires a Supabase user JWT with an internal role."
-    };
+  try {
+    const { supabase } = await getInternalPageContext();
+    const [rates, countries] = await Promise.all([
+      listExchangeRates(supabase, filters),
+      listCountryReferences(supabase)
+    ]);
+    return { status: "ready", rates, countries };
+  } catch (error) {
+    return classifyPageDataError(error);
   }
-
-  const [rateResponse, countryResponse] = await Promise.all([
-    fetch(buildInternalApiUrl("/api/exchange-rates", filters, headerStore), {
-      headers: { authorization },
-      cache: "no-store"
-    }),
-    fetch(buildInternalApiUrl("/api/countries", {}, headerStore), {
-      headers: { authorization },
-      cache: "no-store"
-    })
-  ]);
-  const [ratePayload, countryPayload] = await Promise.all([rateResponse.json(), countryResponse.json()]);
-  const failedResponse = [rateResponse, countryResponse].find((response) => !response.ok);
-  if (failedResponse) {
-    return {
-      status: failedResponse.status === 401 || failedResponse.status === 403 ? "auth-required" : "error",
-      message: ratePayload.error ?? countryPayload.error ?? "Unknown exchange-rate API error"
-    };
-  }
-
-  return { status: "ready", rates: ratePayload.data ?? [], countries: countryPayload.data ?? [] };
-}
-
-function buildInternalApiUrl(path: string, filters: { countryCode?: string; baseCurrency?: string; status?: string }, headerStore: Headers) {
-  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
-  const host = headerStore.get("host") ?? "localhost:3000";
-  const url = new URL(path, `${protocol}://${host}`);
-  if (filters.countryCode) url.searchParams.set("countryCode", filters.countryCode);
-  if (filters.baseCurrency) url.searchParams.set("baseCurrency", filters.baseCurrency);
-  if (filters.status) url.searchParams.set("status", filters.status);
-  return url;
 }
 
 function formatStatusLabel(value: string) {

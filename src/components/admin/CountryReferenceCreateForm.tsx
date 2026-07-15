@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useEffect, useMemo, useState } from "react";
 import { buildCurrencyOptions, mergeCountryReferences } from "@/features/countries/defaults";
 import type { CountryReference } from "@/features/countries/types";
@@ -81,7 +83,7 @@ export function CountryReferenceCreateForm({ countries = [] }: { countries?: Cou
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

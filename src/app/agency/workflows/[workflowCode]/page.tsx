@@ -2,9 +2,10 @@ import type { Route } from "next";
 import Link from "next/link";
 import { WorkflowLedger } from "@/components/workflow/WorkflowLedger";
 import { getDemoWorkflowByCode } from "@/features/workflow/demo-data";
+import { ensureWorkflowThread, getWorkflowThreadByCode, resolveWorkflowSeedByCode } from "@/features/workflow/queries";
 import type { WorkflowThreadDetail } from "@/features/workflow/types";
-import { getPageAuthorization } from "@/lib/api/page-session";
 import { isDemoModeEnabled } from "@/lib/api/guards";
+import { getAgencyPageContext } from "@/lib/api/server-page-context";
 
 export const dynamic = "force-dynamic";
 
@@ -54,14 +55,30 @@ export default async function AgencyWorkflowPage({ params }: { params: PageParam
 }
 
 async function loadWorkflow(workflowCode: string): Promise<LoadState> {
-  const { headerStore, authorization } = await getPageAuthorization();
-  const response = await fetch(buildInternalApiUrl(`/api/workflows/${encodeURIComponent(workflowCode)}`, headerStore), {
-    headers: authorization ? { authorization } : {},
-    cache: "no-store"
-  });
-  const payload = await response.json();
-  if (!response.ok) return { status: "error", message: payload.error ?? "Workflow could not load" };
-  if (payload.data) return { status: "ready", workflow: payload.data, previewMode: Boolean(payload.data.preview || !authorization) };
+  try {
+    const { supabase, user } = await getAgencyPageContext();
+    const existing = await getWorkflowThreadByCode(supabase, workflowCode, { partnerVisibleOnly: true });
+    if (existing) return { status: "ready", workflow: existing, previewMode: false };
+
+    const seed = await resolveWorkflowSeedByCode(supabase, workflowCode);
+    if (seed && seed.agencyAccountId === user.agencyAccountId) {
+      await ensureWorkflowThread(supabase, {
+        workflowCode: seed.workflowCode ?? workflowCode,
+        title: seed.title ?? workflowCode,
+        agencyAccountId: seed.agencyAccountId,
+        agencyInquiryId: seed.agencyInquiryId,
+        quoteCaseId: seed.quoteCaseId,
+        reservationId: seed.reservationId,
+        currentInvoiceId: null,
+        createdBy: null
+      });
+      const workflow = await getWorkflowThreadByCode(supabase, workflowCode, { partnerVisibleOnly: true });
+      if (workflow) return { status: "ready", workflow, previewMode: false };
+    }
+  } catch {
+    // 아래 개발 미리보기 경로에서만 샘플 원장을 사용하고 운영에서는 일반 오류로 종료합니다.
+    if (!isDemoModeEnabled()) return { status: "error", message: "Workflow could not load" };
+  }
 
   const demo = getDemoWorkflowByCode(workflowCode);
   if (isDemoModeEnabled() && demo) {
@@ -76,10 +93,4 @@ async function loadWorkflow(workflowCode: string): Promise<LoadState> {
     };
   }
   return { status: "not-found", message: "No workflow thread exists for this code yet." };
-}
-
-function buildInternalApiUrl(path: string, headerStore: Headers) {
-  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
-  const host = headerStore.get("host") ?? "localhost:3000";
-  return new URL(path, `${protocol}://${host}`);
 }

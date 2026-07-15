@@ -1,13 +1,15 @@
 import type { Route } from "next";
 import Link from "next/link";
-import { getPageAuthorization } from "@/lib/api/page-session";
-import { QUOTE_STATUSES } from "@/features/quotation/queries";
+import { QUOTE_STATUSES, listQuoteCasePage } from "@/features/quotation/queries";
 import type { QuoteCaseListItem } from "@/features/quotation/types";
 import { QuoteCaseCreateForm } from "@/components/admin/QuoteCaseCreateForm";
 import type { AgencyListItem } from "@/features/agency/types";
+import { listAgencyAccountPage } from "@/features/agency/queries";
 import type { CompanyListItem } from "@/features/company/types";
+import { listCompanies } from "@/features/company/queries";
 import { PaginationControls } from "@/components/PaginationControls";
-import type { PaginationMeta } from "@/lib/api/pagination";
+import { parsePagination, type PaginationMeta } from "@/lib/api/pagination";
+import { classifyPageDataError, getInternalPageContext } from "@/lib/api/server-page-context";
 
 export const dynamic = "force-dynamic";
 
@@ -194,61 +196,30 @@ function QuoteCaseTable({ quoteCases }: { quoteCases: QuoteCaseListItem[] }) {
 }
 
 async function loadQuoteCases(filters: { q?: string; status?: string; page?: string; pageSize?: string }): Promise<LoadState> {
-  const { headerStore, authorization } = await getPageAuthorization();
-  if (!authorization) {
+  try {
+    const { supabase } = await getInternalPageContext();
+    const searchParams = new URLSearchParams();
+    if (filters.page) searchParams.set("page", filters.page);
+    if (filters.pageSize) searchParams.set("pageSize", filters.pageSize);
+    const pagination = parsePagination(searchParams);
+
+    /* 인증을 한 번만 확인한 뒤 화면에 필요한 세 조회를 같은 서버 요청에서 병렬 실행합니다. */
+    const [quoteCases, agencies, companies] = await Promise.all([
+      listQuoteCasePage(supabase, { q: filters.q, status: filters.status }, pagination),
+      listAgencyAccountPage(supabase, { status: "active" }, { page: 1, pageSize: 100 }),
+      listCompanies(supabase)
+    ]);
+
     return {
-      status: "auth-required",
-      message:
-        "This page reads quote cases through the internal API, which requires a Supabase user JWT with an internal role."
+      status: "ready",
+      quoteCases: quoteCases.items,
+      agencies: agencies.items,
+      companies,
+      pagination: quoteCases.pagination
     };
+  } catch (error) {
+    return classifyPageDataError(error);
   }
-
-  const [quoteResponse, agencyResponse, companyResponse] = await Promise.all([
-    fetch(buildInternalApiUrl("/api/quote-cases", filters, headerStore), {
-      headers: { authorization },
-      cache: "no-store"
-    }),
-    fetch(buildInternalApiUrl("/api/agencies", { status: "active" }, headerStore), {
-      headers: { authorization },
-      cache: "no-store"
-    }),
-    fetch(buildInternalApiUrl("/api/companies", {}, headerStore), {
-      headers: { authorization },
-      cache: "no-store"
-    })
-  ]);
-  const [quotePayload, agencyPayload, companyPayload] = await Promise.all([
-    quoteResponse.json(),
-    agencyResponse.json(),
-    companyResponse.json()
-  ]);
-
-  const failedResponse = [quoteResponse, agencyResponse, companyResponse].find((response) => !response.ok);
-  if (failedResponse) {
-    return {
-      status: failedResponse.status === 401 || failedResponse.status === 403 ? "auth-required" : "error",
-      message: quotePayload.error ?? agencyPayload.error ?? companyPayload.error ?? "Unknown quote case API error"
-    };
-  }
-
-  return {
-    status: "ready",
-    quoteCases: quotePayload.data ?? [],
-    agencies: agencyPayload.data ?? [],
-    companies: companyPayload.data ?? [],
-    pagination: quotePayload.pagination
-  };
-}
-
-function buildInternalApiUrl(path: string, filters: { q?: string; status?: string; page?: string; pageSize?: string }, headerStore: Headers) {
-  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
-  const host = headerStore.get("host") ?? "localhost:3000";
-  const url = new URL(path, `${protocol}://${host}`);
-  if (filters.q) url.searchParams.set("q", filters.q);
-  if (filters.status) url.searchParams.set("status", filters.status);
-  if (filters.page) url.searchParams.set("page", filters.page);
-  if (filters.pageSize) url.searchParams.set("pageSize", filters.pageSize);
-  return url;
 }
 
 function formatDateRange(start: string | null, end: string | null) {

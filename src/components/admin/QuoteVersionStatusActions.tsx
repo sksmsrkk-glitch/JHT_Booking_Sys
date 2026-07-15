@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 
 export function QuoteVersionStatusActions({
@@ -29,7 +31,7 @@ export function QuoteVersionStatusActions({
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   const canSend = ["draft", "review"].includes(status) && publicTotalAmount > 0;

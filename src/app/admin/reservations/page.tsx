@@ -1,13 +1,18 @@
 import type { Route } from "next";
 import Link from "next/link";
-import { getPageAuthorization } from "@/lib/api/page-session";
-import { RESERVATION_STATUSES } from "@/features/reservation/queries";
+import {
+  RESERVATION_STATUSES,
+  getReservationDashboard,
+  listReservationCalendar,
+  listReservationPage
+} from "@/features/reservation/queries";
 import { demoReservations } from "@/features/reservation/demo-data";
 import type { ReservationDashboardData, ReservationListItem } from "@/features/reservation/types";
 import { ReservationActions } from "@/components/admin/ReservationActions";
 import { PaginationControls } from "@/components/PaginationControls";
 import { buildPaginationMeta, type PaginationMeta } from "@/lib/api/pagination";
 import { isDemoModeEnabled } from "@/lib/api/guards";
+import { classifyPageDataError, getInternalPageContext } from "@/lib/api/server-page-context";
 
 export const dynamic = "force-dynamic";
 
@@ -963,38 +968,47 @@ async function loadReservations(filters: {
   pageSize: number;
   sortBy: string;
 }): Promise<LoadState> {
-  const { headerStore, authorization } = await getPageAuthorization();
-  if (!authorization) {
-    if (isDemoModeEnabled()) {
-      return buildDemoReservationState(
-        filters,
-        "Demo mode is enabled. Showing sample group-status data without an internal session."
-      );
-    }
+  try {
+    const { supabase } = await getInternalPageContext();
+    const month = filters.month ?? currentCalendarMonth();
+    const { start, end } = reservationMonthRange(month);
+
+    /* 목록, 집계 RPC, 달력 범위를 한 인증 컨텍스트에서 병렬 조회해 내부 HTTP 왕복을 제거합니다. */
+    const [list, dashboard, calendar] = await Promise.all([
+      listReservationPage(
+        supabase,
+        { q: filters.q, status: filters.status, sortBy: filters.sortBy },
+        { page: filters.page, pageSize: filters.pageSize }
+      ),
+      getReservationDashboard(supabase, {
+        q: filters.q,
+        status: filters.status,
+        monthStart: start
+      }),
+      listReservationCalendar(
+        supabase,
+        { q: filters.q, status: filters.status },
+        { start, end, maxItems: 250 }
+      )
+    ]);
+
     return {
-      status: "auth-required",
-      message: "Sign in with an active internal account to view reservation operations."
+      status: "ready",
+      reservations: list.items,
+      calendarReservations: calendar.items,
+      dashboard,
+      pagination: list.pagination,
+      calendarPagination: calendar.pagination,
+      month,
+      isPreview: false
     };
-  }
-
-  const [listResponse, dashboardResponse] = await Promise.all([
-    fetch(buildInternalApiUrl("/api/reservations", filters, headerStore, true), {
-      headers: { authorization },
-      cache: "no-store"
-    }),
-    fetch(buildInternalApiUrl("/api/reservations/dashboard", filters, headerStore, false), {
-      headers: { authorization },
-      cache: "no-store"
-    })
-  ]);
-  const [listPayload, dashboardPayload] = await Promise.all([listResponse.json(), dashboardResponse.json()]);
-
-  if (!listResponse.ok || !dashboardResponse.ok) {
-    if ([listResponse.status, dashboardResponse.status].some((status) => status === 401 || status === 403)) {
+  } catch (error) {
+    const failure = classifyPageDataError(error);
+    if (failure.status === "auth-required") {
       if (isDemoModeEnabled()) {
         return buildDemoReservationState(
           filters,
-          "Demo mode is enabled because the live reservation API rejected the current session."
+          "Demo mode is enabled because the live reservation data source rejected the current session."
         );
       }
       return {
@@ -1002,42 +1016,16 @@ async function loadReservations(filters: {
         message: "Your internal session is missing, expired, or does not have reservation access."
       };
     }
-    return {
-      status: "error",
-      message: listPayload.error ?? dashboardPayload.error ?? "Unknown reservation API error"
-    };
+    return failure;
   }
-
-  return {
-    status: "ready",
-    reservations: listPayload.data ?? [],
-    calendarReservations: dashboardPayload.data?.calendar ?? [],
-    dashboard: dashboardPayload.data,
-    pagination: listPayload.pagination,
-    calendarPagination: dashboardPayload.data?.calendarPagination,
-    month: dashboardPayload.data?.month ?? filters.month,
-    isPreview: false
-  };
 }
 
-function buildInternalApiUrl(
-  path: string,
-  filters: { q?: string; status?: string; month?: string; page: number; pageSize: number; sortBy: string },
-  headerStore: Headers,
-  includeListControls: boolean
-) {
-  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
-  const host = headerStore.get("host") ?? "localhost:3000";
-  const url = new URL(path, `${protocol}://${host}`);
-  if (filters.q) url.searchParams.set("q", filters.q);
-  if (filters.status) url.searchParams.set("status", filters.status);
-  if (filters.month) url.searchParams.set("month", filters.month);
-  if (includeListControls) {
-    url.searchParams.set("page", String(filters.page));
-    url.searchParams.set("pageSize", String(filters.pageSize));
-    url.searchParams.set("sortBy", filters.sortBy);
-  }
-  return url;
+function reservationMonthRange(month: string) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const start = `${year}-${String(monthNumber).padStart(2, "0")}-01`;
+  const endDate = new Date(Date.UTC(year, monthNumber, 0));
+  const end = `${year}-${String(monthNumber).padStart(2, "0")}-${String(endDate.getUTCDate()).padStart(2, "0")}`;
+  return { start, end };
 }
 
 function buildDemoReservationState(

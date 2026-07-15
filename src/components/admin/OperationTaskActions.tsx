@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 import { OPERATION_TASK_STATUSES } from "@/features/operations/queries";
 
@@ -50,7 +52,7 @@ export function OperationTaskActions({
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   async function sendReminder() {
@@ -67,7 +69,7 @@ export function OperationTaskActions({
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

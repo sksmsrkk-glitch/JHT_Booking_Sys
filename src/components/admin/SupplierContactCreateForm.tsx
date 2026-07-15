@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 
 export function SupplierContactCreateForm({ supplierId }: { supplierId: string }) {
@@ -31,7 +33,7 @@ export function SupplierContactCreateForm({ supplierId }: { supplierId: string }
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

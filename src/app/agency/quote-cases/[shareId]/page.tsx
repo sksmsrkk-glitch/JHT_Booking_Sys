@@ -1,9 +1,9 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { QuoteRequestActions } from "@/components/agency/QuoteRequestActions";
+import { getAgencyQuoteCaseDetail } from "@/features/agency-portal/queries";
 import type { AgencyQuoteDetail, AgencyQuotePresentationBlock } from "@/features/agency-portal/types";
-import { getPageAuthorization } from "@/lib/api/page-session";
-import { convertKrwToQuoteCurrency } from "@/lib/domain/currency.mjs";
+import { classifyPageDataError, getAgencyPageContext } from "@/lib/api/server-page-context";
 
 export const dynamic = "force-dynamic";
 
@@ -286,32 +286,19 @@ function MealSummary({ mealSummary }: { mealSummary: Record<string, unknown> }) 
 }
 
 async function loadQuoteCase(shareId: string): Promise<LoadState> {
-  const { headerStore, authorization } = await getPageAuthorization();
-  if (!authorization) {
+  try {
+    const { supabase, user } = await getAgencyPageContext();
+    const quoteCase = await getAgencyQuoteCaseDetail(supabase, user.agencyAccountId, shareId);
+    if (quoteCase) return { status: "ready", quoteCase };
+
     const preview = getPreviewQuoteDetail(shareId);
     if (preview) return { status: "ready", quoteCase: preview };
-    return { status: "auth-required", message: "This page requires an active agency user JWT." };
-  }
-
-  const response = await fetch(buildInternalApiUrl(`/api/agency/quote-cases/${shareId}`, headerStore), {
-    headers: { authorization },
-    cache: "no-store"
-  });
-  const payload = await response.json();
-
-  if (!response.ok) {
+    return { status: "not-found", message: "Quote not found" };
+  } catch (error) {
     const preview = getPreviewQuoteDetail(shareId);
-    if ((response.status === 401 || response.status === 403 || response.status === 404) && preview) {
-      return { status: "ready", quoteCase: preview };
-    }
-    if (response.status === 404) return { status: "not-found", message: payload.error ?? "Quote not found" };
-    return {
-      status: response.status === 401 || response.status === 403 ? "auth-required" : "error",
-      message: payload.error ?? "Unknown quote detail API error"
-    };
+    if (preview) return { status: "ready", quoteCase: preview };
+    return classifyPageDataError(error);
   }
-
-  return { status: "ready", quoteCase: mapQuoteDetail(payload.data) };
 }
 
 function getPreviewQuoteDetail(shareId: string): AgencyQuoteDetail | null {
@@ -429,87 +416,6 @@ function makePreviewItineraryDay(
   };
 }
 
-function mapQuoteDetail(row: any): AgencyQuoteDetail {
-  const mapBlock = (block: any): AgencyQuotePresentationBlock => ({
-    id: block.id,
-    quoteItineraryDayId: block.quote_itinerary_day_id ?? null,
-    blockType: block.block_type,
-    displayContext: block.display_context,
-    title: block.title ?? null,
-    description: block.description ?? null,
-    imageStoragePath: block.image_storage_path ?? null,
-    imageUrl: block.image_url ?? null,
-    altText: block.alt_text ?? null,
-    sortOrder: block.sort_order,
-    metadata: block.metadata ?? {}
-  });
-
-  return {
-    id: row.id,
-    caseCode: row.case_code,
-    shareId: row.share_id,
-    tourName: row.tour_name,
-    tourType: row.tour_type ?? null,
-    status: row.status,
-    currency: row.currency,
-    estimatedPax: row.estimated_pax ?? null,
-    startDate: row.start_date ?? null,
-    endDate: row.end_date ?? null,
-    createdAt: row.created_at,
-    requestTimeline: (row.request_timeline ?? []).map((request: any) => ({
-      id: request.id,
-      inquiryType: request.inquiry_type,
-      title: request.title,
-      status: request.status,
-      requestPayload: request.request_payload ?? {},
-      createdAt: request.created_at
-    })),
-    versions: (row.versions ?? []).map((version: any) => {
-      const presentationBlocks: AgencyQuotePresentationBlock[] = (version.quote_presentation_blocks ?? []).map(mapBlock);
-      const currency = version.currency ?? row.currency;
-      const publicTotalAmount = convertKrwToQuoteCurrency(
-        Number(version.public_total_amount ?? 0),
-        Number(version.exchange_rate_to_krw ?? 1),
-        currency
-      );
-
-      return {
-        id: version.id,
-        versionNo: version.version_no,
-        status: version.status,
-        currency,
-        agencyVisibleSummary: version.agency_visible_summary ?? {},
-        publicFareOptions: Array.isArray(version.public_fare_options) ? version.public_fare_options : [],
-        publicTotalAmount,
-        termsAndConditions: version.terms_and_conditions ?? null,
-        sentAt: version.sent_at ?? null,
-        acceptedAt: version.accepted_at ?? null,
-        presentationBlocks,
-        itineraryDays: (version.quote_itinerary_days ?? []).map((day: any) => ({
-          id: day.id,
-          dayNo: day.day_no,
-          serviceDate: day.service_date ?? null,
-          title: day.title ?? null,
-          mealSummary: day.meal_summary ?? {},
-          publicDescription: day.public_description ?? null,
-          presentationBlocks: presentationBlocks.filter(
-            (block: AgencyQuotePresentationBlock) => block.quoteItineraryDayId === day.id
-          ),
-          routeSegments: (day.route_segments ?? []).map((segment: any) => ({
-            id: segment.id,
-            seq: segment.seq,
-            originLabel: segment.origin_label,
-            destinationLabel: segment.destination_label,
-            travelMinutes: segment.travel_minutes ?? null,
-            distanceMeters: segment.distance_meters ?? null,
-            provider: segment.provider
-          }))
-        }))
-      };
-    })
-  };
-}
-
 function AgencyPresentationGrid({ blocks }: { blocks: AgencyQuotePresentationBlock[] }) {
   const publicBlocks = blocks.slice().sort((left, right) => left.sortOrder - right.sortOrder);
   if (publicBlocks.length === 0) return null;
@@ -529,12 +435,6 @@ function AgencyPresentationGrid({ blocks }: { blocks: AgencyQuotePresentationBlo
       ))}
     </div>
   );
-}
-
-function buildInternalApiUrl(path: string, headerStore: Headers) {
-  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
-  const host = headerStore.get("host") ?? "localhost:3000";
-  return new URL(path, `${protocol}://${host}`);
 }
 
 function formatDateRange(start: string | null, end: string | null) {

@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 
 export function CompanyCreateForm() {
@@ -26,7 +28,7 @@ export function CompanyCreateForm() {
       return;
     }
 
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

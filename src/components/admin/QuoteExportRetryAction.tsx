@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 
 export function QuoteExportRetryAction({ exportId, status }: { exportId: string; status: string }) {
@@ -22,7 +24,7 @@ export function QuoteExportRetryAction({ exportId, status }: { exportId: string;
       return;
     }
 
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

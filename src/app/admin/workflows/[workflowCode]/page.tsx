@@ -2,9 +2,10 @@ import type { Route } from "next";
 import Link from "next/link";
 import { WorkflowLedger } from "@/components/workflow/WorkflowLedger";
 import { getDemoWorkflowByCode } from "@/features/workflow/demo-data";
+import { ensureWorkflowThread, getWorkflowThreadByCode, resolveWorkflowSeedByCode } from "@/features/workflow/queries";
 import type { WorkflowThreadDetail } from "@/features/workflow/types";
-import { getPageAuthorization } from "@/lib/api/page-session";
 import { isDemoModeEnabled } from "@/lib/api/guards";
+import { classifyPageDataError, getInternalPageContext } from "@/lib/api/server-page-context";
 
 export const dynamic = "force-dynamic";
 
@@ -54,22 +55,22 @@ export default async function AdminWorkflowPage({ params }: { params: PageParams
 }
 
 async function loadWorkflow(workflowCode: string): Promise<LoadState> {
-  const { headerStore, authorization } = await getPageAuthorization();
-  const response = await fetch(buildInternalApiUrl(`/api/workflows/${encodeURIComponent(workflowCode)}`, headerStore), {
-    headers: authorization ? { authorization } : {},
-    cache: "no-store"
-  });
-  const payload = await response.json();
-  if (!response.ok) return { status: "error", message: payload.error ?? "Workflow could not load" };
-  if (payload.data) return { status: "ready", workflow: payload.data, previewMode: Boolean(payload.data.preview || !authorization) };
+  try {
+    const { supabase, user } = await getInternalPageContext();
+    const existing = await getWorkflowThreadByCode(supabase, workflowCode);
+    if (existing) return { status: "ready", workflow: existing, previewMode: false };
+
+    const seed = await resolveWorkflowSeedByCode(supabase, workflowCode);
+    if (seed) {
+      const workflow = await ensureWorkflowThread(supabase, { ...seed, createdBy: user.profileId });
+      return { status: "ready", workflow, previewMode: false };
+    }
+  } catch (error) {
+    const failure = classifyPageDataError(error);
+    if (failure.status !== "auth-required" || !isDemoModeEnabled()) return { status: "error", message: failure.message };
+  }
 
   const demo = getDemoWorkflowByCode(workflowCode);
   if (isDemoModeEnabled() && demo) return { status: "ready", workflow: demo, previewMode: true };
   return { status: "not-found", message: "No workflow thread exists for this code yet." };
-}
-
-function buildInternalApiUrl(path: string, headerStore: Headers) {
-  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
-  const host = headerStore.get("host") ?? "localhost:3000";
-  return new URL(path, `${protocol}://${host}`);
 }

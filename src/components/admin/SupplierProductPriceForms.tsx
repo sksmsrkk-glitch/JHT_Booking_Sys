@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 import { PRICING_UNITS, SUPPLIER_PRODUCT_TYPES } from "@/features/supplier/queries";
 
@@ -35,7 +37,7 @@ export function SupplierProductCreateForm({ supplierId }: { supplierId: string }
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (
@@ -136,7 +138,7 @@ export function SupplierPriceCreateForm({ productId }: { productId: string }) {
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

@@ -1,5 +1,8 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+import { useRouter } from "next/navigation";
+
 import { useRef, useState } from "react";
 
 export function InvoiceCreateFromReservationAction({
@@ -9,6 +12,7 @@ export function InvoiceCreateFromReservationAction({
   reservationId: string;
   canInvoice: boolean;
 }) {
+  const router = useRouter();
   const [message, setMessage] = useState("");
   const [isBusy, setIsBusy] = useState(false);
   const idempotencyKeyRef = useRef<string | null>(null);
@@ -36,10 +40,10 @@ export function InvoiceCreateFromReservationAction({
       const invoiceId = result.data?.invoice?.id;
       idempotencyKeyRef.current = null;
       if (invoiceId) {
-        window.location.href = `/admin/finance/invoices/${invoiceId}`;
+        router.push(`/admin/finance/invoices/${invoiceId}`);
         return;
       }
-      window.location.reload();
+      requestRouteRefresh();
     } catch {
       setMessage("Network error while creating the invoice. Please retry.");
       setIsBusy(false);

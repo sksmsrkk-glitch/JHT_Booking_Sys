@@ -86,6 +86,47 @@ test("measured list APIs expose request correlation and server timing", async ()
   assert.equal(packageJson.scripts["smoke:load"], "node scripts/load-smoke.mjs");
 });
 
+test("core navigation avoids server self-fetches and full document reloads", async () => {
+  const corePages = [
+    "src/app/admin/page.tsx",
+    "src/app/admin/quote-cases/page.tsx",
+    "src/app/admin/quote-cases/[quoteCaseId]/page.tsx",
+    "src/app/admin/reservations/page.tsx",
+    "src/app/admin/reservations/[reservationId]/page.tsx",
+    "src/app/admin/workflows/page.tsx",
+    "src/app/agency/page.tsx",
+    "src/app/agency/quote-cases/page.tsx",
+    "src/app/agency/quote-cases/[shareId]/page.tsx",
+    "src/app/agency/reservations/page.tsx",
+    "src/app/agency/reservations/[reservationId]/page.tsx",
+    "src/app/agency/invoices/page.tsx",
+    "src/app/agency/invoices/[invoiceId]/page.tsx",
+    "src/app/agency/workflows/page.tsx"
+  ];
+
+  for (const file of corePages) {
+    const source = await readSource(file);
+    assert.doesNotMatch(source, /buildInternalApiUrl|buildAgencyApiUrl/, `${file} performs an avoidable self-fetch`);
+    assert.doesNotMatch(source, /fetch\(.*\/api\//s, `${file} performs an avoidable self-fetch`);
+  }
+
+  const componentFiles = await Promise.all([
+    readSource("src/components/admin/ReservationActions.tsx"),
+    readSource("src/components/admin/QuoteVersionStatusActions.tsx"),
+    readSource("src/components/agency/QuoteRequestActions.tsx"),
+    readSource("src/components/agency/RoomingListUploadForm.tsx")
+  ]);
+  for (const source of componentFiles) assert.doesNotMatch(source, /window\.location\.reload\(\)/);
+});
+
+test("deployment and authentication fast paths stay near the database", async () => {
+  const vercelConfig = JSON.parse(await readSource("vercel.json"));
+  const authSource = await readSource("src/lib/api/auth.ts");
+  assert.deepEqual(vercelConfig.regions, ["hnd1"]);
+  assert.match(authSource, /supabase\.auth\.getClaims\(\)/);
+  assert.doesNotMatch(authSource, /supabase\.auth\.getUser\(\)/);
+});
+
 test("multi-table writes are transactional and idempotent", async () => {
   const atomicWrites = await readSource("supabase/migrations/202607150003_atomic_writes_idempotency.sql");
   const partnerInquiry = await readSource("supabase/migrations/202607150004_atomic_partner_inquiry.sql");

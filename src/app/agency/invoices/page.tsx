@@ -1,11 +1,12 @@
 import type { Route } from "next";
 import Link from "next/link";
-import { getPageAuthorization } from "@/lib/api/page-session";
+import { listAgencyInvoicePage } from "@/features/agency-portal/queries";
 import type { AgencyInvoiceListItem } from "@/features/agency-portal/types";
 import { demoAgencyInvoices } from "@/features/finance/demo-invoices";
 import { PaginationControls } from "@/components/PaginationControls";
-import { buildPaginationMeta, type PaginationMeta } from "@/lib/api/pagination";
+import { buildPaginationMeta, parsePagination, type PaginationMeta } from "@/lib/api/pagination";
 import { isDemoModeEnabled } from "@/lib/api/guards";
+import { classifyPageDataError, getAgencyPageContext } from "@/lib/api/server-page-context";
 
 export const dynamic = "force-dynamic";
 
@@ -188,32 +189,18 @@ function InvoiceDatabase({ invoices, pagination }: { invoices: AgencyInvoiceList
 }
 
 async function loadInvoices(params: { page?: string; pageSize?: string }): Promise<LoadState> {
-  const { headerStore, authorization } = await getPageAuthorization();
-  if (!authorization) {
-    if (!isDemoModeEnabled()) {
-      return { status: "auth-required", message: "Log in with an approved partner account to review invoices." };
-    }
-    return {
-      status: "ready",
-      invoices: demoAgencyInvoices,
-      pagination: buildPaginationMeta({ page: 1, pageSize: 20 }, demoAgencyInvoices.length, demoAgencyInvoices.length),
-      isPreview: true
-    };
-  }
-
-  const url = buildInternalApiUrl("/api/agency/invoices", headerStore);
-  if (params.page) url.searchParams.set("page", params.page);
-  if (params.pageSize) url.searchParams.set("pageSize", params.pageSize);
-  const response = await fetch(url, {
-    headers: { authorization },
-    cache: "no-store"
-  });
-  const payload = await response.json();
-
-  if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
+  try {
+    const { supabase, user } = await getAgencyPageContext();
+    const searchParams = new URLSearchParams();
+    if (params.page) searchParams.set("page", params.page);
+    if (params.pageSize) searchParams.set("pageSize", params.pageSize);
+    const page = await listAgencyInvoicePage(supabase, user.agencyAccountId, parsePagination(searchParams));
+    return { status: "ready", invoices: page.items, pagination: page.pagination };
+  } catch (error) {
+    const failure = classifyPageDataError(error);
+    if (failure.status === "auth-required") {
       if (!isDemoModeEnabled()) {
-        return { status: "auth-required", message: payload.error ?? "This account cannot access partner invoices." };
+        return { status: "auth-required", message: "Log in with an approved partner account to review invoices." };
       }
       return {
         status: "ready",
@@ -222,19 +209,8 @@ async function loadInvoices(params: { page?: string; pageSize?: string }): Promi
         isPreview: true
       };
     }
-    return {
-      status: "error",
-      message: payload.error ?? "Unknown invoice API error"
-    };
+    return failure;
   }
-
-  return { status: "ready", invoices: payload.data ?? [], pagination: payload.pagination };
-}
-
-function buildInternalApiUrl(path: string, headerStore: Headers) {
-  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
-  const host = headerStore.get("host") ?? "localhost:3000";
-  return new URL(path, `${protocol}://${host}`);
 }
 
 function formatLabel(value: string) {

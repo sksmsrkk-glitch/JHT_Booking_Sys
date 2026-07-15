@@ -1,11 +1,12 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { InvoiceDocument } from "@/components/finance/InvoiceDocument";
+import { getAgencyInvoiceDetail } from "@/features/agency-portal/queries";
 import type { AgencyInvoiceDetail } from "@/features/agency-portal/types";
 import { demoAgencyInvoice } from "@/features/finance/demo-invoices";
 import { summarizeInvoicePayments } from "@/lib/domain/finance.mjs";
-import { getPageAuthorization } from "@/lib/api/page-session";
 import { isDemoModeEnabled } from "@/lib/api/guards";
+import { classifyPageDataError, getAgencyPageContext } from "@/lib/api/server-page-context";
 
 export const dynamic = "force-dynamic";
 
@@ -221,37 +222,17 @@ export default async function AgencyInvoiceDetailPage({ params }: { params: Page
 }
 
 async function loadInvoice(invoiceId: string): Promise<LoadState> {
-  const { headerStore, authorization } = await getPageAuthorization();
-  if (!authorization) {
-    return isDemoModeEnabled()
-      ? { status: "ready", invoice: demoAgencyInvoice }
-      : { status: "auth-required", message: "An active partner session is required to view invoices." };
-  }
-
-  const response = await fetch(buildInternalApiUrl(`/api/agency/invoices/${invoiceId}`, headerStore), {
-    headers: { authorization },
-    cache: "no-store"
-  });
-  const payload = await response.json();
-
-  if (!response.ok) {
-    if (isDemoModeEnabled() && (response.status === 401 || response.status === 403) && invoiceId.startsWith("preview-")) {
+  try {
+    const { supabase, user } = await getAgencyPageContext();
+    const invoice = await getAgencyInvoiceDetail(supabase, user.agencyAccountId, invoiceId);
+    if (!invoice) return { status: "not-found", message: "Invoice not found" };
+    return { status: "ready", invoice };
+  } catch (error) {
+    if (isDemoModeEnabled() && invoiceId.startsWith("preview-")) {
       return { status: "ready", invoice: demoAgencyInvoice };
     }
-    if (response.status === 404) return { status: "not-found", message: payload.error ?? "Invoice not found" };
-    return {
-      status: response.status === 401 || response.status === 403 ? "auth-required" : "error",
-      message: payload.error ?? "Unknown invoice detail API error"
-    };
+    return classifyPageDataError(error);
   }
-
-  return { status: "ready", invoice: payload.data };
-}
-
-function buildInternalApiUrl(path: string, headerStore: Headers) {
-  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
-  const host = headerStore.get("host") ?? "localhost:3000";
-  return new URL(path, `${protocol}://${host}`);
 }
 
 function formatDateTime(value: string) {

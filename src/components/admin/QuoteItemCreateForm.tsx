@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useEffect, useState } from "react";
 import { buildCurrencyOptions, DEFAULT_COUNTRY_REFERENCES, mergeCountryReferences } from "@/features/countries/defaults";
 import type { CountryReference } from "@/features/countries/types";
@@ -100,7 +102,7 @@ export function QuoteItemCreateForm({
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   function applyCostOption(value: string) {

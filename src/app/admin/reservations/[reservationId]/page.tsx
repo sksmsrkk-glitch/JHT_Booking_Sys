@@ -7,9 +7,10 @@ import { ReservationStatusForm } from "@/components/admin/ReservationStatusForm"
 import { RoomAssignmentCreateForm } from "@/components/admin/RoomAssignmentCreateForm";
 import { SupplierMessageDraftForm } from "@/components/admin/SupplierMessageDraftForm";
 import { getDemoReservationDetail } from "@/features/reservation/demo-data";
+import { getReservationDetail } from "@/features/reservation/queries";
 import type { ReservationDetail } from "@/features/reservation/types";
-import { getPageAuthorization } from "@/lib/api/page-session";
 import { isDemoModeEnabled } from "@/lib/api/guards";
+import { classifyPageDataError, getInternalPageContext } from "@/lib/api/server-page-context";
 
 export const dynamic = "force-dynamic";
 
@@ -369,42 +370,18 @@ export default async function AdminReservationDetailPage({ params }: { params: P
 
 async function loadReservation(reservationId: string): Promise<LoadState> {
   const demoReservation = getDemoReservationDetail(reservationId);
-  const { headerStore, authorization } = await getPageAuthorization();
-  if (!authorization) {
-    if (isDemoModeEnabled() && demoReservation) return { status: "ready", reservation: demoReservation };
-    return {
-      status: "auth-required",
-      message:
-        "This page reads reservation detail through the internal API, which requires a Supabase user JWT with an internal role."
-    };
-  }
-
-  const response = await fetch(buildInternalApiUrl(`/api/reservations/${reservationId}`, headerStore), {
-    headers: { authorization },
-    cache: "no-store"
-  });
-  const payload = await response.json();
-
-  if (!response.ok) {
-    if (isDemoModeEnabled() && (response.status === 401 || response.status === 403 || response.status === 404) && demoReservation) {
+  try {
+    const { supabase } = await getInternalPageContext();
+    const reservation = await getReservationDetail(supabase, reservationId);
+    if (reservation) return { status: "ready", reservation };
+    if (isDemoModeEnabled() && demoReservation) {
       return { status: "ready", reservation: demoReservation };
     }
-    if (response.status === 404) {
-      return { status: "not-found", message: payload.error ?? "Reservation not found" };
-    }
-    return {
-      status: response.status === 401 || response.status === 403 ? "auth-required" : "error",
-      message: payload.error ?? "Unknown reservation detail API error"
-    };
+    return { status: "not-found", message: "Reservation not found" };
+  } catch (error) {
+    if (isDemoModeEnabled() && demoReservation) return { status: "ready", reservation: demoReservation };
+    return classifyPageDataError(error);
   }
-
-  return { status: "ready", reservation: payload.data };
-}
-
-function buildInternalApiUrl(path: string, headerStore: Headers) {
-  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
-  const host = headerStore.get("host") ?? "localhost:3000";
-  return new URL(path, `${protocol}://${host}`);
 }
 
 function formatDateRange(start: string | null, end: string | null) {

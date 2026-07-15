@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useMemo, useState } from "react";
 import type { CompanyListItem } from "@/features/company/types";
 import { SUPPLIER_CATEGORIES } from "@/features/supplier/queries";
@@ -126,7 +128,7 @@ export function CostMasterQuickCreateForm({
       }
 
       setMessage(`Saved ${productSpecs.length} item(s), ${savedPrices} price row(s), ${savedImages} image link(s). Refreshing...`);
-      window.location.reload();
+      requestRouteRefresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Cost master save failed.");
       setIsBusy(false);

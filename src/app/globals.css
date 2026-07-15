@@ -5113,6 +5113,89 @@ html.dark .nav-more-menu a:hover {
   }
 }
 
+/* 서버 데이터가 도착하기 전에도 페이지 전환이 즉시 시작되었음을 보여주는 공통 골격 화면입니다. */
+.route-loading-shell {
+  display: grid;
+  gap: 20px;
+  min-height: 60vh;
+  padding: 24px 4px;
+}
+
+.route-loading-heading,
+.route-loading-toolbar,
+.route-loading-table {
+  display: grid;
+  gap: 10px;
+}
+
+.route-loading-line,
+.route-loading-toolbar span,
+.route-loading-table span {
+  animation: route-loading-pulse 1.25s ease-in-out infinite alternate;
+  background: color-mix(in srgb, var(--muted, #64748b) 14%, var(--surface, #fff));
+  border-radius: 4px;
+  display: block;
+}
+
+.route-loading-line-short {
+  height: 14px;
+  width: 110px;
+}
+
+.route-loading-line-title {
+  height: 38px;
+  width: min(360px, 70vw);
+}
+
+.route-loading-line-copy {
+  height: 18px;
+  width: min(620px, 90vw);
+}
+
+.route-loading-toolbar {
+  grid-template-columns: minmax(220px, 2fr) repeat(2, minmax(130px, 1fr));
+}
+
+.route-loading-toolbar span {
+  height: 48px;
+}
+
+.route-loading-table {
+  border: 1px solid var(--border, #d8e0ea);
+  border-radius: 6px;
+  gap: 0;
+  overflow: hidden;
+}
+
+.route-loading-table span {
+  border-bottom: 1px solid var(--border, #d8e0ea);
+  border-radius: 0;
+  height: 58px;
+}
+
+.route-loading-table span:last-child {
+  border-bottom: 0;
+}
+
+@keyframes route-loading-pulse {
+  from { opacity: 0.52; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-loading-line,
+  .route-loading-toolbar span,
+  .route-loading-table span {
+    animation: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .route-loading-toolbar {
+    grid-template-columns: 1fr;
+  }
+}
+
 .support-tools-disclosure {
   background: var(--jht-surface);
   border: 1px solid var(--jht-line);

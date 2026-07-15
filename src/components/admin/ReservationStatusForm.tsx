@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 import { RESERVATION_STATUSES } from "@/features/reservation/queries";
 import { HIGH_RISK_RESERVATION_STATUSES } from "@/lib/domain/reservations.mjs";
@@ -33,7 +35,7 @@ export function ReservationStatusForm({
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

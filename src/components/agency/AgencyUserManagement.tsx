@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 
 type AgencyPortalUser = {
@@ -27,7 +29,7 @@ export function AgencyUserManagement({ users, canManage, actorUserId }: { users:
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Sub account creation failed");
-      window.location.reload();
+      requestRouteRefresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Sub account creation failed");
       setIsBusy(false);
@@ -50,7 +52,7 @@ export function AgencyUserManagement({ users, canManage, actorUserId }: { users:
         setIsBusy(false);
         return;
       }
-      window.location.reload();
+      requestRouteRefresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Account update failed");
       setIsBusy(false);

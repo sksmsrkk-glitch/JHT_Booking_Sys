@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 
 export function SettlementStatusActions({ settlementId, status }: { settlementId: string; status: string }) {
@@ -21,7 +23,7 @@ export function SettlementStatusActions({ settlementId, status }: { settlementId
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   if (actions.length === 0) {

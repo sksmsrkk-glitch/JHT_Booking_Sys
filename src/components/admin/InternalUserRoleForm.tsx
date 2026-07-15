@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 import type { CompanyListItem } from "@/features/company/types";
 import { MANAGEABLE_INTERNAL_ROLES } from "@/lib/domain/internal-users.mjs";
@@ -30,7 +32,7 @@ export function InternalUserRoleForm({ companies }: { companies: CompanyListItem
       return;
     }
 
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

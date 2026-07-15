@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 
 export function QuoteRequestActions({ quoteCaseId, tourName }: { quoteCaseId: string; tourName: string }) {
@@ -36,7 +38,7 @@ export function QuoteRequestActions({ quoteCaseId, tourName }: { quoteCaseId: st
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

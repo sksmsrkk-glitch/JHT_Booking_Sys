@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 import type { ReservationListItem } from "@/features/reservation/types";
 import type { SupplierListItem } from "@/features/supplier/types";
@@ -110,7 +112,7 @@ function AdjustmentForm({
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (
@@ -174,7 +176,7 @@ function RecalculateSettlementForm({ reservations }: { reservations: Reservation
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

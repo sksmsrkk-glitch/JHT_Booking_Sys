@@ -1,6 +1,6 @@
 import type { Route } from "next";
 import Link from "next/link";
-import { getPageAuthorization } from "@/lib/api/page-session";
+import { getAgencyPageContext } from "@/lib/api/server-page-context";
 
 export const dynamic = "force-dynamic";
 
@@ -129,19 +129,33 @@ export default async function AgencyPage() {
 }
 
 async function loadPartnerContext(): Promise<PartnerContext | null> {
-  const { authorization, headerStore } = await getPageAuthorization();
-  if (!authorization) return null;
-
-  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
-  const host = headerStore.get("host") ?? "localhost:3000";
   try {
-    const response = await fetch(new URL("/api/agency/context", `${protocol}://${host}`), {
-      cache: "no-store",
-      headers: { authorization }
-    });
-    if (!response.ok) return null;
-    const payload = await response.json() as { data?: PartnerContext };
-    return payload.data ?? null;
+    const { supabase, user } = await getAgencyPageContext();
+    const { data: agency, error } = await supabase
+      .from("agency_accounts")
+      .select("id, name, country_code, billing_currency")
+      .eq("id", user.agencyAccountId)
+      .single();
+    if (error) throw error;
+
+    const { data: country, error: countryError } = agency.country_code
+      ? await supabase
+          .from("country_references")
+          .select("country_name, default_currency")
+          .eq("country_code", agency.country_code)
+          .eq("status", "active")
+          .maybeSingle()
+      : { data: null, error: null };
+    if (countryError) throw countryError;
+
+    return {
+      agencyName: agency.name,
+      agencyUserName: user.name,
+      agencyUserEmail: user.email,
+      billingCurrency: agency.billing_currency ?? country?.default_currency ?? "KRW",
+      countryCode: agency.country_code,
+      countryName: country?.country_name ?? agency.country_code
+    };
   } catch {
     // 포털 소개 화면은 공개 경로이므로 컨텍스트 조회 장애가 전체 페이지 장애로 번지지 않게 합니다.
     return null;

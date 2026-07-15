@@ -1,9 +1,12 @@
 import type { Route } from "next";
 import Link from "next/link";
 import type { WorkflowThreadSummary } from "@/features/workflow/types";
-import { getPageAuthorization } from "@/lib/api/page-session";
+import { demoWorkflowThreads } from "@/features/workflow/demo-data";
+import { listWorkflowThreadPage } from "@/features/workflow/queries";
 import { PaginationControls } from "@/components/PaginationControls";
-import { buildPaginationMeta, type PaginationMeta } from "@/lib/api/pagination";
+import { buildPaginationMeta, parsePagination, type PaginationMeta } from "@/lib/api/pagination";
+import { isDemoModeEnabled } from "@/lib/api/guards";
+import { classifyPageDataError, getAgencyPageContext } from "@/lib/api/server-page-context";
 
 export const dynamic = "force-dynamic";
 
@@ -138,34 +141,37 @@ async function loadWorkflows(params: { page?: string; pageSize?: string }): Prom
   previewMode: boolean;
   error?: string;
 }> {
-  const { headerStore, authorization } = await getPageAuthorization();
-  const url = buildInternalApiUrl("/api/workflows", headerStore);
-  if (params.page) url.searchParams.set("page", params.page);
-  if (params.pageSize) url.searchParams.set("pageSize", params.pageSize);
-  const response = await fetch(url, {
-    headers: authorization ? { authorization } : {},
-    cache: "no-store"
-  });
-  const payload = await response.json();
-  if (!response.ok) {
+  const searchParams = new URLSearchParams();
+  if (params.page) searchParams.set("page", params.page);
+  if (params.pageSize) searchParams.set("pageSize", params.pageSize);
+  const pagination = parsePagination(searchParams);
+
+  try {
+    const { supabase, user } = await getAgencyPageContext();
+    const page = await listWorkflowThreadPage(supabase, {
+      agencyAccountId: user.agencyAccountId,
+      pagination
+    });
+    return { workflows: page.items, pagination: page.pagination, previewMode: false };
+  } catch (error) {
+    const failure = classifyPageDataError(error);
+    if (failure.status === "auth-required" && isDemoModeEnabled()) {
+      const summaries = demoWorkflowThreads.map(({ messages, actionItems, linkedDocs, ...thread }) => thread);
+      const from = (pagination.page - 1) * pagination.pageSize;
+      const workflows = summaries.slice(from, from + pagination.pageSize);
+      return {
+        workflows,
+        pagination: buildPaginationMeta(pagination, summaries.length, workflows.length),
+        previewMode: true
+      };
+    }
     return {
       workflows: [],
       pagination: buildPaginationMeta({ page: 1, pageSize: 20 }, 0, 0),
       previewMode: false,
-      error: payload.error ?? "An active partner session is required."
+      error: failure.status === "auth-required" ? "An active partner session is required." : failure.message
     };
   }
-  return {
-    workflows: payload.data ?? [],
-    pagination: payload.pagination,
-    previewMode: Boolean(!authorization || payload.data?.[0]?.preview)
-  };
-}
-
-function buildInternalApiUrl(path: string, headerStore: Headers) {
-  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
-  const host = headerStore.get("host") ?? "localhost:3000";
-  return new URL(path, `${protocol}://${host}`);
 }
 
 function formatLabel(value: string) {

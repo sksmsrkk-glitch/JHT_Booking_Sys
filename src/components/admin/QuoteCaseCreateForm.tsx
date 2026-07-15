@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { Fragment, useEffect, useState } from "react";
 import type { AgencyListItem } from "@/features/agency/types";
 import type { CompanyListItem } from "@/features/company/types";
@@ -602,7 +604,7 @@ export function QuoteCaseCreateForm({
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

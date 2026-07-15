@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 /*
@@ -42,6 +43,7 @@ export function FinalOperationSnapshotForm({
   disabledReason?: string;
   previewMode?: boolean;
 }) {
+  const router = useRouter();
   const [days, setDays] = useState<DayRow[]>(defaultDays);
   const [flights, setFlights] = useState<FlightRow[]>(defaultFlights);
   const [bank, setBank] = useState(defaultBank);
@@ -119,7 +121,7 @@ export function FinalOperationSnapshotForm({
     const invoiceId = result.data?.invoice?.id;
     if (invoiceId) {
       // 인보이스가 자동 생성된 경우 회계 담당자가 바로 확인할 수 있도록 상세 화면으로 이동합니다.
-      window.location.href = `/admin/finance/invoices/${invoiceId}`;
+      router.push(`/admin/finance/invoices/${invoiceId}`);
       return;
     }
     setMessage(status === "finalized" ? "Final snapshot saved." : "Draft saved.");

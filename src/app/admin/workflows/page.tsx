@@ -2,11 +2,12 @@ import type { Route } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { getWorkflowDateKey, normalizeWorkflowFilters, type WorkflowFilters } from "@/features/workflow/filters";
+import { listWorkflowThreadPage } from "@/features/workflow/queries";
 import type { WorkflowThreadSummary } from "@/features/workflow/types";
-import { getPageAuthorization } from "@/lib/api/page-session";
 import { normalizeLocale } from "@/lib/i18n";
 import { PaginationControls } from "@/components/PaginationControls";
-import type { PaginationMeta } from "@/lib/api/pagination";
+import { buildPaginationMeta, parsePagination, type PaginationMeta } from "@/lib/api/pagination";
+import { classifyPageDataError, getInternalPageContext } from "@/lib/api/server-page-context";
 
 export const dynamic = "force-dynamic";
 
@@ -185,42 +186,23 @@ async function loadWorkflows(
   filters: WorkflowFilters,
   rawSearchParams: { page?: string; pageSize?: string }
 ): Promise<{ workflows: WorkflowThreadSummary[]; pagination: PaginationMeta; previewMode: boolean; error?: string }> {
-  const { headerStore, authorization } = await getPageAuthorization();
-  const response = await fetch(buildInternalApiUrl("/api/workflows", filters, rawSearchParams, headerStore), {
-    headers: authorization ? { authorization } : {},
-    cache: "no-store"
-  });
-  const payload = await response.json();
-  if (!response.ok) {
+  const searchParams = new URLSearchParams();
+  if (rawSearchParams.page) searchParams.set("page", rawSearchParams.page);
+  if (rawSearchParams.pageSize) searchParams.set("pageSize", rawSearchParams.pageSize);
+  const pagination = parsePagination(searchParams);
+  try {
+    const { supabase } = await getInternalPageContext();
+    const page = await listWorkflowThreadPage(supabase, { filters, pagination });
+    return { workflows: page.items, pagination: page.pagination, previewMode: false };
+  } catch (error) {
+    const failure = classifyPageDataError(error);
     return {
       workflows: [],
-      pagination: payload.pagination ?? { page: 1, pageSize: 20, total: 0, totalPages: 1, hasNext: false, hasPrevious: false },
+      pagination: buildPaginationMeta(pagination, 0, 0),
       previewMode: false,
-      error: payload.error ?? "An active internal session is required."
+      error: failure.status === "auth-required" ? "An active internal session is required." : failure.message
     };
   }
-  return {
-    workflows: payload.data ?? [],
-    pagination: payload.pagination,
-    previewMode: Boolean(!authorization || payload.data?.[0]?.preview)
-  };
-}
-
-function buildInternalApiUrl(
-  path: string,
-  filters: WorkflowFilters,
-  pagination: { page?: string; pageSize?: string },
-  headerStore: Headers
-) {
-  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
-  const host = headerStore.get("host") ?? "localhost:3000";
-  const url = new URL(path, `${protocol}://${host}`);
-  Object.entries(filters).forEach(([key, value]) => {
-    if (value) url.searchParams.set(key, value);
-  });
-  if (pagination.page) url.searchParams.set("page", pagination.page);
-  if (pagination.pageSize) url.searchParams.set("pageSize", pagination.pageSize);
-  return url;
 }
 
 function formatLabel(value: string) {

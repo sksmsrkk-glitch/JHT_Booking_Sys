@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 import {
   SUPPLIER_MESSAGE_CHANNELS,
@@ -78,7 +80,7 @@ export function SupplierMessageDraftForm({
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   function fillTemplate() {

@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useEffect, useState } from "react";
 import { buildCurrencyOptions, DEFAULT_COUNTRY_REFERENCES, mergeCountryReferences } from "@/features/countries/defaults";
 import type { CountryReference } from "@/features/countries/types";
@@ -41,7 +43,7 @@ export function DomesticSupplierCreateForm({ companies }: { companies: CompanyLi
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (
@@ -162,7 +164,7 @@ export function AgencyCreateForm({ companies }: { companies: CompanyListItem[] }
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

@@ -3,11 +3,19 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { RouteCardGrid } from "@/components/v1/RouteCardGrid";
 import type { AgencyListItem } from "@/features/agency/types";
+import { listAgencyAccountPage } from "@/features/agency/queries";
 import type { InvoiceListItem, SettlementListItem } from "@/features/finance/types";
+import { listInvoicePage, listSettlements } from "@/features/finance/queries";
 import type { QuoteCaseListItem } from "@/features/quotation/types";
+import { listQuoteCasePage } from "@/features/quotation/queries";
 import type { ReservationListItem } from "@/features/reservation/types";
+import { listReservationPage } from "@/features/reservation/queries";
 import { adminRoutes } from "@/features/v1/site-map";
-import { getPageAuthorization } from "@/lib/api/page-session";
+import {
+  classifyPageDataError,
+  getInternalPageContext,
+  requirePageFinanceRole
+} from "@/lib/api/server-page-context";
 import { normalizeLocale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
@@ -439,77 +447,32 @@ function DashboardBoardColumn({ rows, title }: { rows: DashboardRow[]; title: st
 }
 
 async function loadDashboardData(): Promise<DashboardLoadState> {
-  const { authorization, headerStore } = await getPageAuthorization();
-  if (!authorization) {
+  try {
+    const { supabase, user } = await getInternalPageContext();
+    requirePageFinanceRole(user.roles);
+    const firstPage = { page: 1, pageSize: 100 };
+
+    /* 대시보드의 다섯 API 재호출을 제거하고 동일한 인증 컨텍스트에서 병렬 조회합니다. */
+    const [agencies, quoteCases, reservations, invoices, settlements] = await Promise.all([
+      listAgencyAccountPage(supabase, { status: "active" }, firstPage),
+      listQuoteCasePage(supabase, {}, firstPage),
+      listReservationPage(supabase, { sortBy: "created_desc" }, firstPage),
+      listInvoicePage(supabase, {}, firstPage),
+      listSettlements(supabase)
+    ]);
+
     return {
-      status: "auth-required",
-      message: "This dashboard reads internal quote, reservation, and agency data and requires a Supabase user JWT with an internal role.",
-      agencies: [],
-      quoteCases: [],
-      reservations: [],
-      invoices: [],
-      settlements: []
+      status: "ready",
+      agencies: agencies.items,
+      quoteCases: quoteCases.items,
+      reservations: reservations.items,
+      invoices: invoices.items,
+      settlements
     };
+  } catch (error) {
+    const failure = classifyPageDataError(error);
+    return { ...failure, agencies: [], quoteCases: [], reservations: [], invoices: [], settlements: [] };
   }
-
-  const [agencyResponse, quoteResponse, reservationResponse, invoiceResponse, settlementResponse] = await Promise.all([
-    fetch(buildInternalApiUrl("/api/agencies", { status: "active" }, headerStore), {
-      headers: { authorization },
-      cache: "no-store"
-    }),
-    fetch(buildInternalApiUrl("/api/quote-cases", {}, headerStore), {
-      headers: { authorization },
-      cache: "no-store"
-    }),
-    fetch(buildInternalApiUrl("/api/reservations", {}, headerStore), {
-      headers: { authorization },
-      cache: "no-store"
-    }),
-    fetch(buildInternalApiUrl("/api/finance/invoices", {}, headerStore), {
-      headers: { authorization },
-      cache: "no-store"
-    }),
-    fetch(buildInternalApiUrl("/api/finance/settlements", {}, headerStore), {
-      headers: { authorization },
-      cache: "no-store"
-    })
-  ]);
-
-  const [agencyPayload, quotePayload, reservationPayload, invoicePayload, settlementPayload] = await Promise.all([
-    agencyResponse.json(),
-    quoteResponse.json(),
-    reservationResponse.json(),
-    invoiceResponse.json(),
-    settlementResponse.json()
-  ]);
-  const failedResponse = [agencyResponse, quoteResponse, reservationResponse, invoiceResponse, settlementResponse].find((response) => !response.ok);
-
-  if (failedResponse) {
-    return {
-      status: failedResponse.status === 401 || failedResponse.status === 403 ? "auth-required" : "error",
-      message:
-        agencyPayload.error ??
-        quotePayload.error ??
-        reservationPayload.error ??
-        invoicePayload.error ??
-        settlementPayload.error ??
-        "Unknown dashboard API error",
-      agencies: [],
-      quoteCases: [],
-      reservations: [],
-      invoices: [],
-      settlements: []
-    };
-  }
-
-  return {
-    status: "ready",
-    agencies: agencyPayload.data ?? [],
-    quoteCases: quotePayload.data ?? [],
-    reservations: reservationPayload.data ?? [],
-    invoices: invoicePayload.data ?? [],
-    settlements: settlementPayload.data ?? []
-  };
 }
 
 function applyDashboardFilters(loadState: DashboardLoadState, filters: DashboardFilters) {
@@ -839,16 +802,6 @@ function buildMetricHref(
   }
   const query = params.toString();
   return `${path}${query ? `?${query}` : ""}` as Route;
-}
-
-function buildInternalApiUrl(path: string, filters: Record<string, string>, headerStore: Headers) {
-  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
-  const host = headerStore.get("host") ?? "localhost:3000";
-  const url = new URL(path, `${protocol}://${host}`);
-  for (const [key, value] of Object.entries(filters)) {
-    if (value) url.searchParams.set(key, value);
-  }
-  return url;
 }
 
 function normalizeOptional(value: string | undefined) {

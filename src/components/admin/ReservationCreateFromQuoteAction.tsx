@@ -1,5 +1,8 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+import { useRouter } from "next/navigation";
+
 import { useState } from "react";
 
 export function ReservationCreateFromQuoteAction({
@@ -13,6 +16,7 @@ export function ReservationCreateFromQuoteAction({
   startDate: string | null;
   endDate: string | null;
 }) {
+  const router = useRouter();
   const [message, setMessage] = useState("");
   const [isBusy, setIsBusy] = useState(false);
 
@@ -41,10 +45,10 @@ export function ReservationCreateFromQuoteAction({
 
     const reservationId = result.data?.reservation?.id;
     if (reservationId) {
-      window.location.href = `/admin/reservations/${reservationId}`;
+      router.push(`/admin/reservations/${reservationId}`);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

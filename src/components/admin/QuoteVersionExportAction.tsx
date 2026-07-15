@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 
 export function QuoteVersionExportAction({
@@ -33,7 +35,7 @@ export function QuoteVersionExportAction({
 
     const exportStatus = result.data?.status ? ` (${result.data.status})` : "";
     setMessage(`Export queued${exportStatus}.`);
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

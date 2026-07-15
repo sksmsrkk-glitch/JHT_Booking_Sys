@@ -19,11 +19,21 @@ export const INTERNAL_ROLES = [
 ];
 
 export async function requireCurrentUser(supabase: any) {
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data?.user) {
+  /*
+   * 공개키로 서명된 Supabase JWT는 getClaims()가 서명과 만료 시간을 검증합니다.
+   * getUser()처럼 매 요청마다 Auth 서버를 왕복하지 않으므로 모든 보호 API의 공통 지연을 줄입니다.
+   * 실제 권한과 계정 활성 상태는 아래 user_roles/agency_users 조회에서 계속 확인합니다.
+   */
+  const { data, error } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  if (error || !claims?.sub) {
     throw new HttpError(401, "Authentication is required");
   }
-  return data.user;
+  return {
+    id: String(claims.sub),
+    email: typeof claims.email === "string" ? claims.email : null,
+    claims
+  };
 }
 
 export async function requireInternalUser(supabase: any) {

@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 import type { AgencyLifecycleStatus, AgencySignupApplication } from "@/features/agency/types";
 
@@ -24,7 +26,7 @@ export function AgencySignupApplicationActions({ application }: { application: A
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (
@@ -69,7 +71,7 @@ export function AgencyLifecycleActions({
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (
@@ -106,7 +108,7 @@ export function AgencyUserGovernanceActions({ agencyId, userId }: { agencyId: st
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

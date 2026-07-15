@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { FormEvent, useRef, useState } from "react";
 import { NOTION_CSV_TARGET_TABLES } from "@/features/migration/queries";
 
@@ -50,7 +52,7 @@ export function NotionCsvStagingForm() {
       setMessage(`Staged ${result.data?.rowCount ?? 0} rows.`);
       idempotencyKeyRef.current = null;
       formElement.reset();
-      window.location.reload();
+      requestRouteRefresh();
     } catch {
       setMessage("Network error while staging rows. Please retry.");
       setIsSubmitting(false);

@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 
 export function MigrationBatchActions({ batchId, status, errorCount }: { batchId: string; status: string; errorCount: number }) {
@@ -23,7 +25,7 @@ export function MigrationBatchActions({ batchId, status, errorCount }: { batchId
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

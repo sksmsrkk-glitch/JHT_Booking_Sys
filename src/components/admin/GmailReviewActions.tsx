@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 import type { QuoteCaseListItem } from "@/features/quotation/types";
 import type { ReservationListItem } from "@/features/reservation/types";
@@ -40,7 +42,7 @@ export function GmailReviewActions({
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

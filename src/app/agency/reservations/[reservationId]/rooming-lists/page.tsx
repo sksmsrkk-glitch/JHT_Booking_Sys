@@ -1,8 +1,9 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { RoomingListUploadForm } from "@/components/agency/RoomingListUploadForm";
+import { getAgencyReservationDetail } from "@/features/agency-portal/queries";
 import type { AgencyReservationDetail } from "@/features/agency-portal/types";
-import { getPageAuthorization } from "@/lib/api/page-session";
+import { classifyPageDataError, getAgencyPageContext } from "@/lib/api/server-page-context";
 
 export const dynamic = "force-dynamic";
 
@@ -136,35 +137,14 @@ export default async function AgencyReservationRoomingListsPage({ params }: { pa
 }
 
 async function loadReservation(reservationId: string): Promise<LoadState> {
-  const { headerStore, authorization } = await getPageAuthorization();
-  if (!authorization) {
-    return {
-      status: "auth-required",
-      message: "This page requires an active agency user JWT."
-    };
+  try {
+    const { supabase, user } = await getAgencyPageContext();
+    const reservation = await getAgencyReservationDetail(supabase, user.agencyAccountId, reservationId);
+    if (!reservation) return { status: "not-found", message: "Reservation not found" };
+    return { status: "ready", reservation };
+  } catch (error) {
+    return classifyPageDataError(error);
   }
-
-  const response = await fetch(buildInternalApiUrl(`/api/agency/reservations/${reservationId}`, headerStore), {
-    headers: { authorization },
-    cache: "no-store"
-  });
-  const payload = await response.json();
-
-  if (!response.ok) {
-    if (response.status === 404) return { status: "not-found", message: payload.error ?? "Reservation not found" };
-    return {
-      status: response.status === 401 || response.status === 403 ? "auth-required" : "error",
-      message: payload.error ?? "Unknown reservation detail API error"
-    };
-  }
-
-  return { status: "ready", reservation: payload.data };
-}
-
-function buildInternalApiUrl(path: string, headerStore: Headers) {
-  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
-  const host = headerStore.get("host") ?? "localhost:3000";
-  return new URL(path, `${protocol}://${host}`);
 }
 
 function formatDateTime(value: string) {

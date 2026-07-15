@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 
 export function AgencyContactCreateForm({ agencyId }: { agencyId: string }) {
@@ -30,7 +32,7 @@ export function AgencyContactCreateForm({ agencyId }: { agencyId: string }) {
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (
@@ -109,7 +111,7 @@ export function AgencyUserCreateForm({ agencyId }: { agencyId: string }) {
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

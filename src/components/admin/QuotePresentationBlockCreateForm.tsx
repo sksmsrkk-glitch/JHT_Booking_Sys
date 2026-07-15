@@ -1,5 +1,7 @@
 "use client";
 
+import { requestRouteRefresh } from "@/lib/client/route-refresh";
+
 import { useState } from "react";
 import type { QuoteItineraryDayDetail } from "@/features/quotation/types";
 
@@ -52,7 +54,7 @@ export function QuotePresentationBlockCreateForm({
       setIsBusy(false);
       return;
     }
-    window.location.reload();
+    requestRouteRefresh();
   }
 
   return (

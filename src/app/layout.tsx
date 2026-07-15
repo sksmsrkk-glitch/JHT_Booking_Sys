@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { AppTopbar } from "@/components/AppTopbar";
 import { CalendarLocaleEnforcer } from "@/components/CalendarLocaleEnforcer";
 import { GlobalTextTranslator } from "@/components/GlobalTextTranslator";
+import { RouteRefreshBridge } from "@/components/RouteRefreshBridge";
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "@/lib/domain/auth-session.mjs";
 import { normalizeLocale } from "@/lib/i18n";
 import "./globals.css";
@@ -29,6 +30,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <div className="shell">
           <AppTopbar isSignedIn={isSignedIn} locale={locale} />
           <main className="main">{children}</main>
+          <RouteRefreshBridge />
           <CalendarLocaleEnforcer />
           <GlobalTextTranslator locale={locale} />
         </div>
