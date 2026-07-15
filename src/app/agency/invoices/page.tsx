@@ -5,6 +5,7 @@ import type { AgencyInvoiceListItem } from "@/features/agency-portal/types";
 import { demoAgencyInvoices } from "@/features/finance/demo-invoices";
 import { PaginationControls } from "@/components/PaginationControls";
 import { buildPaginationMeta, type PaginationMeta } from "@/lib/api/pagination";
+import { isDemoModeEnabled } from "@/lib/api/guards";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,13 @@ export default async function AgencyInvoicesPage({ searchParams }: { searchParam
       {loadState.status === "error" ? (
         <section className="notice danger">
           <h2>Invoices could not load</h2>
+          <p>{loadState.message}</p>
+        </section>
+      ) : null}
+
+      {loadState.status === "auth-required" ? (
+        <section className="notice warning">
+          <h2>Partner session required</h2>
           <p>{loadState.message}</p>
         </section>
       ) : null}
@@ -182,6 +190,9 @@ function InvoiceDatabase({ invoices, pagination }: { invoices: AgencyInvoiceList
 async function loadInvoices(params: { page?: string; pageSize?: string }): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
+    if (!isDemoModeEnabled()) {
+      return { status: "auth-required", message: "Log in with an approved partner account to review invoices." };
+    }
     return {
       status: "ready",
       invoices: demoAgencyInvoices,
@@ -201,6 +212,9 @@ async function loadInvoices(params: { page?: string; pageSize?: string }): Promi
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
+      if (!isDemoModeEnabled()) {
+        return { status: "auth-required", message: payload.error ?? "This account cannot access partner invoices." };
+      }
       return {
         status: "ready",
         invoices: demoAgencyInvoices,

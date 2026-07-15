@@ -6,6 +6,7 @@ import type { InvoiceDetail } from "@/features/finance/types";
 import { demoFinanceInvoice } from "@/features/finance/demo-invoices";
 import { summarizeInvoicePayments } from "@/lib/domain/finance.mjs";
 import { getPageAuthorization } from "@/lib/api/page-session";
+import { isDemoModeEnabled } from "@/lib/api/guards";
 
 export const dynamic = "force-dynamic";
 
@@ -217,7 +218,9 @@ export default async function AdminInvoiceDetailPage({ params }: { params: PageP
 async function loadInvoice(invoiceId: string): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
-    return { status: "ready", invoice: demoFinanceInvoice };
+    return isDemoModeEnabled()
+      ? { status: "ready", invoice: demoFinanceInvoice }
+      : { status: "auth-required", message: "An active finance or internal session is required." };
   }
 
   const response = await fetch(buildInternalApiUrl(`/api/finance/invoices/${invoiceId}`, headerStore), {
@@ -227,7 +230,7 @@ async function loadInvoice(invoiceId: string): Promise<LoadState> {
   const payload = await response.json();
 
   if (!response.ok) {
-    if ((response.status === 401 || response.status === 403) && invoiceId.startsWith("preview-")) {
+    if (isDemoModeEnabled() && (response.status === 401 || response.status === 403) && invoiceId.startsWith("preview-")) {
       return { status: "ready", invoice: demoFinanceInvoice };
     }
     if (response.status === 404) return { status: "not-found", message: payload.error ?? "Invoice not found" };

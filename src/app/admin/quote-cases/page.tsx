@@ -69,33 +69,34 @@ export default async function AdminQuoteCasesPage({ searchParams }: { searchPara
         </button>
       </form>
 
-      <section className="action-band">
-        <div>
-          <h2>Create Quote Case</h2>
-          <p>
-            Create a quote case, draft version, itinerary rows, and internal quote item snapshots
-            from one controlled form.
+      <details className="quote-create-disclosure">
+        <summary>
+          <span>
+            <strong>Create Quote Case</strong>
+            <small>Open the full costing, itinerary, and quote-item editor only when needed.</small>
+          </span>
+          <span className="disclosure-action">Open editor</span>
+        </summary>
+        <div className="quote-create-disclosure-body">
+          <div className="section-heading">
+            <div>
+              <h2>Create Quote Case</h2>
+              <p className="subtext">Draft a version with its internal cost snapshots and itinerary rows.</p>
+            </div>
+            <Link className="button-secondary" href={costSearchRoute}>
+              Search Costs
+            </Link>
+          </div>
+          <QuoteCaseCreateForm
+            agencies={loadState.status === "ready" ? loadState.agencies : []}
+            companies={loadState.status === "ready" ? loadState.companies : []}
+          />
+          <p className="subtext">
+            Quote item rows must include snapshot item name, supplier name, cost currency, unit
+            cost, exchange rate, pricing unit, quantity, pax count, and margin mode.
           </p>
         </div>
-        <Link className="button-primary" href={costSearchRoute}>
-          Search Costs
-        </Link>
-      </section>
-
-      <section className="panel-section">
-        <div className="section-heading">
-          <h2>Create Quote Case</h2>
-          <span>Internal only</span>
-        </div>
-        <QuoteCaseCreateForm
-          agencies={loadState.status === "ready" ? loadState.agencies : []}
-          companies={loadState.status === "ready" ? loadState.companies : []}
-        />
-        <p className="subtext">
-          Quote item rows must include snapshot item name, supplier name, cost currency, unit
-          cost, exchange rate, pricing unit, quantity, pax count, and margin mode.
-        </p>
-      </section>
+      </details>
 
       {loadState.status === "auth-required" ? (
         <section className="notice warning">

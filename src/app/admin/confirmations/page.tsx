@@ -3,6 +3,7 @@ import Link from "next/link";
 import { demoReservations } from "@/features/reservation/demo-data";
 import type { ReservationListItem } from "@/features/reservation/types";
 import { getPageAuthorization } from "@/lib/api/page-session";
+import { isDemoModeEnabled } from "@/lib/api/guards";
 
 export const dynamic = "force-dynamic";
 
@@ -237,7 +238,11 @@ function ConfirmationTable({ reservations }: { reservations: ReservationListItem
 
 async function loadConfirmationReservations(): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
-  if (!authorization) return { status: "ready", reservations: demoReservations, isPreview: true };
+  if (!authorization) {
+    return isDemoModeEnabled()
+      ? { status: "ready", reservations: demoReservations, isPreview: true }
+      : { status: "error", message: "Sign in with an active internal account to view final confirmations." };
+  }
 
   const response = await fetch(buildInternalApiUrl("/api/reservations", headerStore), {
     headers: { authorization },
@@ -246,7 +251,9 @@ async function loadConfirmationReservations(): Promise<LoadState> {
   const payload = await response.json();
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
-      return { status: "ready", reservations: demoReservations, isPreview: true };
+      return isDemoModeEnabled()
+        ? { status: "ready", reservations: demoReservations, isPreview: true }
+        : { status: "error", message: "Your internal session does not have confirmation access." };
     }
     return { status: "error", message: payload.error ?? "Unknown confirmations API error" };
   }

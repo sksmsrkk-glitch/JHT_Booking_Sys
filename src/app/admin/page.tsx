@@ -130,13 +130,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
         <span className="status-dot status-live">{locale === "ko" ? "운영중" : "Live"}</span>
       </Link>
       <RouteCardGrid locale={locale} routes={primaryRoutes} />
-      <section className="section-block">
-        <div className="section-heading">
-          <h2>{locale === "ko" ? "지원 도구" : "Support Tools"}</h2>
+      <details className="section-block support-tools-disclosure">
+        <summary>
+          <strong>{locale === "ko" ? "지원 도구" : "Support Tools"}</strong>
           <span>{locale === "ko" ? `${secondaryRoutes.length}개 도구` : `${secondaryRoutes.length} tools`}</span>
-        </div>
+        </summary>
         <RouteCardGrid density="compact" locale={locale} routes={secondaryRoutes} />
-      </section>
+      </details>
     </>
   );
 }
@@ -196,7 +196,6 @@ function AdminDashboard({
 
       <div className="dashboard-kpi-grid">
         <MetricCard
-          href={buildMetricHref("/agency/inquiries", filters)}
           label="Partner quote inquiries"
           value={metric.quoteInquiryCount}
           hint="new, revision, product inquiries"

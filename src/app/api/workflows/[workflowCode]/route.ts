@@ -24,7 +24,9 @@ export async function GET(request: Request, context: RouteContext) {
     if (existing) return ok(existing);
 
     const seed = await resolveWorkflowSeedByCode(supabase, workflowCode);
-    if (!seed) return ok(demo ? { ...demo, preview: true } : null);
+    if (!seed) {
+      return ok(isDemoModeEnabled() && demo ? { ...demo, preview: true } : null);
+    }
     if (actor.type === "agency" && seed.agencyAccountId !== actor.agencyAccountId) {
       throw new HttpError(403, "Workflow does not belong to this agency");
     }

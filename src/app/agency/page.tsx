@@ -1,5 +1,17 @@
 import type { Route } from "next";
 import Link from "next/link";
+import { getPageAuthorization } from "@/lib/api/page-session";
+
+export const dynamic = "force-dynamic";
+
+type PartnerContext = {
+  agencyName: string;
+  agencyUserName: string;
+  agencyUserEmail: string;
+  billingCurrency: string;
+  countryCode: string | null;
+  countryName: string | null;
+};
 
 const partnerTasks = [
   {
@@ -36,7 +48,9 @@ const partnerTasks = [
 
 const processSteps = ["Inquiry", "Quote", "Revision", "Confirmation", "Reservation", "Invoice"];
 
-export default function AgencyPage() {
+export default async function AgencyPage() {
+  const partnerContext = await loadPartnerContext();
+
   return (
     <div className="partner-portal-shell">
       <section className="partner-portal-header">
@@ -50,18 +64,35 @@ export default function AgencyPage() {
         </div>
         <div className="partner-access-panel">
           <span>Partner Account</span>
-          <strong>Approval Required</strong>
-          <p>
-            New agencies submit an application first. JHT approval activates the mother account.
-          </p>
-          <div className="partner-access-actions">
-            <Link className="button-primary" href={"/agency/login" as Route}>
-              Partner Log In
-            </Link>
-            <Link className="button-secondary" href={"/agency/signup" as Route}>
-              Apply
-            </Link>
-          </div>
+          {partnerContext ? (
+            <>
+              <strong>{partnerContext.agencyName}</strong>
+              <p>
+                {partnerContext.agencyUserName} · {partnerContext.countryCode ?? "Country not set"} · Billing in {partnerContext.billingCurrency}
+              </p>
+              <div className="partner-access-actions">
+                <Link className="button-primary" href={"/agency/workflows" as Route}>
+                  Open Communication
+                </Link>
+                <Link className="button-secondary" href={"/agency/account/users" as Route}>
+                  Manage Account
+                </Link>
+              </div>
+            </>
+          ) : (
+            <>
+              <strong>Approval Required</strong>
+              <p>New agencies submit an application first. JHT approval activates the mother account.</p>
+              <div className="partner-access-actions">
+                <Link className="button-primary" href={"/agency/login" as Route}>
+                  Partner Log In
+                </Link>
+                <Link className="button-secondary" href={"/agency/signup" as Route}>
+                  Apply
+                </Link>
+              </div>
+            </>
+          )}
         </div>
       </section>
 
@@ -95,4 +126,24 @@ export default function AgencyPage() {
       </section>
     </div>
   );
+}
+
+async function loadPartnerContext(): Promise<PartnerContext | null> {
+  const { authorization, headerStore } = await getPageAuthorization();
+  if (!authorization) return null;
+
+  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
+  const host = headerStore.get("host") ?? "localhost:3000";
+  try {
+    const response = await fetch(new URL("/api/agency/context", `${protocol}://${host}`), {
+      cache: "no-store",
+      headers: { authorization }
+    });
+    if (!response.ok) return null;
+    const payload = await response.json() as { data?: PartnerContext };
+    return payload.data ?? null;
+  } catch {
+    // 포털 소개 화면은 공개 경로이므로 컨텍스트 조회 장애가 전체 페이지 장애로 번지지 않게 합니다.
+    return null;
+  }
 }

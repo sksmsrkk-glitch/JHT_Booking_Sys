@@ -9,6 +9,7 @@ import { SupplierMessageDraftForm } from "@/components/admin/SupplierMessageDraf
 import { getDemoReservationDetail } from "@/features/reservation/demo-data";
 import type { ReservationDetail } from "@/features/reservation/types";
 import { getPageAuthorization } from "@/lib/api/page-session";
+import { isDemoModeEnabled } from "@/lib/api/guards";
 
 export const dynamic = "force-dynamic";
 
@@ -370,7 +371,7 @@ async function loadReservation(reservationId: string): Promise<LoadState> {
   const demoReservation = getDemoReservationDetail(reservationId);
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
-    if (demoReservation) return { status: "ready", reservation: demoReservation };
+    if (isDemoModeEnabled() && demoReservation) return { status: "ready", reservation: demoReservation };
     return {
       status: "auth-required",
       message:
@@ -385,7 +386,7 @@ async function loadReservation(reservationId: string): Promise<LoadState> {
   const payload = await response.json();
 
   if (!response.ok) {
-    if ((response.status === 401 || response.status === 403 || response.status === 404) && demoReservation) {
+    if (isDemoModeEnabled() && (response.status === 401 || response.status === 403 || response.status === 404) && demoReservation) {
       return { status: "ready", reservation: demoReservation };
     }
     if (response.status === 404) {

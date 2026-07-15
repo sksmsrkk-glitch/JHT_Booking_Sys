@@ -79,7 +79,11 @@ const accountRecoveryMigration = readFileSync(
   new URL("../supabase/migrations/202607130003_account_recovery.sql", import.meta.url),
   "utf8"
 );
-const schema = `${initialSchema}\n${gmailCandidatesMigration}\n${quoteExcelModelMigration}\n${quoteFareOptionsMigration}\n${quotePresentationBlocksMigration}\n${supplierMediaAttachmentsMigration}\n${partnerReceivableLedgerMigration}\n${exchangeRatesMigration}\n${agencyInquiryTourWorkflowMigration}\n${invoiceVersioningMigration}\n${finalOperationInvoiceMigration}\n${guideExpenseReportsMigration}\n${agencyOnboardingGovernanceMigration}\n${countryReferenceExchangeRatesMigration}\n${workflowPortalCommunicationMigration}\n${workflowMessageActorLinksMigration}\n${securityHardeningMigration}\n${quoteVersionInternalsMigration}\n${signupBillingCurrencyMigration}\n${accountRecoveryMigration}`;
+const signupBillingCurrencyRepairMigration = readFileSync(
+  new URL("../supabase/migrations/202607150008_repair_signup_billing_currency.sql", import.meta.url),
+  "utf8"
+);
+const schema = `${initialSchema}\n${gmailCandidatesMigration}\n${quoteExcelModelMigration}\n${quoteFareOptionsMigration}\n${quotePresentationBlocksMigration}\n${supplierMediaAttachmentsMigration}\n${partnerReceivableLedgerMigration}\n${exchangeRatesMigration}\n${agencyInquiryTourWorkflowMigration}\n${invoiceVersioningMigration}\n${finalOperationInvoiceMigration}\n${guideExpenseReportsMigration}\n${agencyOnboardingGovernanceMigration}\n${countryReferenceExchangeRatesMigration}\n${workflowPortalCommunicationMigration}\n${workflowMessageActorLinksMigration}\n${securityHardeningMigration}\n${quoteVersionInternalsMigration}\n${signupBillingCurrencyMigration}\n${accountRecoveryMigration}\n${signupBillingCurrencyRepairMigration}`;
 const agencyPortalQueries = readFileSync(new URL("../src/features/agency-portal/queries.ts", import.meta.url), "utf8");
 const agencySignupDecisionRoute = readFileSync(
   new URL("../src/app/api/agency/signup-applications/[id]/decision/route.ts", import.meta.url),
@@ -311,6 +315,8 @@ test("country references are shared between exchange rates and partner signup", 
 });
 
 test("partner signup billing currency is resolved from common country master", () => {
+  assert.match(schema, /update agency_signup_applications application/);
+  assert.match(schema, /set requested_billing_currency = reference\.default_currency/);
   assert.match(agencySignupDecisionRoute, /requested_billing_currency/);
   assert.match(agencySignupDecisionRoute, /from\("country_references"\)/);
   assert.match(agencySignupDecisionRoute, /default_currency/);

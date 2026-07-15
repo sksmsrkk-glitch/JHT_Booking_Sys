@@ -6,6 +6,7 @@ import type { InvoiceListItem } from "@/features/finance/types";
 import { demoFinanceInvoices } from "@/features/finance/demo-invoices";
 import { PaginationControls } from "@/components/PaginationControls";
 import { buildPaginationMeta, type PaginationMeta } from "@/lib/api/pagination";
+import { isDemoModeEnabled } from "@/lib/api/guards";
 
 export const dynamic = "force-dynamic";
 
@@ -221,7 +222,9 @@ function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
 async function loadInvoices(filters: { q?: string; status?: string; page?: string; pageSize?: string }): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
-    return { status: "ready", invoices: demoFinanceInvoices, pagination: previewPagination(demoFinanceInvoices.length), isPreview: true };
+    return isDemoModeEnabled()
+      ? { status: "ready", invoices: demoFinanceInvoices, pagination: previewPagination(demoFinanceInvoices.length), isPreview: true }
+      : { status: "auth-required", message: "Sign in with an active finance or internal account to view invoices." };
   }
 
   const response = await fetch(buildInternalApiUrl("/api/finance/invoices", filters, headerStore), {
@@ -232,7 +235,9 @@ async function loadInvoices(filters: { q?: string; status?: string; page?: strin
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
-      return { status: "ready", invoices: demoFinanceInvoices, pagination: previewPagination(demoFinanceInvoices.length), isPreview: true };
+      return isDemoModeEnabled()
+        ? { status: "ready", invoices: demoFinanceInvoices, pagination: previewPagination(demoFinanceInvoices.length), isPreview: true }
+        : { status: "auth-required", message: "Your session does not have finance invoice access." };
     }
     return {
       status: "error",

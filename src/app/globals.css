@@ -1042,6 +1042,7 @@ select:disabled {
 }
 
 .dashboard-layout-grid {
+  align-items: start;
   display: grid;
   gap: 14px;
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
@@ -3018,7 +3019,7 @@ tbody tr:last-child td {
 }
 
 .workflow-filter-shell {
-  --workflow-control-height: 48px;
+  --workflow-control-height: var(--jht-control-height);
   background: #ffffff;
   border: 1px solid #d6deea;
   border-radius: 8px;
@@ -4740,7 +4741,7 @@ tbody tr:hover td {
 }
 
 .workflow-filter-shell {
-  --workflow-control-height: 48px;
+  --workflow-control-height: var(--jht-control-height);
   gap: 12px;
   padding: 16px;
 }
@@ -5110,6 +5111,89 @@ html.dark .nav-more-menu a:hover {
   .language-switcher button {
     width: auto;
   }
+}
+
+.support-tools-disclosure {
+  background: var(--jht-surface);
+  border: 1px solid var(--jht-line);
+  border-radius: var(--jht-radius-lg);
+  box-shadow: var(--jht-shadow-card);
+  padding: 0 18px;
+}
+
+.support-tools-disclosure > summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  min-height: 58px;
+  user-select: none;
+}
+
+.support-tools-disclosure > summary::marker {
+  color: var(--jht-text-tertiary);
+}
+
+.support-tools-disclosure > summary span {
+  color: var(--jht-text-tertiary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.support-tools-disclosure[open] > summary {
+  border-bottom: 1px solid var(--jht-line-soft);
+  margin-bottom: 12px;
+}
+
+.support-tools-disclosure .route-grid {
+  padding-bottom: 18px;
+}
+
+.quote-create-disclosure {
+  background: var(--jht-surface);
+  border: 1px solid var(--jht-line);
+  border-radius: var(--jht-radius-lg);
+  box-shadow: var(--jht-shadow-card);
+  margin: 18px 0;
+}
+
+.quote-create-disclosure > summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  min-height: 72px;
+  padding: 12px 18px;
+  user-select: none;
+}
+
+.quote-create-disclosure > summary > span:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.quote-create-disclosure > summary strong {
+  color: var(--jht-text-primary);
+  font-size: 17px;
+}
+
+.quote-create-disclosure > summary small {
+  color: var(--jht-text-secondary);
+  font-size: 13px;
+}
+
+.quote-create-disclosure .disclosure-action {
+  color: var(--jht-primary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.quote-create-disclosure[open] > summary {
+  border-bottom: 1px solid var(--jht-line-soft);
+}
+
+.quote-create-disclosure-body {
+  padding: 18px;
 }
 
 /* 파트너 포털 전용 Notion형 워크스페이스 UI입니다. 내부 관리자 화면과 분리해서 관리합니다. */
@@ -5848,7 +5932,7 @@ html.dark .jht-calendar-month-grid button {
   align-items: end;
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(180px, 0.65fr) minmax(240px, 1.1fr) minmax(140px, 0.45fr) 132px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .exchange-country-preset-field {
@@ -5856,11 +5940,11 @@ html.dark .jht-calendar-month-grid button {
 }
 
 .exchange-country-name-field {
-  grid-column: span 2;
+  grid-column: span 1;
 }
 
 .exchange-country-alias-field {
-  grid-column: span 3;
+  grid-column: span 2;
 }
 
 .exchange-country-master-grid .exchange-form-submit-cell {
@@ -5872,7 +5956,7 @@ html.dark .jht-calendar-month-grid button {
   align-items: end;
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(260px, 1.35fr) minmax(130px, 0.6fr) minmax(110px, 0.5fr) minmax(130px, 0.6fr) minmax(140px, 0.65fr) minmax(120px, 0.55fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .exchange-rate-country-field {
@@ -5880,16 +5964,16 @@ html.dark .jht-calendar-month-grid button {
 }
 
 .exchange-rate-source-field {
-  grid-column: span 2;
+  grid-column: span 1;
 }
 
 .exchange-rate-notes-field {
-  grid-column: span 4;
+  grid-column: 1 / -1;
 }
 
 .exchange-rate-create-grid .exchange-form-submit-cell {
   align-self: end;
-  grid-column: span 2;
+  grid-column: 1 / -1;
 }
 
 .exchange-form-submit-cell {
@@ -5986,5 +6070,80 @@ html.dark .jht-calendar-month-grid button {
 
   .pagination-size-form {
     justify-content: space-between;
+  }
+}
+
+/*
+ * 모바일 상단은 로고/세션 제어와 핵심 메뉴를 두 줄로 고정합니다.
+ * DOM 순서에 맡기면 세션 버튼이 메뉴 아래로 밀려 헤더가 세 줄 이상 커지므로 위치를 명시합니다.
+ */
+@media (max-width: 820px) {
+  .topbar .brand {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .topbar-controls {
+    flex-wrap: nowrap;
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .primary-nav:not(.agency-nav) {
+    display: grid;
+    gap: 2px;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    overflow: visible;
+  }
+
+  .primary-nav:not(.agency-nav) > a,
+  .primary-nav:not(.agency-nav) .nav-more-trigger {
+    font-size: 11px;
+    justify-content: center;
+    padding-inline: 4px;
+    width: 100%;
+  }
+
+  .primary-nav:not(.agency-nav) .nav-more {
+    min-width: 0;
+  }
+
+  .agency-nav {
+    display: none;
+  }
+
+  .partner-workspace-sidebar {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .partner-workspace-brand {
+    padding-bottom: 10px;
+  }
+
+  .partner-workspace-brand p,
+  .partner-workspace-nav-section h2 {
+    display: none;
+  }
+
+  .partner-workspace-nav {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
+  }
+
+  .partner-workspace-nav-section {
+    display: contents;
+  }
+
+  .partner-workspace-link {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 8px 10px;
   }
 }

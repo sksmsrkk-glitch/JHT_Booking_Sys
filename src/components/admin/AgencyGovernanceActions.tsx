@@ -74,13 +74,13 @@ export function AgencyLifecycleActions({
 
   return (
     <div className="inline-actions">
-      <button className="button-secondary" disabled={isBusy || lifecycleStatus === "active"} onClick={() => update("active")}>
+      <button className="button-secondary" disabled={isBusy || lifecycleStatus === "active"} onClick={() => update("active")} type="button">
         Reactivate
       </button>
-      <button className="button-secondary" disabled={isBusy || lifecycleStatus === "frozen"} onClick={() => update("frozen")}>
+      <button className="button-secondary" disabled={isBusy || lifecycleStatus === "frozen"} onClick={() => update("frozen")} type="button">
         Freeze
       </button>
-      <button className="button-secondary" disabled={isBusy || lifecycleStatus === "withdrawn"} onClick={() => update("withdrawn")}>
+      <button className="button-secondary" disabled={isBusy || lifecycleStatus === "withdrawn"} onClick={() => update("withdrawn")} type="button">
         Withdraw
       </button>
       {message ? <span className="danger-text">{message}</span> : null}
@@ -111,10 +111,10 @@ export function AgencyUserGovernanceActions({ agencyId, userId }: { agencyId: st
 
   return (
     <div className="inline-actions">
-      <button className="button-secondary" disabled={isBusy} onClick={() => patch({ passwordResetRequired: true })}>
+      <button className="button-secondary" disabled={isBusy} onClick={() => patch({ passwordResetRequired: true })} type="button">
         Reset PW
       </button>
-      <button className="button-secondary" disabled={isBusy} onClick={() => patch({ status: "inactive" })}>
+      <button className="button-secondary" disabled={isBusy} onClick={() => patch({ status: "inactive" })} type="button">
         Force Withdraw
       </button>
       {message ? <span className="danger-text">{message}</span> : null}

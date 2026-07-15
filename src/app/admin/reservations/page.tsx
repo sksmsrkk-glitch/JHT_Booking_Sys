@@ -7,6 +7,7 @@ import type { ReservationDashboardData, ReservationListItem } from "@/features/r
 import { ReservationActions } from "@/components/admin/ReservationActions";
 import { PaginationControls } from "@/components/PaginationControls";
 import { buildPaginationMeta, type PaginationMeta } from "@/lib/api/pagination";
+import { isDemoModeEnabled } from "@/lib/api/guards";
 
 export const dynamic = "force-dynamic";
 
@@ -964,7 +965,16 @@ async function loadReservations(filters: {
 }): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
-    return buildDemoReservationState(filters, "Internal API access requires a Supabase internal-role JWT. Showing dummy group-status data so the reservation dashboard can be reviewed without login.");
+    if (isDemoModeEnabled()) {
+      return buildDemoReservationState(
+        filters,
+        "Demo mode is enabled. Showing sample group-status data without an internal session."
+      );
+    }
+    return {
+      status: "auth-required",
+      message: "Sign in with an active internal account to view reservation operations."
+    };
   }
 
   const [listResponse, dashboardResponse] = await Promise.all([
@@ -981,10 +991,16 @@ async function loadReservations(filters: {
 
   if (!listResponse.ok || !dashboardResponse.ok) {
     if ([listResponse.status, dashboardResponse.status].some((status) => status === 401 || status === 403)) {
-      return buildDemoReservationState(
-        filters,
-        "The live reservation API rejected the current session. Showing dummy group-status data for preview."
-      );
+      if (isDemoModeEnabled()) {
+        return buildDemoReservationState(
+          filters,
+          "Demo mode is enabled because the live reservation API rejected the current session."
+        );
+      }
+      return {
+        status: "auth-required",
+        message: "Your internal session is missing, expired, or does not have reservation access."
+      };
     }
     return {
       status: "error",

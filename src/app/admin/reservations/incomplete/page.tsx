@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getPageAuthorization } from "@/lib/api/page-session";
 import { demoReservations } from "@/features/reservation/demo-data";
 import type { ReservationListItem } from "@/features/reservation/types";
+import { isDemoModeEnabled } from "@/lib/api/guards";
 
 export const dynamic = "force-dynamic";
 
@@ -172,6 +173,9 @@ function getReservationReadiness(reservation: ReservationListItem) {
 async function loadReservations(): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
+    if (!isDemoModeEnabled()) {
+      return { status: "error", message: "Sign in with an active internal account to view incomplete groups." };
+    }
     return {
       status: "ready",
       reservations: demoReservations,
@@ -189,6 +193,12 @@ async function loadReservations(): Promise<LoadState> {
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
+      if (!isDemoModeEnabled()) {
+        return {
+          status: "error",
+          message: "Your internal session is missing, expired, or does not have reservation access."
+        };
+      }
       return {
         status: "ready",
         reservations: demoReservations,
@@ -202,12 +212,9 @@ async function loadReservations(): Promise<LoadState> {
   const reservations = payload.data ?? [];
   return {
     status: "ready",
-    reservations: reservations.length > 0 ? reservations : demoReservations,
-    isPreview: reservations.length === 0,
-    previewReason:
-      reservations.length === 0
-        ? "The live database returned no reservation rows yet. Showing dummy group-status data."
-        : undefined
+    reservations: reservations.length > 0 || !isDemoModeEnabled() ? reservations : demoReservations,
+    isPreview: reservations.length === 0 && isDemoModeEnabled(),
+    previewReason: reservations.length === 0 && isDemoModeEnabled() ? "Demo mode is enabled for an empty database." : undefined
   };
 }
 

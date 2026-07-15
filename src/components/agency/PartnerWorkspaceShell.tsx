@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 
 type PartnerWorkspaceShellProps = {
   children: ReactNode;
+  isAuthenticated: boolean;
 };
 
 type PartnerNavItem = {
@@ -50,8 +51,17 @@ const partnerNavSections: Array<{ title: string; items: PartnerNavItem[] }> = [
  * Notion처럼 좌측 페이지 트리와 중앙 데이터베이스 화면을 분리해
  * 파트너가 견적, 예약, 인보이스, 소통 내역을 같은 workflow code 기준으로 찾게 합니다.
  */
-export function PartnerWorkspaceShell({ children }: PartnerWorkspaceShellProps) {
+export function PartnerWorkspaceShell({ children, isAuthenticated }: PartnerWorkspaceShellProps) {
   const pathname = usePathname();
+  const visibleNavSections = partnerNavSections.map((section) => {
+    if (section.title !== "Account") return section;
+    return {
+      ...section,
+      items: section.items.filter((item) =>
+        isAuthenticated ? item.href !== "/agency/signup" : item.href !== "/agency/account/users"
+      )
+    };
+  });
 
   useEffect(() => {
     const previousLanguage = document.documentElement.lang;
@@ -74,7 +84,7 @@ export function PartnerWorkspaceShell({ children }: PartnerWorkspaceShellProps) 
         </div>
 
         <nav className="partner-workspace-nav">
-          {partnerNavSections.map((section) => (
+          {visibleNavSections.map((section) => (
             <section className="partner-workspace-nav-section" key={section.title}>
               <h2>{section.title}</h2>
               {section.items.map((item) => {

@@ -5,6 +5,7 @@ import { FinalOperationSnapshotForm } from "@/components/admin/FinalOperationSna
 import { getDemoReservationDetail } from "@/features/reservation/demo-data";
 import type { ReservationDetail } from "@/features/reservation/types";
 import { getPageAuthorization } from "@/lib/api/page-session";
+import { isDemoModeEnabled } from "@/lib/api/guards";
 
 export const dynamic = "force-dynamic";
 
@@ -120,8 +121,8 @@ async function loadReservation(reservationId: string): Promise<LoadState> {
   const demoReservation = getDemoReservationDetail(reservationId);
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
-    if (demoReservation) return { status: "ready", reservation: demoReservation, isPreview: true };
-    return { status: "not-found", message: "Preview reservation not found." };
+    if (isDemoModeEnabled() && demoReservation) return { status: "ready", reservation: demoReservation, isPreview: true };
+    return { status: "error", message: "An active internal session is required to view final confirmations." };
   }
 
   const response = await fetch(buildInternalApiUrl(`/api/reservations/${reservationId}`, headerStore), {
@@ -130,7 +131,7 @@ async function loadReservation(reservationId: string): Promise<LoadState> {
   });
   const payload = await response.json();
   if (!response.ok) {
-    if ((response.status === 401 || response.status === 403 || response.status === 404) && demoReservation) {
+    if (isDemoModeEnabled() && (response.status === 401 || response.status === 403 || response.status === 404) && demoReservation) {
       return { status: "ready", reservation: demoReservation, isPreview: true };
     }
     if (response.status === 404) return { status: "not-found", message: payload.error ?? "Reservation not found" };

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { demoReservations } from "@/features/reservation/demo-data";
 import type { ReservationListItem } from "@/features/reservation/types";
 import { getPageAuthorization } from "@/lib/api/page-session";
+import { isDemoModeEnabled } from "@/lib/api/guards";
 
 export const dynamic = "force-dynamic";
 
@@ -101,7 +102,14 @@ export default async function GuideExpenseReportsPage() {
 async function loadReservations(): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
-    return { status: "ready", reservations: demoReservations, previewMode: true };
+    return isDemoModeEnabled()
+      ? { status: "ready", reservations: demoReservations, previewMode: true }
+      : {
+          status: "error",
+          message: "Sign in with an active internal account to view guide expense reports.",
+          reservations: [],
+          previewMode: false
+        };
   }
 
   const response = await fetch(buildInternalApiUrl("/api/reservations", headerStore), {
@@ -111,11 +119,12 @@ async function loadReservations(): Promise<LoadState> {
   const payload = await response.json();
 
   if (!response.ok) {
+    const canPreview = isDemoModeEnabled();
     return {
       status: "error",
       message: payload.error ?? "Unknown reservations API error",
-      reservations: demoReservations,
-      previewMode: true
+      reservations: canPreview ? demoReservations : [],
+      previewMode: canPreview
     };
   }
 

@@ -5,6 +5,7 @@ import type { AgencyInquirySummary } from "@/features/agency/types";
 import { InquiryCreateForm } from "@/components/agency/InquiryCreateForm";
 import { PaginationControls } from "@/components/PaginationControls";
 import { buildPaginationMeta, type PaginationMeta } from "@/lib/api/pagination";
+import { isDemoModeEnabled } from "@/lib/api/guards";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,13 @@ export default async function AgencyInquiriesPage({ searchParams }: { searchPara
       {loadState.status === "error" ? (
         <section className="notice danger">
           <h2>Inquiries could not load</h2>
+          <p>{loadState.message}</p>
+        </section>
+      ) : null}
+
+      {loadState.status === "auth-required" ? (
+        <section className="notice warning">
+          <h2>Partner session required</h2>
           <p>{loadState.message}</p>
         </section>
       ) : null}
@@ -175,6 +183,9 @@ function InquiryDatabase({ inquiries, pagination }: { inquiries: AgencyInquirySu
 async function loadInquiries(params: { page?: string; pageSize?: string }): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
+    if (!isDemoModeEnabled()) {
+      return { status: "auth-required", message: "Log in with an approved partner account to view inquiries." };
+    }
     return {
       status: "ready",
       inquiries: demoAgencyInquiries,
@@ -193,6 +204,9 @@ async function loadInquiries(params: { page?: string; pageSize?: string }): Prom
   const payload = await response.json();
 
   if (!response.ok) {
+    if ((response.status === 401 || response.status === 403) && !isDemoModeEnabled()) {
+      return { status: "auth-required", message: payload.error ?? "This account cannot access partner inquiries." };
+    }
     return {
       status: response.status === 401 || response.status === 403 ? "ready" : "error",
       ...(response.status === 401 || response.status === 403

@@ -4,6 +4,7 @@ import { GuideExpenseReportForm } from "@/components/admin/GuideExpenseReportFor
 import { getDemoReservationDetail } from "@/features/reservation/demo-data";
 import type { ReservationDetail } from "@/features/reservation/types";
 import { getPageAuthorization } from "@/lib/api/page-session";
+import { isDemoModeEnabled } from "@/lib/api/guards";
 
 export const dynamic = "force-dynamic";
 
@@ -133,7 +134,9 @@ async function loadPageData(reservationId: string): Promise<LoadState> {
   const demoReservation = getDemoReservationDetail(reservationId);
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
-    if (demoReservation) return { status: "ready", reservation: demoReservation, report: null, previewMode: true };
+    if (isDemoModeEnabled() && demoReservation) {
+      return { status: "ready", reservation: demoReservation, report: null, previewMode: true };
+    }
     return { status: "error", message: "Internal login is required for live guide expense reports." };
   }
 
@@ -151,7 +154,9 @@ async function loadPageData(reservationId: string): Promise<LoadState> {
   const reservationPayload = await reservationResponse.json();
   const reportPayload = await reportResponse.json();
   if (!reservationResponse.ok) {
-    if (demoReservation) return { status: "ready", reservation: demoReservation, report: null, previewMode: true };
+    if (isDemoModeEnabled() && demoReservation) {
+      return { status: "ready", reservation: demoReservation, report: null, previewMode: true };
+    }
     return { status: "error", message: reservationPayload.error ?? "Reservation could not load" };
   }
   if (!reportResponse.ok) {

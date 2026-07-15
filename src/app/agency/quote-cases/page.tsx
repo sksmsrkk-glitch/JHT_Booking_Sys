@@ -5,6 +5,7 @@ import type { AgencyQuoteListItem } from "@/features/agency-portal/types";
 import { QuoteRequestActions } from "@/components/agency/QuoteRequestActions";
 import { PaginationControls } from "@/components/PaginationControls";
 import { buildPaginationMeta, type PaginationMeta } from "@/lib/api/pagination";
+import { isDemoModeEnabled } from "@/lib/api/guards";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,13 @@ export default async function AgencyQuoteCasesPage({ searchParams }: { searchPar
       {loadState.status === "error" ? (
         <section className="notice danger">
           <h2>Quotes could not load</h2>
+          <p>{loadState.message}</p>
+        </section>
+      ) : null}
+
+      {loadState.status === "auth-required" ? (
+        <section className="notice warning">
+          <h2>Partner session required</h2>
           <p>{loadState.message}</p>
         </section>
       ) : null}
@@ -180,6 +188,9 @@ function QuoteDatabase({ quoteCases, pagination }: { quoteCases: AgencyQuoteList
 async function loadQuoteCases(params: { page?: string; pageSize?: string }): Promise<LoadState> {
   const { headerStore, authorization } = await getPageAuthorization();
   if (!authorization) {
+    if (!isDemoModeEnabled()) {
+      return { status: "auth-required", message: "Log in with an approved partner account to review quotes." };
+    }
     return {
       status: "ready",
       quoteCases: demoQuoteCases,
@@ -199,6 +210,9 @@ async function loadQuoteCases(params: { page?: string; pageSize?: string }): Pro
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
+      if (!isDemoModeEnabled()) {
+        return { status: "auth-required", message: payload.error ?? "This account cannot access partner quotes." };
+      }
       return {
         status: "ready",
         quoteCases: demoQuoteCases,

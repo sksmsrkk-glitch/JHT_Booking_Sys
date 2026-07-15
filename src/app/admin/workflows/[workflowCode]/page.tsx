@@ -4,6 +4,7 @@ import { WorkflowLedger } from "@/components/workflow/WorkflowLedger";
 import { getDemoWorkflowByCode } from "@/features/workflow/demo-data";
 import type { WorkflowThreadDetail } from "@/features/workflow/types";
 import { getPageAuthorization } from "@/lib/api/page-session";
+import { isDemoModeEnabled } from "@/lib/api/guards";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +64,7 @@ async function loadWorkflow(workflowCode: string): Promise<LoadState> {
   if (payload.data) return { status: "ready", workflow: payload.data, previewMode: Boolean(payload.data.preview || !authorization) };
 
   const demo = getDemoWorkflowByCode(workflowCode);
-  if (demo) return { status: "ready", workflow: demo, previewMode: true };
+  if (isDemoModeEnabled() && demo) return { status: "ready", workflow: demo, previewMode: true };
   return { status: "not-found", message: "No workflow thread exists for this code yet." };
 }
 
