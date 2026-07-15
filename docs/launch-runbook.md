@@ -70,6 +70,7 @@ If Supabase CLI is unavailable, apply the SQL files in this order through the Su
 27. `supabase/migrations/202607150004_atomic_partner_inquiry.sql`
 28. `supabase/migrations/202607150005_hybrid_worker_contract.sql`
 29. `supabase/migrations/202607150006_worker_atomic_finish_audit.sql`
+30. `supabase/migrations/202607150007_restore_privileged_session_helper.sql`
 
 After migration, open `/admin/readiness` with an internal admin account and confirm database smoke checks are ready.
 
@@ -253,7 +254,7 @@ The v1 handoff is ready when all of these are true:
 
 프로덕션 배포 전 다음 확장성 항목을 추가 확인한다.
 
-1. `202607150001`부터 `202607150006`까지의 migration이 대상 Supabase에 적용되었는지 확인한다.
+1. `202607150001`부터 `202607150007`까지의 migration이 대상 Supabase에 적용되었는지 확인한다.
 2. `npx supabase db lint --linked` 또는 안전한 staging local lint를 통과시킨다.
 3. staging에서 `npm run test:e2e`를 데스크톱과 모바일 프로젝트 모두 실행한다.
 4. 테스트 JWT로 `npm run smoke:load`를 실행하고 인증 API p95가 750ms 이하인지 확인한다.

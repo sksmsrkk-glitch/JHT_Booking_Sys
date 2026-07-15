@@ -137,6 +137,14 @@ test("local auth seed remains compatible with current GoTrue user scanning", asy
   assert.match(seed, /phone,\s*phone_change/s);
 });
 
+test("manually bootstrapped databases restore the privileged-session helper", async () => {
+  const migration = await readSource("supabase/migrations/202607150007_restore_privileged_session_helper.sql");
+
+  assert.match(migration, /create or replace function jht_is_privileged_session/);
+  assert.match(migration, /revoke execute .* from public/);
+  assert.match(migration, /grant execute .* to anon, authenticated, service_role/);
+});
+
 async function readSource(relativePath) {
   return readFile(path.join(repositoryRoot, relativePath), "utf8");
 }
