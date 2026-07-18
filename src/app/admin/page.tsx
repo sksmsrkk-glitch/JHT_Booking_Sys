@@ -2,15 +2,13 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { RouteCardGrid } from "@/components/v1/RouteCardGrid";
-import type { AgencyListItem } from "@/features/agency/types";
-import { listAgencyAccountPage } from "@/features/agency/queries";
-import type { InvoiceListItem, SettlementListItem } from "@/features/finance/types";
-import type { AdminFinanceKpis } from "@/features/finance/queries";
-import { getAdminFinanceKpis, listInvoicePage, listSettlements } from "@/features/finance/queries";
-import type { QuoteCaseListItem } from "@/features/quotation/types";
-import { listQuoteCasePage } from "@/features/quotation/queries";
-import type { ReservationListItem } from "@/features/reservation/types";
-import { listReservationPage } from "@/features/reservation/queries";
+import {
+  emptyAdminDashboardAnalytics,
+  getAdminDashboardAnalytics,
+  type AdminDashboardAgencyOption,
+  type AdminDashboardAnalytics,
+  type AdminDashboardRow as DashboardRow
+} from "@/features/admin-dashboard/queries";
 import { adminRoutes } from "@/features/v1/site-map";
 import {
   classifyPageDataError,
@@ -42,51 +40,14 @@ type DashboardView = "overview" | "country" | "partner" | "period" | "status";
 type DashboardLoadState =
   | {
       status: "ready";
-      agencies: AgencyListItem[];
-      quoteCases: QuoteCaseListItem[];
-      reservations: ReservationListItem[];
-      invoices: InvoiceListItem[];
-      settlements: SettlementListItem[];
-      financeKpis: AdminFinanceKpis;
+      analytics: AdminDashboardAnalytics;
     }
   | {
       status: "auth-required";
       message: string;
-      agencies: AgencyListItem[];
-      quoteCases: [];
-      reservations: [];
-      invoices: [];
-      settlements: [];
-      financeKpis: AdminFinanceKpis;
+      analytics: AdminDashboardAnalytics;
     }
-  | { status: "error"; message: string; agencies: AgencyListItem[]; quoteCases: []; reservations: []; invoices: []; settlements: []; financeKpis: AdminFinanceKpis };
-
-type DashboardMetric = {
-  quoteInquiryCount: number;
-  confirmedCount: number;
-  cancelledCount: number;
-  totalInquiryCount: number;
-  quoteCaseCount: number;
-  activeReservationCount: number;
-  paxCount: number;
-  settlementDoneCount: number;
-  receivableCount: number;
-  receivableAmount: number;
-};
-
-type DashboardRow = {
-  key: string;
-  label: string;
-  quoteInquiries: number;
-  confirmed: number;
-  cancelled: number;
-  inquiries: number;
-  quoteCases: number;
-  pax: number;
-  settlementDone: number;
-  receivableCount: number;
-  receivableAmount: number;
-};
+  | { status: "error"; message: string; analytics: AdminDashboardAnalytics };
 
 const dashboardViews: Array<{ value: DashboardView; label: string }> = [
   { value: "overview", label: "Overview" },
@@ -101,7 +62,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
   const locale = normalizeLocale(cookieStore.get("jht_locale")?.value);
   const filters = normalizeDashboardFilters(await searchParams);
   const loadState = await loadDashboardData(filters);
-  const data = applyDashboardFilters(loadState, filters);
 
   const primaryTitles = ["Quote Cases", "Reservations", "Domestic Suppliers", "Overseas Agencies"];
   const primaryRoutes = primaryTitles
@@ -123,7 +83,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
         </div>
       </div>
 
-      <AdminDashboard filters={filters} loadState={loadState} data={data} />
+      <AdminDashboard filters={filters} loadState={loadState} />
 
       <Link
         aria-label={locale === "ko" ? "파트너 소통 워크플로우 열기" : "Open partner communication workflow"}
@@ -154,25 +114,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
 
 function AdminDashboard({
   filters,
-  loadState,
-  data
+  loadState
 }: {
   filters: DashboardFilters;
   loadState: DashboardLoadState;
-  data: ReturnType<typeof applyDashboardFilters>;
 }) {
-  const metric = buildDashboardMetric(
-    data.agencies,
-    data.quoteCases,
-    data.reservations,
-    data.invoices,
-    data.settlements,
-    data.financeKpis
-  );
-  const countryRows = buildRowsByAgencyDimension(data.agencies, data.quoteCases, data.reservations, data.invoices, data.settlements, "country");
-  const partnerRows = buildRowsByAgencyDimension(data.agencies, data.quoteCases, data.reservations, data.invoices, data.settlements, "partner");
-  const periodRows = buildRowsByPeriod(data.agencies, data.quoteCases, data.reservations, data.invoices, data.settlements);
-  const statusRows = buildRowsByStatus(data.quoteCases, data.reservations, data.invoices, data.settlements);
+  const { metrics: metric, countryRows, partnerRows, periodRows, statusRows, agencyOptions } = loadState.analytics;
   const activeRows =
     filters.view === "country"
       ? countryRows
@@ -196,7 +143,7 @@ function AdminDashboard({
         </Link>
       </div>
 
-      <DashboardFilterBar agencies={loadState.agencies} filters={filters} />
+      <DashboardFilterBar agencies={agencyOptions} filters={filters} />
 
       {loadState.status === "auth-required" ? (
         <section className="notice warning compact-notice">
@@ -290,7 +237,7 @@ function AdminDashboard({
   );
 }
 
-function DashboardFilterBar({ agencies, filters }: { agencies: AgencyListItem[]; filters: DashboardFilters }) {
+function DashboardFilterBar({ agencies, filters }: { agencies: AdminDashboardAgencyOption[]; filters: DashboardFilters }) {
   const countries = [...new Set(agencies.map((agency) => agency.countryCode).filter(Boolean) as string[])].sort();
 
   return (
@@ -460,288 +407,17 @@ async function loadDashboardData(filters: DashboardFilters): Promise<DashboardLo
   try {
     const { supabase, user } = await getInternalPageContext();
     requirePageFinanceRole(user.roles);
-    const firstPage = { page: 1, pageSize: 100 };
 
-    /* 대시보드의 다섯 API 재호출을 제거하고 동일한 인증 컨텍스트에서 병렬 조회합니다. */
-    const [agencies, quoteCases, reservations, invoices, settlements, financeKpis] = await Promise.all([
-      listAgencyAccountPage(supabase, { status: "active" }, firstPage),
-      listQuoteCasePage(supabase, {}, firstPage),
-      listReservationPage(supabase, { sortBy: "created_desc" }, firstPage),
-      listInvoicePage(supabase, {}, firstPage),
-      listSettlements(supabase),
-      getAdminFinanceKpis(supabase, filters)
-    ]);
-
-    return {
-      status: "ready",
-      agencies: agencies.items,
-      quoteCases: quoteCases.items,
-      reservations: reservations.items,
-      invoices: invoices.items,
-      settlements,
-      financeKpis
-    };
+    // KPI와 모든 분해 행은 PostgreSQL에서 전체 필터 범위를 집계합니다.
+    // 운영 목록의 첫 페이지가 대시보드 수치에 섞이지 않도록 경계를 분리합니다.
+    const analytics = await getAdminDashboardAnalytics(supabase, filters);
+    return { status: "ready", analytics };
   } catch (error) {
-    const failure = classifyPageDataError(error);
     return {
-      ...failure,
-      agencies: [],
-      quoteCases: [],
-      reservations: [],
-      invoices: [],
-      settlements: [],
-      financeKpis: emptyFinanceKpis()
+      ...classifyPageDataError(error),
+      analytics: emptyAdminDashboardAnalytics()
     };
   }
-}
-
-function applyDashboardFilters(loadState: DashboardLoadState, filters: DashboardFilters) {
-  const agencyById = new Map(loadState.agencies.map((agency) => [agency.id, agency]));
-  const agencies = loadState.agencies.filter((agency) => matchesAgencyFilter(agency, filters));
-  const allowedAgencyIds = new Set(agencies.map((agency) => agency.id));
-  const quoteCases = loadState.quoteCases.filter(
-    (quoteCase) =>
-      allowedAgencyIds.has(quoteCase.agencyAccountId) &&
-      matchesDateFilter(resolveQuoteDate(quoteCase), filters)
-  );
-  const reservations = loadState.reservations.filter(
-    (reservation) =>
-      allowedAgencyIds.has(reservation.agencyAccountId) &&
-      matchesDateFilter(resolveReservationDate(reservation), filters)
-  );
-  const allowedReservationIds = new Set(reservations.map((reservation) => reservation.id));
-  const invoices = loadState.invoices.filter((invoice) => allowedReservationIds.has(invoice.reservationId));
-  const settlements = loadState.settlements.filter((settlement) => allowedReservationIds.has(settlement.reservationId));
-  const usedAgencyIds = new Set([
-    ...quoteCases.map((quoteCase) => quoteCase.agencyAccountId),
-    ...reservations.map((reservation) => reservation.agencyAccountId)
-  ]);
-
-  return {
-    agencies: agencies.filter((agency) => usedAgencyIds.has(agency.id) || !filters.from),
-    quoteCases,
-    reservations,
-    invoices,
-    settlements,
-    financeKpis: loadState.financeKpis,
-    agencyById
-  };
-}
-
-function buildDashboardMetric(
-  agencies: AgencyListItem[],
-  quoteCases: QuoteCaseListItem[],
-  reservations: ReservationListItem[],
-  invoices: InvoiceListItem[],
-  settlements: SettlementListItem[],
-  financeKpis: AdminFinanceKpis
-): DashboardMetric {
-  const quoteInquiryCount = quoteCases.filter((quoteCase) =>
-    ["new", "triage", "quoting", "sent", "revision_requested"].includes(quoteCase.status)
-  ).length;
-  const confirmedCount = reservations.filter((reservation) =>
-    ["confirmed", "on_tour", "completed"].includes(reservation.status)
-  ).length;
-  const cancelledCount =
-    reservations.filter((reservation) => reservation.status === "cancelled").length +
-    quoteCases.filter((quoteCase) => quoteCase.status === "cancelled").length;
-  const totalInquiryCount = agencies.reduce((sum, agency) => sum + agency.inquiryCount, 0);
-  const quotePax = quoteCases.reduce((sum, quoteCase) => sum + (quoteCase.estimatedPax ?? 0), 0);
-  const reservationPax = reservations.reduce((sum, reservation) => sum + resolveReservationPax(reservation), 0);
-  return {
-    quoteInquiryCount,
-    confirmedCount,
-    cancelledCount,
-    totalInquiryCount,
-    quoteCaseCount: quoteCases.length,
-    activeReservationCount: reservations.filter((reservation) => !["cancelled", "completed"].includes(reservation.status)).length,
-    paxCount: quotePax + reservationPax,
-    settlementDoneCount: financeKpis.settlementDoneCount,
-    receivableCount: financeKpis.receivableCount,
-    receivableAmount: financeKpis.receivableAmount
-  };
-}
-
-function emptyFinanceKpis(): AdminFinanceKpis {
-  return { settlementDoneCount: 0, receivableCount: 0, receivableAmount: 0 };
-}
-
-function buildRowsByAgencyDimension(
-  agencies: AgencyListItem[],
-  quoteCases: QuoteCaseListItem[],
-  reservations: ReservationListItem[],
-  invoices: InvoiceListItem[],
-  settlements: SettlementListItem[],
-  dimension: "country" | "partner"
-) {
-  const agencyById = new Map(agencies.map((agency) => [agency.id, agency]));
-  const reservationById = new Map(reservations.map((reservation) => [reservation.id, reservation]));
-  const rows = new Map<string, DashboardRow>();
-
-  for (const agency of agencies) {
-    const key = dimension === "country" ? agency.countryCode ?? "UNKNOWN" : agency.id;
-    ensureRow(rows, key, dimension === "country" ? agency.countryCode ?? "Unknown country" : agency.name).inquiries += agency.inquiryCount;
-  }
-
-  for (const quoteCase of quoteCases) {
-    const agency = agencyById.get(quoteCase.agencyAccountId);
-    const key = dimension === "country" ? agency?.countryCode ?? "UNKNOWN" : quoteCase.agencyAccountId;
-    const row = ensureRow(rows, key, dimension === "country" ? agency?.countryCode ?? "Unknown country" : agency?.name ?? quoteCase.agencyName ?? "Unknown partner");
-    row.quoteCases += 1;
-    row.pax += quoteCase.estimatedPax ?? 0;
-    if (["new", "triage", "quoting", "sent", "revision_requested"].includes(quoteCase.status)) row.quoteInquiries += 1;
-    if (quoteCase.status === "accepted") row.confirmed += 1;
-    if (quoteCase.status === "cancelled") row.cancelled += 1;
-  }
-
-  for (const reservation of reservations) {
-    const agency = agencyById.get(reservation.agencyAccountId);
-    const key = dimension === "country" ? agency?.countryCode ?? "UNKNOWN" : reservation.agencyAccountId;
-    const row = ensureRow(rows, key, dimension === "country" ? agency?.countryCode ?? "Unknown country" : agency?.name ?? reservation.agencyName ?? "Unknown partner");
-    row.pax += resolveReservationPax(reservation);
-    if (["confirmed", "on_tour", "completed"].includes(reservation.status)) row.confirmed += 1;
-    if (reservation.status === "cancelled") row.cancelled += 1;
-  }
-
-  for (const invoice of invoices) {
-    const reservation = reservationById.get(invoice.reservationId);
-    const agency = reservation ? agencyById.get(reservation.agencyAccountId) : null;
-    const key = dimension === "country" ? agency?.countryCode ?? "UNKNOWN" : reservation?.agencyAccountId ?? invoice.reservationId;
-    const row = ensureRow(rows, key, dimension === "country" ? agency?.countryCode ?? "Unknown country" : agency?.name ?? invoice.agencyName ?? "Unknown partner");
-    const receivable = getInvoiceReceivableAmount(invoice);
-    if (receivable > 0 && invoice.status !== "void") {
-      row.receivableCount += 1;
-      row.receivableAmount += receivable;
-    }
-  }
-
-  for (const settlement of settlements) {
-    if (!["approved", "closed"].includes(settlement.status)) continue;
-    const reservation = reservationById.get(settlement.reservationId);
-    const agency = reservation ? agencyById.get(reservation.agencyAccountId) : null;
-    const key = dimension === "country" ? agency?.countryCode ?? "UNKNOWN" : reservation?.agencyAccountId ?? settlement.reservationId;
-    const row = ensureRow(rows, key, dimension === "country" ? agency?.countryCode ?? "Unknown country" : agency?.name ?? settlement.agencyName ?? "Unknown partner");
-    row.settlementDone += 1;
-  }
-
-  return sortDashboardRows([...rows.values()]);
-}
-
-function buildRowsByPeriod(
-  agencies: AgencyListItem[],
-  quoteCases: QuoteCaseListItem[],
-  reservations: ReservationListItem[],
-  invoices: InvoiceListItem[],
-  settlements: SettlementListItem[]
-) {
-  const rows = new Map<string, DashboardRow>();
-  const reservationById = new Map(reservations.map((reservation) => [reservation.id, reservation]));
-  for (const quoteCase of quoteCases) {
-    const key = resolveMonthKey(resolveQuoteDate(quoteCase));
-    const row = ensureRow(rows, key, key);
-    row.quoteCases += 1;
-    row.pax += quoteCase.estimatedPax ?? 0;
-    if (["new", "triage", "quoting", "sent", "revision_requested"].includes(quoteCase.status)) row.quoteInquiries += 1;
-    if (quoteCase.status === "accepted") row.confirmed += 1;
-    if (quoteCase.status === "cancelled") row.cancelled += 1;
-  }
-  for (const reservation of reservations) {
-    const key = resolveMonthKey(resolveReservationDate(reservation));
-    const row = ensureRow(rows, key, key);
-    row.pax += resolveReservationPax(reservation);
-    if (["confirmed", "on_tour", "completed"].includes(reservation.status)) row.confirmed += 1;
-    if (reservation.status === "cancelled") row.cancelled += 1;
-  }
-  for (const agency of agencies) {
-    const key = resolveMonthKey(agency.updatedAt);
-    ensureRow(rows, key, key).inquiries += agency.inquiryCount;
-  }
-  for (const invoice of invoices) {
-    const reservation = reservationById.get(invoice.reservationId);
-    const key = resolveMonthKey(resolveReservationDate(reservation) ?? invoice.createdAt);
-    const row = ensureRow(rows, key, key);
-    const receivable = getInvoiceReceivableAmount(invoice);
-    if (receivable > 0 && invoice.status !== "void") {
-      row.receivableCount += 1;
-      row.receivableAmount += receivable;
-    }
-  }
-  for (const settlement of settlements) {
-    if (!["approved", "closed"].includes(settlement.status)) continue;
-    const reservation = reservationById.get(settlement.reservationId);
-    const key = resolveMonthKey(resolveReservationDate(reservation) ?? settlement.createdAt);
-    ensureRow(rows, key, key).settlementDone += 1;
-  }
-  return [...rows.values()].sort((left, right) => right.key.localeCompare(left.key));
-}
-
-function buildRowsByStatus(
-  quoteCases: QuoteCaseListItem[],
-  reservations: ReservationListItem[],
-  invoices: InvoiceListItem[],
-  settlements: SettlementListItem[]
-) {
-  const rows = new Map<string, DashboardRow>();
-  for (const quoteCase of quoteCases) {
-    const row = ensureRow(rows, `quote:${quoteCase.status}`, `Quote: ${formatLabel(quoteCase.status)}`);
-    row.quoteCases += 1;
-    row.pax += quoteCase.estimatedPax ?? 0;
-    if (["new", "triage", "quoting", "sent", "revision_requested"].includes(quoteCase.status)) row.quoteInquiries += 1;
-    if (quoteCase.status === "accepted") row.confirmed += 1;
-    if (quoteCase.status === "cancelled") row.cancelled += 1;
-  }
-  for (const reservation of reservations) {
-    const row = ensureRow(rows, `reservation:${reservation.status}`, `Reservation: ${formatLabel(reservation.status)}`);
-    row.pax += resolveReservationPax(reservation);
-    if (["confirmed", "on_tour", "completed"].includes(reservation.status)) row.confirmed += 1;
-    if (reservation.status === "cancelled") row.cancelled += 1;
-  }
-  for (const invoice of invoices) {
-    const row = ensureRow(rows, `invoice:${invoice.status}`, `Invoice: ${formatLabel(invoice.status)}`);
-    const receivable = getInvoiceReceivableAmount(invoice);
-    if (receivable > 0 && invoice.status !== "void") {
-      row.receivableCount += 1;
-      row.receivableAmount += receivable;
-    }
-  }
-  for (const settlement of settlements) {
-    const row = ensureRow(rows, `settlement:${settlement.status}`, `Settlement: ${formatLabel(settlement.status)}`);
-    if (["approved", "closed"].includes(settlement.status)) row.settlementDone += 1;
-  }
-  return sortDashboardRows([...rows.values()]);
-}
-
-function ensureRow(rows: Map<string, DashboardRow>, key: string, label: string) {
-  const existing = rows.get(key);
-  if (existing) return existing;
-  const row = {
-    key,
-    label,
-    quoteInquiries: 0,
-    confirmed: 0,
-    cancelled: 0,
-    inquiries: 0,
-    quoteCases: 0,
-    pax: 0,
-    settlementDone: 0,
-    receivableCount: 0,
-    receivableAmount: 0
-  };
-  rows.set(key, row);
-  return row;
-}
-
-function sortDashboardRows(rows: DashboardRow[]) {
-  return rows.sort(
-    (left, right) =>
-      right.quoteInquiries +
-      right.confirmed +
-      right.cancelled +
-      right.inquiries +
-      right.settlementDone +
-      right.receivableCount -
-      (left.quoteInquiries + left.confirmed + left.cancelled + left.inquiries + left.settlementDone + left.receivableCount)
-  );
 }
 
 function normalizeDashboardFilters(params: Awaited<SearchParams>): DashboardFilters {
@@ -753,39 +429,6 @@ function normalizeDashboardFilters(params: Awaited<SearchParams>): DashboardFilt
     to: normalizeDate(params.to),
     view
   };
-}
-
-function matchesAgencyFilter(agency: AgencyListItem, filters: DashboardFilters) {
-  if (filters.country && agency.countryCode !== filters.country) return false;
-  if (filters.agencyAccountId && agency.id !== filters.agencyAccountId) return false;
-  return true;
-}
-
-function matchesDateFilter(date: string | null, filters: DashboardFilters) {
-  if (!date) return !filters.from && !filters.to;
-  if (filters.from && date < filters.from) return false;
-  if (filters.to && date > filters.to) return false;
-  return true;
-}
-
-function resolveQuoteDate(quoteCase: QuoteCaseListItem) {
-  return quoteCase.startDate ?? quoteCase.createdAt ?? null;
-}
-
-function resolveReservationDate(reservation: ReservationListItem | undefined) {
-  return reservation?.tourStartDate ?? reservation?.createdAt ?? null;
-}
-
-function resolveMonthKey(date: string | null) {
-  return date ? date.slice(0, 7) : "Unscheduled";
-}
-
-function resolveReservationPax(reservation: ReservationListItem) {
-  return reservation.estimatedPax ?? 0;
-}
-
-function getInvoiceReceivableAmount(invoice: InvoiceListItem) {
-  return Math.max(0, Number(invoice.totalAmount ?? 0) - Number(invoice.confirmedPaymentTotal ?? 0));
 }
 
 function formatMoney(value: number) {
@@ -836,12 +479,5 @@ function normalizeOptional(value: string | undefined) {
 function normalizeDate(value: string | undefined) {
   const trimmed = normalizeOptional(value);
   return trimmed && /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : undefined;
-}
-
-function formatLabel(value: string) {
-  return value
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
 }
 

@@ -177,7 +177,11 @@ function QuoteDatabase({ quoteCases, pagination }: { quoteCases: AgencyQuoteList
               </strong>
             </div>
             <div className="partner-database-actions">
-              <QuoteRequestActions quoteCaseId={quoteCase.id} tourName={quoteCase.tourName} />
+              <QuoteRequestActions
+                quoteCaseId={quoteCase.id}
+                quoteCaseStatus={quoteCase.status}
+                tourName={quoteCase.tourName}
+              />
             </div>
           </article>
         ))}

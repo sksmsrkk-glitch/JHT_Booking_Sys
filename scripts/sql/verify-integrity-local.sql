@@ -75,6 +75,12 @@ $$;
 drop trigger jht_test_force_quote_audit_failure on public.audit_logs;
 drop function public.jht_test_force_quote_audit_failure();
 
+-- The seed quote is accepted for reservation demos. Put this transaction-local
+-- fixture in an allowed state before verifying the successful revision path.
+update public.quote_cases
+set status = 'sent'
+where id = '00000000-0000-4000-8000-000000008001';
+
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000002002', true);
 
@@ -152,6 +158,132 @@ begin
 end;
 $$;
 
+-- A completed quote lifecycle cannot be reopened by a new partner revision.
+-- Replaying the exact earlier request remains safe and does not mutate status.
+update public.quote_cases
+set status = 'accepted'
+where id = '00000000-0000-4000-8000-000000008001';
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000002002', true);
+
+do $$
+declare
+  replay_revision jsonb;
+begin
+  replay_revision := public.submit_agency_quote_request_atomic(
+    '00000000-0000-4000-8000-000000003001',
+    '00000000-0000-4000-8000-000000003101',
+    '00000000-0000-4000-8000-000000008001',
+    'revision_request',
+    'Revision request integrity verification',
+    'Move one hotel night to Busan',
+    '["Move one hotel night to Busan"]'::jsonb,
+    null,
+    null,
+    'integrity-revision-success'
+  );
+  if not coalesce((replay_revision ->> 'existing')::boolean, false) then
+    raise exception 'Existing revision request was not replayed idempotently';
+  end if;
+
+  begin
+    perform public.submit_agency_quote_request_atomic(
+      '00000000-0000-4000-8000-000000003001',
+      '00000000-0000-4000-8000-000000003101',
+      '00000000-0000-4000-8000-000000008001',
+      'revision_request',
+      'Accepted quote must stay accepted',
+      'Attempt to reopen accepted quote',
+      '[]'::jsonb,
+      null,
+      null,
+      'integrity-revision-accepted-blocked'
+    );
+    raise exception 'Accepted quote case accepted a new revision request';
+  exception
+    when check_violation then null;
+  end;
+
+end;
+$$;
+
+reset role;
+
+do $$
+begin
+  if (select status::text from public.quote_cases where id = '00000000-0000-4000-8000-000000008001') <> 'accepted' then
+    raise exception 'Accepted quote status changed during blocked revision request';
+  end if;
+  if exists (select 1 from public.agency_inquiries where idempotency_key = 'integrity-revision-accepted-blocked') then
+    raise exception 'Blocked accepted revision request left a partial inquiry';
+  end if;
+end;
+$$;
+
+update public.quote_cases
+set status = 'cancelled'
+where id = '00000000-0000-4000-8000-000000008001';
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000002002', true);
+
+do $$
+begin
+  begin
+    perform public.submit_agency_quote_request_atomic(
+      '00000000-0000-4000-8000-000000003001',
+      '00000000-0000-4000-8000-000000003101',
+      '00000000-0000-4000-8000-000000008001',
+      'revision_request',
+      'Cancelled quote must stay cancelled',
+      'Attempt to reopen cancelled quote',
+      '[]'::jsonb,
+      null,
+      null,
+      'integrity-revision-cancelled-blocked'
+    );
+    raise exception 'Cancelled quote case accepted a new revision request';
+  exception
+    when check_violation then null;
+  end;
+
+  begin
+    perform public.submit_agency_quote_request_atomic(
+      '00000000-0000-4000-8000-000000003001',
+      '00000000-0000-4000-8000-000000003101',
+      '00000000-0000-4000-8000-000000008001',
+      'booking_request',
+      null,
+      'Attempt to book cancelled quote',
+      '[]'::jsonb,
+      '00000000-0000-4000-8000-000000008101',
+      null,
+      'integrity-booking-cancelled-blocked'
+    );
+    raise exception 'Cancelled quote case accepted a new booking request';
+  exception
+    when check_violation then null;
+  end;
+end;
+$$;
+
+reset role;
+
+do $$
+begin
+  if (select status::text from public.quote_cases where id = '00000000-0000-4000-8000-000000008001') <> 'cancelled' then
+    raise exception 'Cancelled quote status changed during blocked revision request';
+  end if;
+  if exists (select 1 from public.agency_inquiries where idempotency_key = 'integrity-revision-cancelled-blocked') then
+    raise exception 'Blocked cancelled revision request left a partial inquiry';
+  end if;
+  if exists (select 1 from public.agency_inquiries where idempotency_key = 'integrity-booking-cancelled-blocked') then
+    raise exception 'Blocked cancelled booking request left a partial inquiry';
+  end if;
+end;
+$$;
+
 -- The same payment key must be reusable on another invoice without replaying the first payment.
 do $$
 declare
@@ -193,7 +325,7 @@ create temporary table jht_test_kpi_reservations (
 with inserted_quotes as (
   insert into public.quote_cases (
     id, company_id, agency_account_id, case_code, share_id, tour_name,
-    status, currency, start_date, end_date
+    status, currency, estimated_pax, start_date, end_date
   )
   select
     gen_random_uuid(),
@@ -204,6 +336,7 @@ with inserted_quotes as (
     'KPI integrity group ' || series_no,
     'accepted',
     'KRW',
+    1,
     date '2035-01-15',
     date '2035-01-16'
   from generate_series(1, 101) as series_no
@@ -240,9 +373,16 @@ select
   100
 from jht_test_kpi_reservations;
 
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000002001', true);
+
 do $$
 declare
   kpis jsonb;
+  analytics jsonb;
+  partner_row jsonb;
+  country_row jsonb;
+  reservation_status_row jsonb;
 begin
   kpis := public.get_admin_finance_kpis(
     null,
@@ -256,8 +396,51 @@ begin
   if (kpis ->> 'receivableAmount')::numeric <> 10100 then
     raise exception 'Expected receivable amount 10100, got %', kpis ->> 'receivableAmount';
   end if;
+
+  analytics := public.get_admin_dashboard_analytics(
+    null,
+    '00000000-0000-4000-8000-000000003001',
+    date '2035-01-01',
+    date '2035-01-31'
+  );
+  if (analytics #>> '{metrics,quoteCaseCount}')::integer <> 101 then
+    raise exception 'Dashboard quote case KPI was truncated: %', analytics #>> '{metrics,quoteCaseCount}';
+  end if;
+  if (analytics #>> '{metrics,confirmedCount}')::integer <> 101 then
+    raise exception 'Dashboard confirmed KPI was truncated: %', analytics #>> '{metrics,confirmedCount}';
+  end if;
+  if (analytics #>> '{metrics,paxCount}')::integer <> 101 then
+    raise exception 'Dashboard pax KPI was truncated or double-counted: %', analytics #>> '{metrics,paxCount}';
+  end if;
+  if (analytics #>> '{metrics,receivableCount}')::integer <> 101 then
+    raise exception 'Dashboard receivable KPI was truncated: %', analytics #>> '{metrics,receivableCount}';
+  end if;
+
+  select row into partner_row
+  from jsonb_array_elements(analytics -> 'partnerRows') row
+  where row ->> 'key' = '00000000-0000-4000-8000-000000003001';
+  if coalesce((partner_row ->> 'quote_cases')::integer, 0) <> 101
+     or coalesce((partner_row ->> 'receivable_count')::integer, 0) <> 101 then
+    raise exception 'Partner breakdown was truncated: %', partner_row;
+  end if;
+
+  select row into country_row
+  from jsonb_array_elements(analytics -> 'countryRows') row
+  where row ->> 'key' = 'MY';
+  if coalesce((country_row ->> 'quote_cases')::integer, 0) <> 101 then
+    raise exception 'Country breakdown was truncated: %', country_row;
+  end if;
+
+  select row into reservation_status_row
+  from jsonb_array_elements(analytics -> 'statusRows') row
+  where row ->> 'key' = 'reservation:confirmed';
+  if coalesce((reservation_status_row ->> 'confirmed')::integer, 0) <> 101 then
+    raise exception 'Status breakdown was truncated: %', reservation_status_row;
+  end if;
 end;
 $$;
+
+reset role;
 
 -- Delivery evidence must prevent a failed message from being requeued.
 do $$

@@ -6,11 +6,21 @@ import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useRef, useState } from "react";
 
-export function QuoteRequestActions({ quoteCaseId, tourName }: { quoteCaseId: string; tourName: string }) {
+export function QuoteRequestActions({
+  quoteCaseId,
+  quoteCaseStatus,
+  tourName
+}: {
+  quoteCaseId: string;
+  quoteCaseStatus: string;
+  tourName: string;
+}) {
   const [message, setMessage] = useState("");
   const [isBusy, setIsBusy] = useState(false);
   const bookingIdempotencyKey = useRef<string | null>(null);
   const revisionIdempotencyKey = useRef<string | null>(null);
+  const canBook = ["sent", "accepted"].includes(quoteCaseStatus);
+  const canRevise = ["quoting", "sent", "revision_requested"].includes(quoteCaseStatus);
 
   async function sendBookingRequest(formData: FormData) {
     await submit(
@@ -68,28 +78,35 @@ export function QuoteRequestActions({ quoteCaseId, tourName }: { quoteCaseId: st
     <details className="row-details">
       <summary>Request</summary>
       <div className="stack">
-        <form action={sendBookingRequest} className="compact-form">
-          <label>
-            Booking Message
-            <textarea name="bookingMessage" placeholder="Please proceed with booking." required rows={3} />
-          </label>
-          <label>
-            Agency Ref.
-            <input name="agencyReferenceNo" placeholder="Optional" />
-          </label>
-          <button className="button-secondary" disabled={isBusy} type="submit">
-            Book
-          </button>
-        </form>
-        <form action={sendRevisionRequest} className="compact-form">
-          <label>
-            Revision Message
-            <textarea name="revisionMessage" placeholder="Please revise dates, pax, or itinerary." required rows={3} />
-          </label>
-          <button className="button-secondary" disabled={isBusy} type="submit">
-            Revise
-          </button>
-        </form>
+        {canBook ? (
+          <form action={sendBookingRequest} className="compact-form">
+            <label>
+              Booking Message
+              <textarea name="bookingMessage" placeholder="Please proceed with booking." required rows={3} />
+            </label>
+            <label>
+              Agency Ref.
+              <input name="agencyReferenceNo" placeholder="Optional" />
+            </label>
+            <button className="button-secondary" disabled={isBusy} type="submit">
+              Book
+            </button>
+          </form>
+        ) : null}
+        {canRevise ? (
+          <form action={sendRevisionRequest} className="compact-form">
+            <label>
+              Revision Message
+              <textarea name="revisionMessage" placeholder="Please revise dates, pax, or itinerary." required rows={3} />
+            </label>
+            <button className="button-secondary" disabled={isBusy} type="submit">
+              Revise
+            </button>
+          </form>
+        ) : null}
+        {!canBook && !canRevise ? (
+          <span className="subtext">This quote is closed. Use the reservation change or cancellation workflow.</span>
+        ) : null}
         {message ? <span className="danger-text">{message}</span> : null}
       </div>
     </details>

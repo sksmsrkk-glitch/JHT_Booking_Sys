@@ -5,15 +5,47 @@
  */
 export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   try {
-    return await fetch(input, init);
-  } catch {
-    return new Response(
-      JSON.stringify({ error: "Network connection failed. Please check your connection and retry." }),
-      {
-        status: 503,
-        statusText: "Network request failed",
-        headers: { "content-type": "application/json" }
+    const response = await fetch(input, init);
+    if (response.status === 204) return response;
+
+    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+    const isJson = contentType.includes("application/json") || contentType.includes("+json");
+    if (isJson) {
+      // Content-Type만 JSON이고 본문이 잘못된 프록시 응답도 폼의 response.json()을
+      // 예외로 중단시키지 않도록 복제본으로 유효성을 먼저 확인합니다.
+      try {
+        await response.clone().json();
+        return response;
+      } catch {
+        return invalidApiResponse(response);
       }
+    }
+
+    // 이 helper를 사용하는 경로는 JSON API입니다. 프록시의 HTML 502 또는
+    // 만료된 세션이 로그인 HTML로 리다이렉트된 경우를 일관된 JSON 오류로 바꿉니다.
+    return invalidApiResponse(response);
+  } catch {
+    return jsonErrorResponse(
+      503,
+      "Network connection failed. Please check your connection and retry.",
+      "Network request failed"
     );
   }
+}
+
+function invalidApiResponse(response: Response) {
+  const status = response.redirected ? 401 : response.ok ? 502 : response.status;
+  const message = response.redirected
+    ? "Your session has expired. Please log in again."
+    : status >= 500
+      ? "The server is temporarily unavailable. Please retry."
+      : "The server returned an invalid response. Please retry.";
+  return jsonErrorResponse(status, message, response.statusText || "Invalid API response", response.headers);
+}
+
+function jsonErrorResponse(status: number, error: string, statusText: string, sourceHeaders?: Headers) {
+  const headers = new Headers(sourceHeaders);
+  headers.set("content-type", "application/json");
+  headers.set("cache-control", "no-store");
+  return new Response(JSON.stringify({ error }), { status, statusText, headers });
 }

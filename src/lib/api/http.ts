@@ -152,3 +152,32 @@ export function supabaseError(error: { message?: string } | null, fallback = "Da
     throw new HttpError(500, error.message ?? fallback);
   }
 }
+
+type RpcError = {
+  code?: string | null;
+  message?: string | null;
+};
+
+/**
+ * Postgres/PostgREST 오류를 외부 API 상태로 변환합니다.
+ *
+ * DB 원문에는 제약조건명, 테이블명, 함수 내부 정보가 포함될 수 있으므로 4xx 응답에도
+ * 원문을 그대로 사용하지 않습니다. 알 수 없는 오류는 500으로 처리되어 fail()에서
+ * 일반 메시지로 감춰지고, 서버 로그에만 정제된 진단 정보가 남습니다.
+ */
+export function throwRpcError(error: RpcError): never {
+  switch (error.code) {
+    case "42501":
+      throw new HttpError(403, "You do not have permission to perform this action.");
+    case "P0002":
+      throw new HttpError(404, "The requested record was not found.");
+    case "22023":
+      throw new HttpError(409, "The request is not valid for the current record state.");
+    case "23505":
+      throw new HttpError(409, "The request conflicts with an existing record.");
+    case "23514":
+      throw new HttpError(409, "This action is not allowed in the current lifecycle state.");
+    default:
+      throw new HttpError(500, error.message ?? "Database operation failed");
+  }
+}

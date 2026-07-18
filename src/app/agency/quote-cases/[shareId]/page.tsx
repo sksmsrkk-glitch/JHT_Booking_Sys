@@ -88,7 +88,11 @@ export default async function AgencyQuoteDetailPage({ params }: { params: PagePa
         </article>
         <article className="panel">
           <h2>Request Action</h2>
-          <QuoteRequestActions quoteCaseId={quoteCase.id} tourName={quoteCase.tourName} />
+          <QuoteRequestActions
+            quoteCaseId={quoteCase.id}
+            quoteCaseStatus={quoteCase.status}
+            tourName={quoteCase.tourName}
+          />
         </article>
       </section>
 

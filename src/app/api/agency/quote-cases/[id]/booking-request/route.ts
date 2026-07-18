@@ -1,5 +1,5 @@
 import { requireAgencyUser } from "@/lib/api/auth";
-import { created, fail, HttpError, readJson, requireString } from "@/lib/api/http";
+import { created, fail, HttpError, readJson, requireString, throwRpcError } from "@/lib/api/http";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -30,9 +30,4 @@ export async function POST(request: Request, context: RouteContext) {
   } catch (error) {
     return fail(error);
   }
-}
-
-function throwRpcError(error: { code?: string; message: string }): never {
-  const status = error.code === "42501" ? 403 : error.code === "P0002" ? 404 : ["22023", "23505"].includes(error.code ?? "") ? 409 : 500;
-  throw new HttpError(status, error.message);
 }

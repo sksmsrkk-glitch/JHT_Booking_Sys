@@ -11,8 +11,11 @@ const readinessMigration = read("supabase/migrations/202607150002_reservation_re
 const requestSecurityMigration = read("supabase/migrations/202607180001_partner_request_payment_security.sql");
 const financeKpiMigration = read("supabase/migrations/202607180002_admin_finance_kpis.sql");
 const supplierSafetyMigration = read("supabase/migrations/202607180003_supplier_message_delivery_safety.sql");
+const revisionLifecycleMigration = read("supabase/migrations/202607180004_quote_revision_lifecycle.sql");
+const dashboardAnalyticsMigration = read("supabase/migrations/202607180005_admin_dashboard_analytics.sql");
 const bookingRoute = read("src/app/api/agency/quote-cases/[id]/booking-request/route.ts");
 const revisionRoute = read("src/app/api/agency/quote-cases/[id]/revision-request/route.ts");
+const httpHelpers = read("src/lib/api/http.ts");
 const paymentRoute = read("src/app/api/finance/invoices/[id]/payments/route.ts");
 const dashboardPage = read("src/app/admin/page.tsx");
 const financeQueries = read("src/features/finance/queries.ts");
@@ -45,6 +48,30 @@ test("partner booking and revision requests use one authenticated atomic RPC", (
   }
 });
 
+test("partner revision lifecycle is explicitly whitelisted and terminal quote states cannot be reopened", () => {
+  assert.match(
+    revisionLifecycleMigration,
+    /quote_row\.status::text not in \('sent', 'accepted'\)[\s\S]+Booking request is not allowed/i
+  );
+  assert.match(
+    revisionLifecycleMigration,
+    /quote_row\.status::text not in \('quoting', 'sent', 'revision_requested'\)/i
+  );
+  assert.match(revisionLifecycleMigration, /using errcode = '23514'/i);
+  assert.match(revisionLifecycleMigration, /idempotent replay is safe[\s\S]+if p_inquiry_type = 'booking_request'/i);
+  assert.doesNotMatch(revisionLifecycleMigration, /accepted[^\n]+revision_requested/i);
+});
+
+test("RPC errors use one safe public mapper without exposing Postgres constraint messages", () => {
+  for (const route of [bookingRoute, revisionRoute]) {
+    assert.match(route, /import \{[^;]*throwRpcError[^;]*\} from "@\/lib\/api\/http"/);
+    assert.doesNotMatch(route, /function throwRpcError/);
+  }
+  assert.match(httpHelpers, /case "23505":[\s\S]+The request conflicts with an existing record\./);
+  assert.match(httpHelpers, /case "23514":[\s\S]+not allowed in the current lifecycle state\./);
+  assert.doesNotMatch(httpHelpers, /case "23505":[\s\S]{0,160}error\.message/);
+});
+
 test("payment replay is scoped to its invoice in SQL and both API lookup paths", () => {
   assert.match(
     requestSecurityMigration,
@@ -70,7 +97,7 @@ test("client forms use safeFetch so network rejection resolves to an unlockable 
   const safeFetch = read("src/lib/client/safe-fetch.ts");
   assert.match(safeFetch, /try\s*{/);
   assert.match(safeFetch, /catch/);
-  assert.match(safeFetch, /status:\s*503/);
+  assert.match(safeFetch, /jsonErrorResponse\(\s*503/);
 });
 
 test("safeFetch converts an actual rejected network promise into a JSON error response", async () => {
@@ -96,13 +123,57 @@ test("safeFetch converts an actual rejected network promise into a JSON error re
   }
 });
 
-test("admin finance KPIs are aggregated by a full-dataset RPC, not a paged list", () => {
+test("safeFetch converts HTML gateway failures and malformed JSON into parseable JSON errors", async () => {
+  const source = read("src/lib/client/safe-fetch.ts");
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }
+  }).outputText;
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
+  const { safeFetch } = await import(moduleUrl);
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async () => new Response("<html>Bad gateway</html>", {
+      status: 502,
+      headers: { "content-type": "text/html" }
+    });
+    const htmlResponse = await safeFetch("https://example.invalid/save");
+    assert.equal(htmlResponse.status, 502);
+    assert.deepEqual(await htmlResponse.json(), {
+      error: "The server is temporarily unavailable. Please retry."
+    });
+
+    globalThis.fetch = async () => new Response("{not-json", {
+      status: 500,
+      headers: { "content-type": "application/json" }
+    });
+    const malformedResponse = await safeFetch("https://example.invalid/save");
+    assert.equal(malformedResponse.status, 500);
+    assert.deepEqual(await malformedResponse.json(), {
+      error: "The server is temporarily unavailable. Please retry."
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("finance KPI RPC aggregates the full dataset without a page limit", () => {
   assert.match(financeKpiMigration, /create or replace function get_admin_finance_kpis/i);
   assert.match(financeKpiMigration, /from public\.invoices|from invoices/i);
   assert.doesNotMatch(financeKpiMigration, /limit\s+100/i);
   assert.match(financeQueries, /\.rpc\("get_admin_finance_kpis"/);
-  assert.match(dashboardPage, /getAdminFinanceKpis/);
-  assert.match(dashboardPage, /financeKpis\.receivableAmount/);
+});
+
+test("every admin dashboard KPI and breakdown is sourced from the unpaged analytics RPC", () => {
+  assert.match(dashboardAnalyticsMigration, /create or replace function public\.get_admin_dashboard_analytics/i);
+  assert.match(dashboardAnalyticsMigration, /country_grouped/i);
+  assert.match(dashboardAnalyticsMigration, /partner_grouped/i);
+  assert.match(dashboardAnalyticsMigration, /period_grouped/i);
+  assert.match(dashboardAnalyticsMigration, /status_grouped/i);
+  assert.doesNotMatch(dashboardAnalyticsMigration, /limit\s+100/i);
+  assert.match(dashboardPage, /getAdminDashboardAnalytics/);
+  assert.doesNotMatch(dashboardPage, /pageSize:\s*100/);
+  assert.doesNotMatch(dashboardPage, /listQuoteCasePage|listReservationPage|listInvoicePage|listSettlements/);
 });
 
 test("supplier delivery logging cannot reverse a finalized message or permit unsafe requeue", () => {
