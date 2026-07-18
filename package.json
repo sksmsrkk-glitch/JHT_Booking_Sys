@@ -23,6 +23,7 @@
     "verify:api-contract": "node scripts/verify-api-contract.mjs",
     "verify:repo-safety": "node scripts/verify-repo-safety.mjs",
     "verify:security-config": "node scripts/verify-security-config.mjs",
+    "verify:integrity-local": "node scripts/verify-integrity-local.mjs",
     "verify:launch-runbook": "node scripts/verify-launch-runbook.mjs",
     "verify:page-smoke": "node scripts/verify-page-smoke.mjs",
     "verify:app-route-smoke": "node scripts/verify-app-route-smoke.mjs",

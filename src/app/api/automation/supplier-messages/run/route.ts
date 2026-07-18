@@ -75,7 +75,7 @@ async function processMessage(supabase: any, message: any) {
 
     // 실제 이메일/Kakao 발신 연동이 아직 없으므로, live 모드에서 "sent"로 기록하는 것은
     // 거짓 성공입니다. 프로바이더가 연동되기 전까지 live 발송은 명시적으로 실패시킵니다.
-    if (!attempt.dryRun && process.env.SUPPLIER_MESSAGE_ALLOW_UNIMPLEMENTED_LIVE !== "on") {
+    if (!attempt.dryRun) {
       throw new Error(
         "Live supplier delivery is not implemented: no email/Kakao provider is wired. Keep SUPPLIER_MESSAGE_DELIVERY_MODE=dry_run until a provider is integrated."
       );

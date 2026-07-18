@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
@@ -72,6 +73,29 @@ test("client forms use safeFetch so network rejection resolves to an unlockable 
   assert.match(safeFetch, /status:\s*503/);
 });
 
+test("safeFetch converts an actual rejected network promise into a JSON error response", async () => {
+  const source = read("src/lib/client/safe-fetch.ts");
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }
+  }).outputText;
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
+  const { safeFetch } = await import(moduleUrl);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    throw new TypeError("simulated network disconnect");
+  };
+
+  try {
+    const response = await safeFetch("https://example.invalid/save", { method: "POST" });
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), {
+      error: "Network connection failed. Please check your connection and retry."
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("admin finance KPIs are aggregated by a full-dataset RPC, not a paged list", () => {
   assert.match(financeKpiMigration, /create or replace function get_admin_finance_kpis/i);
   assert.match(financeKpiMigration, /from public\.invoices|from invoices/i);
@@ -85,6 +109,7 @@ test("supplier delivery logging cannot reverse a finalized message or permit uns
   assert.match(supplierWorker, /Promise\.allSettled/);
   assert.match(supplierWorker, /\.eq\("status", "sending"\)/);
   assert.match(supplierWorker, /reason: "message was already finalized"/);
+  assert.doesNotMatch(supplierWorker, /SUPPLIER_MESSAGE_ALLOW_UNIMPLEMENTED_LIVE/);
   assert.match(supplierRequeueRoute, /\.is\("provider_message_id", null\)/);
   assert.match(supplierRequeueRoute, /\.is\("sent_at", null\)/);
   assert.match(supplierSafetyMigration, /provider_message_id is not null or old\.sent_at is not null/i);

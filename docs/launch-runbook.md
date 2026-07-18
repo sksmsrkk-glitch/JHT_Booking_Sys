@@ -31,6 +31,16 @@ This command must pass:
 - production Next.js build
 - runtime smoke check for all pages, API handler guards, logout cookie clearing, and baseline security headers
 
+With local Supabase running, also execute the database integrity regression suite:
+
+```bash
+npm run verify:integrity-local
+```
+
+This suite injects real RLS and failure scenarios for partner request atomicity, revision status updates,
+invoice-scoped payment idempotency, finance KPI aggregation beyond 100 rows, privileged RPC access,
+and supplier-message requeue safety. It runs inside a transaction and rolls back all verification data.
+
 ## 2. Supabase Project
 
 Create or select the target Supabase project, then apply migrations in order:
