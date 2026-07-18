@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -31,7 +33,7 @@ export function QuotePresentationBlockCreateForm({
       return;
     }
 
-    const response = await fetch(`/api/quote-versions/${quoteVersionId}/presentation-blocks`, {
+    const response = await safeFetch(`/api/quote-versions/${quoteVersionId}/presentation-blocks`, {
       body: JSON.stringify({
         quoteItineraryDayId: normalizeOptionalString(formData.get("quoteItineraryDayId")),
         blockType: String(formData.get("blockType") ?? "image"),

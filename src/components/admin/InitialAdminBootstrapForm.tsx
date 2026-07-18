@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { useState } from "react";
 
 export function InitialAdminBootstrapForm() {
@@ -10,7 +12,7 @@ export function InitialAdminBootstrapForm() {
     setIsBusy(true);
     setMessage("");
 
-    const response = await fetch("/api/admin/bootstrap", {
+    const response = await safeFetch("/api/admin/bootstrap", {
       method: "POST",
       headers: {
         "content-type": "application/json",

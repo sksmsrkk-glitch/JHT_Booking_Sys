@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { FormEvent, useRef, useState } from "react";
@@ -32,7 +34,7 @@ export function NotionCsvStagingForm() {
       // 네트워크 오류 뒤 같은 제출을 재시도하더라도 서버에는 한 배치만 생성됩니다.
       const idempotencyKey = idempotencyKeyRef.current ?? crypto.randomUUID();
       idempotencyKeyRef.current = idempotencyKey;
-      const response = await fetch("/api/migrations/notion-csv", {
+      const response = await safeFetch("/api/migrations/notion-csv", {
         method: "POST",
         headers: { "content-type": "application/json", "idempotency-key": idempotencyKey },
         body: JSON.stringify({

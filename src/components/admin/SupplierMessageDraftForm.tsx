@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -69,7 +71,7 @@ export function SupplierMessageDraftForm({
       data: buildTemplateData(selectedSupplierId)
     };
 
-    const response = await fetch("/api/supplier-messages/draft", {
+    const response = await safeFetch("/api/supplier-messages/draft", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload)

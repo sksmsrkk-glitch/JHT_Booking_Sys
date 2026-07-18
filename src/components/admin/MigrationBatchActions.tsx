@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -14,7 +16,7 @@ export function MigrationBatchActions({ batchId, status, errorCount }: { batchId
   async function updateStatus(nextStatus: "validated" | "approved" | "imported" | "failed") {
     setIsBusy(true);
     setMessage("");
-    const response = await fetch(`/api/migrations/notion-csv/batches/${batchId}/status`, {
+    const response = await safeFetch(`/api/migrations/notion-csv/batches/${batchId}/status`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ status: nextStatus })

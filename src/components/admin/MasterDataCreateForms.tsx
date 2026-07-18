@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useEffect, useState } from "react";
@@ -32,7 +34,7 @@ export function DomesticSupplierCreateForm({ companies }: { companies: CompanyLi
       "internalNotes"
     ]);
 
-    const response = await fetch("/api/domestic-suppliers", {
+    const response = await safeFetch("/api/domestic-suppliers", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload)
@@ -117,7 +119,7 @@ export function AgencyCreateForm({ companies }: { companies: CompanyListItem[] }
 
   useEffect(() => {
     let mounted = true;
-    fetch("/api/countries")
+    safeFetch("/api/countries")
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         if (!mounted || !payload?.data?.length) return;
@@ -153,7 +155,7 @@ export function AgencyCreateForm({ companies }: { companies: CompanyListItem[] }
     payload.countryCode = selectedCountryCode;
     payload.billingCurrency = billingCurrency;
 
-    const response = await fetch("/api/agencies", {
+    const response = await safeFetch("/api/agencies", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload)

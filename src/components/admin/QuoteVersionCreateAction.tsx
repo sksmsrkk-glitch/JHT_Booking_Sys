@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -18,7 +20,7 @@ export function QuoteVersionCreateAction({
     setIsBusy(true);
     setMessage("");
 
-    const response = await fetch(`/api/quote-cases/${quoteCaseId}/versions`, {
+    const response = await safeFetch(`/api/quote-cases/${quoteCaseId}/versions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({})

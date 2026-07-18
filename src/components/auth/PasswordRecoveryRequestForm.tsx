@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { safeFetch } from "@/lib/client/safe-fetch";
 
 export function PasswordRecoveryRequestForm({ accountType }: { accountType: "internal" | "agency" }) {
   const [email, setEmail] = useState("");
@@ -11,7 +12,7 @@ export function PasswordRecoveryRequestForm({ accountType }: { accountType: "int
     event.preventDefault();
     setIsSubmitting(true);
     setMessage("");
-    const response = await fetch("/api/auth/forgot-password", {
+    const response = await safeFetch("/api/auth/forgot-password", {
       body: JSON.stringify({ accountType, email }),
       headers: { "content-type": "application/json" },
       method: "POST"

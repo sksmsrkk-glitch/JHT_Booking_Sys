@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -22,7 +24,7 @@ export function SupplierContactCreateForm({ supplierId }: { supplierId: string }
       notes: normalizeOptionalString(formData.get("notes"))
     };
 
-    const response = await fetch(`/api/domestic-suppliers/${supplierId}/contacts`, {
+    const response = await safeFetch(`/api/domestic-suppliers/${supplierId}/contacts`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload)

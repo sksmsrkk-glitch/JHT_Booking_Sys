@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import type { Route } from "next";
 import Link from "next/link";
+import { safeFetch } from "@/lib/client/safe-fetch";
 
 type SupabaseLoginFormProps = {
   buttonLabel: string;
@@ -41,7 +42,7 @@ export function SupabaseLoginForm({ accountType, buttonLabel, pendingLabel, redi
       return;
     }
 
-    const sessionResponse = await fetch("/auth/session", {
+    const sessionResponse = await safeFetch("/auth/session", {
       body: JSON.stringify({
         accessToken: data.session.access_token,
         expiresIn: data.session.expires_in,

@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -22,7 +24,7 @@ export function AgencyUserManagement({ users, canManage, actorUserId }: { users:
     setIsBusy(true);
     setMessage("");
     try {
-      const response = await fetch("/api/agency/users", {
+      const response = await safeFetch("/api/agency/users", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email: formData.get("email"), name: formData.get("name"), title: formData.get("title") })
@@ -40,7 +42,7 @@ export function AgencyUserManagement({ users, canManage, actorUserId }: { users:
     setIsBusy(true);
     setMessage("");
     try {
-      const response = await fetch(`/api/agency/users/${userId}`, {
+      const response = await safeFetch(`/api/agency/users/${userId}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action })

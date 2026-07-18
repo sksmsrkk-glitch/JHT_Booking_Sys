@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { buildCurrencyOptions, DEFAULT_COUNTRY_REFERENCES, mergeCountryReferences } from "@/features/countries/defaults";
 import type { CountryReference } from "@/features/countries/types";
@@ -36,8 +38,8 @@ export function InquiryCreateForm() {
   useEffect(() => {
     let mounted = true;
     Promise.all([
-      fetch("/api/agency/context").then((response) => (response.ok ? response.json() : null)),
-      fetch("/api/countries").then((response) => (response.ok ? response.json() : null))
+      safeFetch("/api/agency/context").then((response) => (response.ok ? response.json() : null)),
+      safeFetch("/api/countries").then((response) => (response.ok ? response.json() : null))
     ])
       .then(([contextPayload, countriesPayload]) => {
         if (!mounted) return;
@@ -126,7 +128,7 @@ export function InquiryCreateForm() {
     const idempotencyKey = idempotencyKeyRef.current ?? crypto.randomUUID();
     idempotencyKeyRef.current = idempotencyKey;
     try {
-      const response = await fetch("/api/agency/inquiries", {
+      const response = await safeFetch("/api/agency/inquiries", {
         method: "POST",
         headers: { "content-type": "application/json", "idempotency-key": idempotencyKey },
         body: JSON.stringify(payload)

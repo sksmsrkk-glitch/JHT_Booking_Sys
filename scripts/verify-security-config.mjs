@@ -29,7 +29,9 @@ for (const directive of ["camera=()", "microphone=()", "geolocation=()"]) {
   }
 }
 
-if (!loginPage.includes("fetch(\"/auth/session\"") || !loginPage.includes("expiresIn: data.session.expires_in") || loginPage.includes("document.cookie")) {
+const usesServerSessionRoute =
+  loginPage.includes("fetch(\"/auth/session\"") || loginPage.includes("safeFetch(\"/auth/session\"");
+if (!usesServerSessionRoute || !loginPage.includes("expiresIn: data.session.expires_in") || loginPage.includes("document.cookie")) {
   failures.push("Login page must create the auth cookie through the server session route, not document.cookie");
 }
 

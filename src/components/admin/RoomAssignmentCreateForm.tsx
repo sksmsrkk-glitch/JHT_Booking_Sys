@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -33,7 +35,7 @@ export function RoomAssignmentCreateForm({
       notes: normalizeOptionalString(formData.get("notes"))
     };
 
-    const response = await fetch(`/api/reservations/${reservationId}/room-assignments`, {
+    const response = await safeFetch(`/api/reservations/${reservationId}/room-assignments`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload)

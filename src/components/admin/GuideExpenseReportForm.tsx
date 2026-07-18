@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { useMemo, useState } from "react";
 import { summarizeGuideExpenseReport } from "@/lib/domain/guide-expenses.mjs";
 
@@ -159,7 +161,7 @@ export function GuideExpenseReportForm({
       return;
     }
 
-    const response = await fetch(`/api/reservations/${reservationId}/guide-expense-report`, {
+    const response = await safeFetch(`/api/reservations/${reservationId}/guide-expense-report`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)

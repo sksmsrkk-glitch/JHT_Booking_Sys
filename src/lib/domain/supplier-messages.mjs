@@ -168,6 +168,11 @@ export function buildSupplierMessageRequeueUpdate(message) {
   if (message.status !== "failed") {
     throw new Error(`Only failed supplier messages can be requeued, got ${message.status}`);
   }
+  if (message.provider_message_id || message.sent_at) {
+    throw new Error(
+      "A supplier message with delivery evidence cannot be requeued. Create a new message revision instead."
+    );
+  }
   assertSupplierMessageCanSend(message);
 
   return {

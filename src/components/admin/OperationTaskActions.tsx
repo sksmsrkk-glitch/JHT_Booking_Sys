@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -36,7 +38,7 @@ export function OperationTaskActions({
   async function updateTask() {
     setIsBusy(true);
     setMessage("");
-    const response = await fetch(`/api/operation-tasks/${taskId}`, {
+    const response = await safeFetch(`/api/operation-tasks/${taskId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -58,7 +60,7 @@ export function OperationTaskActions({
   async function sendReminder() {
     setIsBusy(true);
     setMessage("");
-    const response = await fetch(`/api/operation-tasks/${taskId}/remind`, {
+    const response = await safeFetch(`/api/operation-tasks/${taskId}/remind`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ ruleCode: "manual", message: "Manual reminder from operation task board" })

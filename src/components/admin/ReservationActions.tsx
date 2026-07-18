@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -19,7 +21,7 @@ export function ReservationActions({
   async function generateTasks() {
     setIsBusy(true);
     setMessage("");
-    const response = await fetch(`/api/reservations/${reservationId}/generate-operation-tasks`, {
+    const response = await safeFetch(`/api/reservations/${reservationId}/generate-operation-tasks`, {
       method: "POST"
     });
     const payload = await response.json();

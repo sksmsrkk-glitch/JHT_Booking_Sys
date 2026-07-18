@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 import { useRouter } from "next/navigation";
 
@@ -25,7 +27,7 @@ export function InvoiceCreateFromReservationAction({
     const idempotencyKey = idempotencyKeyRef.current ?? crypto.randomUUID();
     idempotencyKeyRef.current = idempotencyKey;
     try {
-      const response = await fetch("/api/finance/invoices", {
+      const response = await safeFetch("/api/finance/invoices", {
         method: "POST",
         headers: { "content-type": "application/json", "idempotency-key": idempotencyKey },
         body: JSON.stringify({ reservationId, status: "issued" })

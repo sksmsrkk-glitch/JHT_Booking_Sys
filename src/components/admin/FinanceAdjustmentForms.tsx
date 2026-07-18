@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -101,7 +103,7 @@ function AdjustmentForm({
       payload[field.name] = String(formData.get(field.name) ?? "").trim();
     }
 
-    const response = await fetch(endpoint, {
+    const response = await safeFetch(endpoint, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload)
@@ -165,7 +167,7 @@ function RecalculateSettlementForm({ reservations }: { reservations: Reservation
   async function submit(formData: FormData) {
     setIsBusy(true);
     setMessage("");
-    const response = await fetch("/api/finance/settlements/recalculate", {
+    const response = await safeFetch("/api/finance/settlements/recalculate", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ reservationId: String(formData.get("reservationId") ?? "").trim() })

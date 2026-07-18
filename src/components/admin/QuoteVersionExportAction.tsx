@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -22,7 +24,7 @@ export function QuoteVersionExportAction({
     setIsBusy(true);
     setMessage("");
 
-    const response = await fetch(`/api/quote-versions/${quoteVersionId}/export-xlsx`, {
+    const response = await safeFetch(`/api/quote-versions/${quoteVersionId}/export-xlsx`, {
       method: "POST"
     });
     const result = await response.json();

@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -51,7 +53,7 @@ export function RoomingListUploadForm({
       passengers
     };
 
-    const response = await fetch("/api/agency/rooming-lists/upload", {
+    const response = await safeFetch("/api/agency/rooming-lists/upload", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload)

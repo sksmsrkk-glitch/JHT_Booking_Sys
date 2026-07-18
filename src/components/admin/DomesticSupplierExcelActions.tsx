@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { useState } from "react";
 import type { CompanyListItem } from "@/features/company/types";
 
@@ -10,7 +12,7 @@ export function DomesticSupplierExcelActions({ companies }: { companies: Company
   async function submit(formData: FormData) {
     setIsBusy(true);
     setMessage("");
-    const response = await fetch("/api/domestic-suppliers/import-xlsx", {
+    const response = await safeFetch("/api/domestic-suppliers/import-xlsx", {
       method: "POST",
       body: formData
     });

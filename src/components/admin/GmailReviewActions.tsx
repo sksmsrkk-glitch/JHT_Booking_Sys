@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -27,7 +29,7 @@ export function GmailReviewActions({
   async function updateReview(action: "link" | "unlink") {
     setIsBusy(true);
     setMessage("");
-    const response = await fetch(`/api/automation/gmail-review/${threadId}`, {
+    const response = await safeFetch(`/api/automation/gmail-review/${threadId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({

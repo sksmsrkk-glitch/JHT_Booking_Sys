@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -13,7 +15,7 @@ export function QuoteExportRetryAction({ exportId, status }: { exportId: string;
     setIsBusy(true);
     setMessage("");
 
-    const response = await fetch(`/api/quote-exports/${exportId}/retry`, {
+    const response = await safeFetch(`/api/quote-exports/${exportId}/retry`, {
       method: "POST"
     });
     const result = await response.json();

@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { Fragment, useEffect, useState } from "react";
@@ -474,7 +476,7 @@ export function QuoteCaseCreateForm({
 
   useEffect(() => {
     let mounted = true;
-    fetch("/api/countries")
+    safeFetch("/api/countries")
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         if (!mounted || !payload?.data?.length) return;
@@ -593,7 +595,7 @@ export function QuoteCaseCreateForm({
       itineraryDays
     };
 
-    const response = await fetch("/api/quote-cases", {
+    const response = await safeFetch("/api/quote-cases", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload)
@@ -1392,7 +1394,7 @@ export function QuoteCaseCreateForm({
     }
 
     setSearches((current) => ({ ...current, [row.id]: { isLoading: true, error: "", results: [] } }));
-    const response = await fetch(`/api/cost-items/search?q=${encodeURIComponent(query)}&limit=5`);
+    const response = await safeFetch(`/api/cost-items/search?q=${encodeURIComponent(query)}&limit=5`);
     const payload = await response.json();
     if (!response.ok) {
       setSearches((current) => ({
@@ -1502,7 +1504,7 @@ export function QuoteCaseCreateForm({
     try {
       const params = new URLSearchParams({ latest: "true", baseCurrency: normalized });
       if (normalizedCountry) params.set("countryCode", normalizedCountry);
-      const response = await fetch(`/api/exchange-rates?${params.toString()}`);
+      const response = await safeFetch(`/api/exchange-rates?${params.toString()}`);
       const payload = await response.json();
       if (!response.ok || !payload.data) {
         setExchangeRateNotice(`No active common FX rate found for ${normalized}. Add it in Exchange Rates or enter manually.`);

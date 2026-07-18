@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useEffect, useMemo, useState } from "react";
@@ -18,7 +20,7 @@ export function ExchangeRateCreateForm({ countries = [] }: { countries?: Country
 
   useEffect(() => {
     let mounted = true;
-    fetch("/api/countries")
+    safeFetch("/api/countries")
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         if (!mounted || !payload?.data?.length) return;
@@ -54,7 +56,7 @@ export function ExchangeRateCreateForm({ countries = [] }: { countries?: Country
       notes: String(formData.get("notes") ?? "").trim()
     };
 
-    const response = await fetch("/api/exchange-rates", {
+    const response = await safeFetch("/api/exchange-rates", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload)

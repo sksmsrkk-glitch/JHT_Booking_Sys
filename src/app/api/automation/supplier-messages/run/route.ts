@@ -35,13 +35,16 @@ export async function POST(request: Request) {
       results
     };
 
-    await writeApiLog(supabase, {
-      source: "automation_supplier_messages",
-      endpoint: "/api/automation/supplier-messages/run",
-      method: "POST",
-      statusCode: responsePayload.failedCount > 0 ? 207 : 200,
-      responsePayload
-    });
+    // API 실행 로그는 발송 결과의 보조 기록입니다. 로그 장애가 확정된 발송 상태를 뒤집지 않도록 분리합니다.
+    await Promise.allSettled([
+      writeApiLog(supabase, {
+        source: "automation_supplier_messages",
+        endpoint: "/api/automation/supplier-messages/run",
+        method: "POST",
+        statusCode: responsePayload.failedCount > 0 ? 207 : 200,
+        responsePayload
+      })
+    ]);
 
     return ok(responsePayload);
   } catch (error) {
@@ -84,43 +87,75 @@ async function processMessage(supabase: any, message: any) {
       .from("supplier_message_outbox")
       .update(attempt.finalUpdate)
       .eq("id", message.id)
+      .eq("status", "sending")
       .select("id, status, channel, provider_message_id, sent_at")
-      .single();
+      .maybeSingle();
     if (sentError) throw new Error(sentError.message);
+    if (!sent) {
+      return { id: message.id, status: "skipped", reason: "message state changed before finalization" };
+    }
 
-    await insertEvent(supabase, message.id, attempt.finalEvent);
-    await writeAuditLog(supabase, {
-      action: "supplier_message.delivery_processed",
-      entityTable: "supplier_message_outbox",
-      entityId: message.id,
-      riskLevel: message.risk_level,
-      beforeData: { id: message.id, status: message.status },
-      afterData: {
-        ...sent,
-        provider: attempt.provider,
-        dryRun: attempt.dryRun
-      }
-    });
+    // 최종 상태 저장 이후의 이벤트/감사 로그는 best-effort로 남깁니다.
+    // 부가 로그 실패를 delivery 실패로 취급하면 sent -> failed 역전과 이중 발송이 발생할 수 있습니다.
+    const logResults = await Promise.allSettled([
+      insertEvent(supabase, message.id, attempt.finalEvent),
+      writeAuditLog(supabase, {
+        action: "supplier_message.delivery_processed",
+        entityTable: "supplier_message_outbox",
+        entityId: message.id,
+        riskLevel: message.risk_level,
+        beforeData: { id: message.id, status: message.status },
+        afterData: {
+          ...sent,
+          provider: attempt.provider,
+          dryRun: attempt.dryRun
+        }
+      })
+    ]);
 
-    return { id: message.id, status: attempt.dryRun ? "simulated" : "sent", provider: attempt.provider, dryRun: attempt.dryRun };
+    return {
+      id: message.id,
+      status: attempt.dryRun ? "simulated" : "sent",
+      provider: attempt.provider,
+      dryRun: attempt.dryRun,
+      logWarningCount: logResults.filter((result) => result.status === "rejected").length
+    };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown supplier delivery error";
-    await supabase
+    // 이 워커가 선점한 sending 행만 failed로 전환하며, 이미 완료된 상태는 절대 덮어쓰지 않습니다.
+    const { data: failed, error: failedUpdateError } = await supabase
       .from("supplier_message_outbox")
       .update({ status: "failed", error_message: errorMessage })
-      .eq("id", message.id);
-    await insertEvent(supabase, message.id, {
-      event_type: "failed",
-      provider: null,
-      provider_payload: { error: errorMessage }
-    });
-    await writeAuditLog(supabase, {
-      action: "supplier_message.delivery_failed",
-      entityTable: "supplier_message_outbox",
-      entityId: message.id,
-      riskLevel: message.risk_level,
-      afterData: { error: errorMessage }
-    });
+      .eq("id", message.id)
+      .eq("status", "sending")
+      .select("id")
+      .maybeSingle();
+
+    if (failedUpdateError) {
+      return {
+        id: message.id,
+        status: "failed",
+        error: `${errorMessage}; state update failed: ${failedUpdateError.message}`
+      };
+    }
+    if (!failed) {
+      return { id: message.id, status: "skipped", reason: "message was already finalized", error: errorMessage };
+    }
+
+    await Promise.allSettled([
+      insertEvent(supabase, message.id, {
+        event_type: "failed",
+        provider: null,
+        provider_payload: { error: errorMessage }
+      }),
+      writeAuditLog(supabase, {
+        action: "supplier_message.delivery_failed",
+        entityTable: "supplier_message_outbox",
+        entityId: message.id,
+        riskLevel: message.risk_level,
+        afterData: { error: errorMessage }
+      })
+    ]);
     return { id: message.id, status: "failed", error: errorMessage };
   }
 }

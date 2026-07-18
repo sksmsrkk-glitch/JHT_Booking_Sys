@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -12,7 +14,7 @@ export function AgencySignupApplicationActions({ application }: { application: A
   async function decide(decision: "approve" | "reject", formData?: FormData) {
     setIsBusy(true);
     setMessage("");
-    const response = await fetch(`/api/agency/signup-applications/${application.id}/decision`, {
+    const response = await safeFetch(`/api/agency/signup-applications/${application.id}/decision`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -60,7 +62,7 @@ export function AgencyLifecycleActions({
   async function update(status: AgencyLifecycleStatus) {
     setIsBusy(true);
     setMessage("");
-    const response = await fetch(`/api/agencies/${agencyId}/lifecycle`, {
+    const response = await safeFetch(`/api/agencies/${agencyId}/lifecycle`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ lifecycleStatus: status })
@@ -97,7 +99,7 @@ export function AgencyUserGovernanceActions({ agencyId, userId }: { agencyId: st
   async function patch(payload: Record<string, unknown>) {
     setIsBusy(true);
     setMessage("");
-    const response = await fetch(`/api/agencies/${agencyId}/users/${userId}`, {
+    const response = await safeFetch(`/api/agencies/${agencyId}/users/${userId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload)

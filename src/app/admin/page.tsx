@@ -5,7 +5,8 @@ import { RouteCardGrid } from "@/components/v1/RouteCardGrid";
 import type { AgencyListItem } from "@/features/agency/types";
 import { listAgencyAccountPage } from "@/features/agency/queries";
 import type { InvoiceListItem, SettlementListItem } from "@/features/finance/types";
-import { listInvoicePage, listSettlements } from "@/features/finance/queries";
+import type { AdminFinanceKpis } from "@/features/finance/queries";
+import { getAdminFinanceKpis, listInvoicePage, listSettlements } from "@/features/finance/queries";
 import type { QuoteCaseListItem } from "@/features/quotation/types";
 import { listQuoteCasePage } from "@/features/quotation/queries";
 import type { ReservationListItem } from "@/features/reservation/types";
@@ -46,6 +47,7 @@ type DashboardLoadState =
       reservations: ReservationListItem[];
       invoices: InvoiceListItem[];
       settlements: SettlementListItem[];
+      financeKpis: AdminFinanceKpis;
     }
   | {
       status: "auth-required";
@@ -55,8 +57,9 @@ type DashboardLoadState =
       reservations: [];
       invoices: [];
       settlements: [];
+      financeKpis: AdminFinanceKpis;
     }
-  | { status: "error"; message: string; agencies: AgencyListItem[]; quoteCases: []; reservations: []; invoices: []; settlements: [] };
+  | { status: "error"; message: string; agencies: AgencyListItem[]; quoteCases: []; reservations: []; invoices: []; settlements: []; financeKpis: AdminFinanceKpis };
 
 type DashboardMetric = {
   quoteInquiryCount: number;
@@ -97,7 +100,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
   const cookieStore = await cookies();
   const locale = normalizeLocale(cookieStore.get("jht_locale")?.value);
   const filters = normalizeDashboardFilters(await searchParams);
-  const loadState = await loadDashboardData();
+  const loadState = await loadDashboardData(filters);
   const data = applyDashboardFilters(loadState, filters);
 
   const primaryTitles = ["Quote Cases", "Reservations", "Domestic Suppliers", "Overseas Agencies"];
@@ -158,7 +161,14 @@ function AdminDashboard({
   loadState: DashboardLoadState;
   data: ReturnType<typeof applyDashboardFilters>;
 }) {
-  const metric = buildDashboardMetric(data.agencies, data.quoteCases, data.reservations, data.invoices, data.settlements);
+  const metric = buildDashboardMetric(
+    data.agencies,
+    data.quoteCases,
+    data.reservations,
+    data.invoices,
+    data.settlements,
+    data.financeKpis
+  );
   const countryRows = buildRowsByAgencyDimension(data.agencies, data.quoteCases, data.reservations, data.invoices, data.settlements, "country");
   const partnerRows = buildRowsByAgencyDimension(data.agencies, data.quoteCases, data.reservations, data.invoices, data.settlements, "partner");
   const periodRows = buildRowsByPeriod(data.agencies, data.quoteCases, data.reservations, data.invoices, data.settlements);
@@ -446,19 +456,20 @@ function DashboardBoardColumn({ rows, title }: { rows: DashboardRow[]; title: st
   );
 }
 
-async function loadDashboardData(): Promise<DashboardLoadState> {
+async function loadDashboardData(filters: DashboardFilters): Promise<DashboardLoadState> {
   try {
     const { supabase, user } = await getInternalPageContext();
     requirePageFinanceRole(user.roles);
     const firstPage = { page: 1, pageSize: 100 };
 
     /* 대시보드의 다섯 API 재호출을 제거하고 동일한 인증 컨텍스트에서 병렬 조회합니다. */
-    const [agencies, quoteCases, reservations, invoices, settlements] = await Promise.all([
+    const [agencies, quoteCases, reservations, invoices, settlements, financeKpis] = await Promise.all([
       listAgencyAccountPage(supabase, { status: "active" }, firstPage),
       listQuoteCasePage(supabase, {}, firstPage),
       listReservationPage(supabase, { sortBy: "created_desc" }, firstPage),
       listInvoicePage(supabase, {}, firstPage),
-      listSettlements(supabase)
+      listSettlements(supabase),
+      getAdminFinanceKpis(supabase, filters)
     ]);
 
     return {
@@ -467,11 +478,20 @@ async function loadDashboardData(): Promise<DashboardLoadState> {
       quoteCases: quoteCases.items,
       reservations: reservations.items,
       invoices: invoices.items,
-      settlements
+      settlements,
+      financeKpis
     };
   } catch (error) {
     const failure = classifyPageDataError(error);
-    return { ...failure, agencies: [], quoteCases: [], reservations: [], invoices: [], settlements: [] };
+    return {
+      ...failure,
+      agencies: [],
+      quoteCases: [],
+      reservations: [],
+      invoices: [],
+      settlements: [],
+      financeKpis: emptyFinanceKpis()
+    };
   }
 }
 
@@ -503,6 +523,7 @@ function applyDashboardFilters(loadState: DashboardLoadState, filters: Dashboard
     reservations,
     invoices,
     settlements,
+    financeKpis: loadState.financeKpis,
     agencyById
   };
 }
@@ -512,7 +533,8 @@ function buildDashboardMetric(
   quoteCases: QuoteCaseListItem[],
   reservations: ReservationListItem[],
   invoices: InvoiceListItem[],
-  settlements: SettlementListItem[]
+  settlements: SettlementListItem[],
+  financeKpis: AdminFinanceKpis
 ): DashboardMetric {
   const quoteInquiryCount = quoteCases.filter((quoteCase) =>
     ["new", "triage", "quoting", "sent", "revision_requested"].includes(quoteCase.status)
@@ -526,8 +548,6 @@ function buildDashboardMetric(
   const totalInquiryCount = agencies.reduce((sum, agency) => sum + agency.inquiryCount, 0);
   const quotePax = quoteCases.reduce((sum, quoteCase) => sum + (quoteCase.estimatedPax ?? 0), 0);
   const reservationPax = reservations.reduce((sum, reservation) => sum + resolveReservationPax(reservation), 0);
-  const openReceivables = invoices.filter((invoice) => getInvoiceReceivableAmount(invoice) > 0 && invoice.status !== "void");
-
   return {
     quoteInquiryCount,
     confirmedCount,
@@ -536,10 +556,14 @@ function buildDashboardMetric(
     quoteCaseCount: quoteCases.length,
     activeReservationCount: reservations.filter((reservation) => !["cancelled", "completed"].includes(reservation.status)).length,
     paxCount: quotePax + reservationPax,
-    settlementDoneCount: settlements.filter((settlement) => ["approved", "closed"].includes(settlement.status)).length,
-    receivableCount: openReceivables.length,
-    receivableAmount: openReceivables.reduce((sum, invoice) => sum + getInvoiceReceivableAmount(invoice), 0)
+    settlementDoneCount: financeKpis.settlementDoneCount,
+    receivableCount: financeKpis.receivableCount,
+    receivableAmount: financeKpis.receivableAmount
   };
+}
+
+function emptyFinanceKpis(): AdminFinanceKpis {
+  return { settlementDoneCount: 0, receivableCount: 0, receivableAmount: 0 };
 }
 
 function buildRowsByAgencyDimension(

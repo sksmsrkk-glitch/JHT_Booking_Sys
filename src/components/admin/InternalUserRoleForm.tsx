@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -13,7 +15,7 @@ export function InternalUserRoleForm({ companies }: { companies: CompanyListItem
   async function saveUser(formData: FormData) {
     setIsBusy(true);
     setMessage("");
-    const response = await fetch("/api/admin/users", {
+    const response = await safeFetch("/api/admin/users", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({

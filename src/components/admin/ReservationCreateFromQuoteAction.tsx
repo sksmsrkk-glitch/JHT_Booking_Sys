@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 import { useRouter } from "next/navigation";
 
@@ -25,7 +27,7 @@ export function ReservationCreateFromQuoteAction({
     setIsBusy(true);
     setMessage("");
 
-    const response = await fetch("/api/reservations", {
+    const response = await safeFetch("/api/reservations", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({

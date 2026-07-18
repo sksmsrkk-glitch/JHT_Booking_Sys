@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -27,7 +29,7 @@ export function SupplierMessageActions({
   async function approve(secondApproval = false) {
     setIsBusy(true);
     setMessage("");
-    const response = await fetch(`/api/supplier-messages/${messageId}/approve`, {
+    const response = await safeFetch(`/api/supplier-messages/${messageId}/approve`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ secondApproval })
@@ -44,7 +46,7 @@ export function SupplierMessageActions({
   async function queueSend() {
     setIsBusy(true);
     setMessage("");
-    const response = await fetch(`/api/supplier-messages/${messageId}/${canRequeue ? "requeue" : "send"}`, {
+    const response = await safeFetch(`/api/supplier-messages/${messageId}/${canRequeue ? "requeue" : "send"}`, {
       method: "POST"
     });
     const payload = await response.json();

@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -26,7 +28,7 @@ export function SupplierProductCreateForm({ supplierId }: { supplierId: string }
       menuTags: normalizeOptionalString(formData.get("menuTags"))
     };
 
-    const response = await fetch(`/api/domestic-suppliers/${supplierId}/products`, {
+    const response = await safeFetch(`/api/domestic-suppliers/${supplierId}/products`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload)
@@ -127,7 +129,7 @@ export function SupplierPriceCreateForm({ productId }: { productId: string }) {
       notes: normalizeOptionalString(formData.get("notes"))
     };
 
-    const response = await fetch(`/api/supplier-products/${productId}/prices`, {
+    const response = await safeFetch(`/api/supplier-products/${productId}/prices`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload)

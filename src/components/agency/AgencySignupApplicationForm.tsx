@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { useEffect, useMemo, useState } from "react";
 import { buildCurrencyOptions, DEFAULT_COUNTRY_REFERENCES, mergeCountryReferences } from "@/features/countries/defaults";
 import type { CountryReference } from "@/features/countries/types";
@@ -21,7 +23,7 @@ export function AgencySignupApplicationForm() {
 
   useEffect(() => {
     let mounted = true;
-    fetch("/api/countries")
+    safeFetch("/api/countries")
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         if (!mounted || !payload?.data?.length) return;
@@ -59,7 +61,7 @@ export function AgencySignupApplicationForm() {
       notes: String(formData.get("notes") ?? "").trim()
     };
 
-    const response = await fetch("/api/agency/signup-applications", {
+    const response = await safeFetch("/api/agency/signup-applications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)

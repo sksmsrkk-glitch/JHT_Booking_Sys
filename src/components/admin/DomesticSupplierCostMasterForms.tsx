@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useMemo, useState } from "react";
@@ -234,7 +236,7 @@ export function CostMasterSearchPanel() {
     if (region) params.set("region", region);
     params.set("limit", "30");
 
-    const response = await fetch(`/api/cost-items/search?${params.toString()}`);
+    const response = await safeFetch(`/api/cost-items/search?${params.toString()}`);
     const result = await response.json();
     if (!response.ok) {
       setMessage(result.error ?? "Search failed.");
@@ -1137,7 +1139,7 @@ function operationHoursSummary(formData: FormData, prefix: string) {
 }
 
 async function postJson(path: string, payload: Record<string, unknown>) {
-  const response = await fetch(path, {
+  const response = await safeFetch(path, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload)
@@ -1151,7 +1153,7 @@ async function postMedia(path: string, mediaItems: ReturnType<typeof buildMediaI
   const body = new FormData();
   body.set("mediaItems", JSON.stringify(mediaItems));
   for (const file of files) body.append("files", file);
-  const response = await fetch(path, { method: "POST", body });
+  const response = await safeFetch(path, { method: "POST", body });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error ?? "Image upload failed.");
   return result.data;

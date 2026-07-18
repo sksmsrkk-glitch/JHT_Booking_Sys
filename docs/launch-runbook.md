@@ -72,6 +72,9 @@ If Supabase CLI is unavailable, apply the SQL files in this order through the Su
 29. `supabase/migrations/202607150006_worker_atomic_finish_audit.sql`
 30. `supabase/migrations/202607150007_restore_privileged_session_helper.sql`
 31. `supabase/migrations/202607150008_repair_signup_billing_currency.sql`
+32. `supabase/migrations/202607180001_partner_request_payment_security.sql`
+33. `supabase/migrations/202607180002_admin_finance_kpis.sql`
+34. `supabase/migrations/202607180003_supplier_message_delivery_safety.sql`
 
 After migration, open `/admin/readiness` with an internal admin account and confirm database smoke checks are ready.
 

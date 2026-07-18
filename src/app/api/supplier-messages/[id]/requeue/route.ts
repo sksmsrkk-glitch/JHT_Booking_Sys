@@ -25,10 +25,16 @@ export async function POST(request: Request, context: RouteContext) {
       .from("supplier_message_outbox")
       .update(update)
       .eq("id", id)
+      .eq("status", "failed")
+      .is("provider_message_id", null)
+      .is("sent_at", null)
       .select("id, status, channel, message_type, idempotency_key, risk_level, error_message")
-      .single();
+      .maybeSingle();
 
     if (error) throw new HttpError(500, error.message);
+    if (!data) {
+      throw new HttpError(409, "Message state changed or delivery evidence exists; requeue was not applied");
+    }
 
     const { error: eventError } = await supabase.from("supplier_message_events").insert({
       supplier_message_outbox_id: id,

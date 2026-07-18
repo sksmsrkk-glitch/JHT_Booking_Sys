@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -79,7 +81,7 @@ export function FinalOperationSnapshotForm({
       return;
     }
 
-    const response = await fetch(`/api/reservations/${reservationId}/final-operation-snapshot`, {
+    const response = await safeFetch(`/api/reservations/${reservationId}/final-operation-snapshot`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({

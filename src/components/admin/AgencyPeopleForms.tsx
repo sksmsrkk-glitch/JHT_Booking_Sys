@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -21,7 +23,7 @@ export function AgencyContactCreateForm({ agencyId }: { agencyId: string }) {
       notes: normalizeOptionalString(formData.get("notes"))
     };
 
-    const response = await fetch(`/api/agencies/${agencyId}/contacts`, {
+    const response = await safeFetch(`/api/agencies/${agencyId}/contacts`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload)
@@ -100,7 +102,7 @@ export function AgencyUserCreateForm({ agencyId }: { agencyId: string }) {
       passwordResetRequired: formData.get("passwordResetRequired") !== "false"
     };
 
-    const response = await fetch(`/api/agencies/${agencyId}/users`, {
+    const response = await safeFetch(`/api/agencies/${agencyId}/users`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload)

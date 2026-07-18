@@ -78,6 +78,13 @@ begin
 end;
 $$;
 
+-- 두 함수는 트리거 내부 전용입니다. Data API 역할이 직접 실행해 SECURITY DEFINER로
+-- reservations를 갱신하지 못하도록 명시적으로 실행 권한을 닫습니다.
+revoke all on function refresh_reservation_operation_readiness(uuid) from public, anon, authenticated;
+revoke all on function sync_reservation_operation_readiness() from public, anon, authenticated;
+grant execute on function refresh_reservation_operation_readiness(uuid) to service_role;
+grant execute on function sync_reservation_operation_readiness() to service_role;
+
 drop trigger if exists operation_tasks_sync_reservation_readiness on operation_tasks;
 create trigger operation_tasks_sync_reservation_readiness
   after insert or update of reservation_id, team, task_type, status or delete on operation_tasks

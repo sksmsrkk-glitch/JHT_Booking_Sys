@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createClient, type Session } from "@supabase/supabase-js";
 import { validateRecoveryPassword } from "@/lib/domain/account-recovery.mjs";
+import { safeFetch } from "@/lib/client/safe-fetch";
 
 export function PasswordResetForm({ accountType }: { accountType: "internal" | "agency" }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -58,7 +59,7 @@ export function PasswordResetForm({ accountType }: { accountType: "internal" | "
       setIsSubmitting(false);
       return;
     }
-    await fetch("/api/auth/password-reset-complete", {
+    await safeFetch("/api/auth/password-reset-complete", {
       headers: { Authorization: `Bearer ${session.access_token}` },
       method: "POST"
     });

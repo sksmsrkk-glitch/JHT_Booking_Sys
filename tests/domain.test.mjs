@@ -353,6 +353,30 @@ test("failed supplier messages can be requeued after approval", () => {
       message_type: "booking_request"
     })
   );
+  assert.throws(
+    () =>
+      buildSupplierMessageRequeueUpdate({
+        id: "message-1",
+        status: "failed",
+        approved_by: "manager-1",
+        approved_at: "2026-06-26T00:00:00.000Z",
+        message_type: "booking_request",
+        provider_message_id: "provider:already-submitted"
+      }),
+    /delivery evidence cannot be requeued/
+  );
+  assert.throws(
+    () =>
+      buildSupplierMessageRequeueUpdate({
+        id: "message-1",
+        status: "failed",
+        approved_by: "manager-1",
+        approved_at: "2026-06-26T00:00:00.000Z",
+        message_type: "booking_request",
+        sent_at: "2026-06-26T00:05:00.000Z"
+      }),
+    /delivery evidence cannot be requeued/
+  );
 });
 
 test("gmail matcher requires manual review below confidence threshold", () => {

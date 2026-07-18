@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useEffect, useMemo, useState } from "react";
@@ -26,7 +28,7 @@ export function CountryReferenceCreateForm({ countries = [] }: { countries?: Cou
 
   useEffect(() => {
     let mounted = true;
-    fetch("/api/countries")
+    safeFetch("/api/countries")
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         if (!mounted || !payload?.data?.length) return;
@@ -72,7 +74,7 @@ export function CountryReferenceCreateForm({ countries = [] }: { countries?: Cou
       source: "manual"
     };
 
-    const response = await fetch("/api/countries", {
+    const response = await safeFetch("/api/countries", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload)

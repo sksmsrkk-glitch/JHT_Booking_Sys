@@ -46,6 +46,7 @@ export async function POST(request: Request, context: RouteContext) {
     const { data: existingPayment, error: existingError } = await supabase
       .from("payments")
       .select("id, invoice_id, status, currency, amount, received_at, method, reference_no, idempotency_key, created_at")
+      .eq("invoice_id", id)
       .eq("idempotency_key", input.idempotencyKey)
       .maybeSingle();
 
@@ -76,6 +77,7 @@ export async function POST(request: Request, context: RouteContext) {
         const { data: raced } = await supabase
           .from("payments")
           .select("id, invoice_id, status, currency, amount, received_at, method, reference_no, idempotency_key, created_at")
+          .eq("invoice_id", id)
           .eq("idempotency_key", input.idempotencyKey)
           .maybeSingle();
         if (raced) return ok({ payment: raced, replayed: true });

@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -12,7 +14,7 @@ export function AccountRecoveryActions({ requestId }: { requestId: string }) {
   async function update(status: "resolved" | "dismissed") {
     setIsBusy(true);
     setMessage("");
-    const response = await fetch(`/api/admin/account-recovery/${requestId}`, {
+    const response = await safeFetch(`/api/admin/account-recovery/${requestId}`, {
       body: JSON.stringify({ resolutionNote: note, status }),
       headers: { "content-type": "application/json" },
       method: "PATCH"

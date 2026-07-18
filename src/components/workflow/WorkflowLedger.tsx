@@ -4,6 +4,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { WorkflowActionItem, WorkflowMessage, WorkflowThreadDetail } from "@/features/workflow/types";
+import { safeFetch } from "@/lib/client/safe-fetch";
 
 const messageTypes = [
   ["general", "General"],
@@ -70,7 +71,7 @@ export function WorkflowLedger({
     }
     setIsSending(true);
     setNotice("");
-    const response = await fetch(`/api/workflows/${encodeURIComponent(workflow.workflowCode)}/messages`, {
+    const response = await safeFetch(`/api/workflows/${encodeURIComponent(workflow.workflowCode)}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

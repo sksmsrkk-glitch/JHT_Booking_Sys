@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useEffect, useState } from "react";
@@ -49,7 +51,7 @@ export function QuoteItemCreateForm({
 
   useEffect(() => {
     let mounted = true;
-    fetch("/api/countries")
+    safeFetch("/api/countries")
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         if (!mounted || !payload?.data?.length) return;
@@ -91,7 +93,7 @@ export function QuoteItemCreateForm({
       publicBreakdown: parseJsonObject(formData.get("publicBreakdown"))
     };
 
-    const response = await fetch(`/api/quote-cases/${quoteCaseId}/items`, {
+    const response = await safeFetch(`/api/quote-cases/${quoteCaseId}/items`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload)
@@ -128,7 +130,7 @@ export function QuoteItemCreateForm({
     try {
       const params = new URLSearchParams({ latest: "true", baseCurrency: normalized });
       if (normalizedCountry) params.set("countryCode", normalizedCountry);
-      const response = await fetch(`/api/exchange-rates?${params.toString()}`);
+      const response = await safeFetch(`/api/exchange-rates?${params.toString()}`);
       const payload = await response.json();
       if (!response.ok || !payload.data) {
         setExchangeRateNotice(`No active common FX rate found for ${normalized}${normalizedCountry ? ` / ${normalizedCountry}` : ""}.`);

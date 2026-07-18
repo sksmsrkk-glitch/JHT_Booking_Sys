@@ -1,5 +1,7 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
 import { useState } from "react";
@@ -40,7 +42,7 @@ export function QuoteVersionPublicSummaryForm({
       return;
     }
 
-    const response = await fetch(`/api/quote-versions/${quoteVersionId}/public-summary`, {
+    const response = await safeFetch(`/api/quote-versions/${quoteVersionId}/public-summary`, {
       body: JSON.stringify(payload),
       headers: { "content-type": "application/json" },
       method: "PATCH"

@@ -1,35 +1,56 @@
 "use client";
 
+import { safeFetch } from "@/lib/client/safe-fetch";
+
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 export function QuoteRequestActions({ quoteCaseId, tourName }: { quoteCaseId: string; tourName: string }) {
   const [message, setMessage] = useState("");
   const [isBusy, setIsBusy] = useState(false);
+  const bookingIdempotencyKey = useRef<string | null>(null);
+  const revisionIdempotencyKey = useRef<string | null>(null);
 
   async function sendBookingRequest(formData: FormData) {
-    await submit(`/api/agency/quote-cases/${quoteCaseId}/booking-request`, {
-      message: String(formData.get("bookingMessage") ?? "").trim(),
-      agencyReferenceNo: normalizeOptionalString(formData.get("agencyReferenceNo"))
-    });
+    await submit(
+      `/api/agency/quote-cases/${quoteCaseId}/booking-request`,
+      {
+        message: String(formData.get("bookingMessage") ?? "").trim(),
+        agencyReferenceNo: normalizeOptionalString(formData.get("agencyReferenceNo"))
+      },
+      bookingIdempotencyKey
+    );
   }
 
   async function sendRevisionRequest(formData: FormData) {
     const revisionMessage = String(formData.get("revisionMessage") ?? "").trim();
-    await submit(`/api/agency/quote-cases/${quoteCaseId}/revision-request`, {
-      title: `Revision request: ${tourName}`,
-      message: revisionMessage,
-      requestedChanges: revisionMessage ? [revisionMessage] : []
-    });
+    await submit(
+      `/api/agency/quote-cases/${quoteCaseId}/revision-request`,
+      {
+        title: `Revision request: ${tourName}`,
+        message: revisionMessage,
+        requestedChanges: revisionMessage ? [revisionMessage] : []
+      },
+      revisionIdempotencyKey
+    );
   }
 
-  async function submit(url: string, payload: Record<string, unknown>) {
+  async function submit(
+    url: string,
+    payload: Record<string, unknown>,
+    idempotencyKeyRef: { current: string | null }
+  ) {
     setIsBusy(true);
     setMessage("");
-    const response = await fetch(url, {
+    const idempotencyKey = idempotencyKeyRef.current ?? crypto.randomUUID();
+    idempotencyKeyRef.current = idempotencyKey;
+    const response = await safeFetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "idempotency-key": idempotencyKey
+      },
       body: JSON.stringify(payload)
     });
     const result = await response.json();
@@ -38,6 +59,8 @@ export function QuoteRequestActions({ quoteCaseId, tourName }: { quoteCaseId: st
       setIsBusy(false);
       return;
     }
+    idempotencyKeyRef.current = null;
+    setIsBusy(false);
     requestRouteRefresh();
   }
 

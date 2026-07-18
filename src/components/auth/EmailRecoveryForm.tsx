@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { safeFetch } from "@/lib/client/safe-fetch";
 
 type RecoveryResult = { status?: string; maskedEmail?: string; message?: string };
 
@@ -13,7 +14,7 @@ export function EmailRecoveryForm({ accountType }: { accountType: "internal" | "
     setIsSubmitting(true);
     setResult(null);
     const formData = new FormData(event.currentTarget);
-    const response = await fetch("/api/auth/forgot-email", {
+    const response = await safeFetch("/api/auth/forgot-email", {
       body: JSON.stringify({
         accountType,
         companyName: formData.get("companyName"),
