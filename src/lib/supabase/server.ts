@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: `server` Supabase 클라이언트의 실행 환경별 생성과 세션 전달을 담당합니다.
+ * 서버 전용 비밀키와 브라우저 공개키가 섞이지 않도록 클라이언트 경계를 분리하고 요청 단위 인증 정보를 보존합니다.
+ */
 import { createClient } from "@supabase/supabase-js";
 
 function requireEnv(name: string) {

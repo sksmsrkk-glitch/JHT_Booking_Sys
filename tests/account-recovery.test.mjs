@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: `account recovery.test` 테스트는 관련 사용자 흐름과 보안·데이터 규칙의 회귀를 방지합니다.
+ * 성공 경로뿐 아니라 권한 거부, 잘못된 입력, 재시도 및 경계 상태를 함께 검증해 배포 전 계약 위반을 탐지합니다.
+ */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";

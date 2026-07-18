@@ -1,3 +1,6 @@
+-- @file 한글 책임: Supabase 마이그레이션 `account recovery`의 스키마, 함수, 권한 또는 데이터 무결성 규칙을 순서대로 반영합니다.
+-- 운영 DB와 로컬 DB가 같은 이력을 재현해야 하므로 이미 배포된 구문을 수정하지 않고 후속 마이그레이션으로 변경합니다.
+
 -- 로그인 화면에서 발생한 이메일 찾기와 비밀번호 재설정 요청을 운영자가 추적할 수 있는 원장입니다.
 -- 공개 화면은 service role을 사용하는 서버 API로만 기록하며, 조회와 처리는 내부 사용자에게만 허용합니다.
 create table if not exists account_recovery_requests (

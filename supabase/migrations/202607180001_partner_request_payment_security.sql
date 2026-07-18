@@ -1,3 +1,6 @@
+-- @file 한글 책임: Supabase 마이그레이션 `partner request payment security`의 스키마, 함수, 권한 또는 데이터 무결성 규칙을 순서대로 반영합니다.
+-- 운영 DB와 로컬 DB가 같은 이력을 재현해야 하므로 이미 배포된 구문을 수정하지 않고 후속 마이그레이션으로 변경합니다.
+
 -- 1) 운영 준비도 갱신 함수는 트리거/서비스 전용입니다.
 -- 이미 202607150002를 적용한 DB에도 누락된 권한 회수를 소급 적용합니다.
 revoke all on function public.refresh_reservation_operation_readiness(uuid) from public, anon, authenticated;

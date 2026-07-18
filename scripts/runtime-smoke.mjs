@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: `runtime smoke` 운영 보조 명령의 입력, 변환 및 실행 절차를 담당합니다.
+ * 반복 실행과 실패 재시도를 고려해 원본 데이터와 비밀값을 훼손하거나 로그로 노출하지 않도록 경계를 유지합니다.
+ */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { relative, resolve, sep } from "node:path";
@@ -222,6 +226,10 @@ try {
   server.kill();
 }
 
+/**
+ * 파일 시스템에서 발견한 Route Handler의 HTTP 메서드를 읽어 최소 권한 요청 목록을 자동 생성합니다.
+ * 신규 API가 추가되면 수동 목록 갱신 없이도 런타임 부팅·응답 규약 검증 대상에 포함됩니다.
+ */
 function buildApiChecks() {
   return listRouteFiles(apiRoot).flatMap((filePath) => {
     const source = readFileSync(filePath, "utf8");
@@ -442,6 +450,7 @@ function assertHeaders(response, path, headers) {
   }
 }
 
+/** 쓰기 API가 인증 검사까지 도달할 수 있는 최소 형태만 제공하며 실제 데이터 변경 성공은 요구하지 않습니다. */
 function buildMutationSmokePayload(path) {
   if (path === "/api/agency/signup-applications") {
     const { countryCode: _countryCode, ...payloadWithoutCountry } = mutationSmokePayload;

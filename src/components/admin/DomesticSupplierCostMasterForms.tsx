@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: `Domestic Supplier Cost Master Forms` UI 컴포넌트의 표시 상태와 사용자 상호작용을 담당합니다.
+ * 화면 입력은 서버 권한 검사를 대체하지 않으며, 제출·실패·재시도 상태를 명확히 관리해 중복 요청과 멈춘 버튼을 방지합니다.
+ */
 "use client";
 
 import { safeFetch } from "@/lib/client/safe-fetch";
@@ -42,6 +46,10 @@ const TICKET_AUDIENCE_PRICE_FIELDS = [
 ];
 const CLOSED_DAY_OPTIONS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Public holiday"];
 
+/**
+ * 공급사 종류마다 서로 다른 필수 필드와 반복 가격 행을 하나의 생성 흐름으로 조립합니다.
+ * 화면에서 만든 메뉴·티켓·기간별 가격은 평면 문자열이 아니라 서버가 검증할 구조화 payload로 변환합니다.
+ */
 export function CostMasterQuickCreateForm({
   companies,
   initialKind = "hotel",
@@ -219,6 +227,7 @@ export function CostMasterQuickCreateForm({
   );
 }
 
+/** 검색 결과, 선택 상품의 가격 규칙, 이미지 및 세부 스펙을 같은 공급사 경계 안에서 표시합니다. */
 export function CostMasterSearchPanel() {
   const [items, setItems] = useState<CreatedItem[]>([]);
   const [message, setMessage] = useState("");

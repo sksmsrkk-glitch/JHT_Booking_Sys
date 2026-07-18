@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: `seed hosted demo auth` 운영 보조 명령의 입력, 변환 및 실행 절차를 담당합니다.
+ * 반복 실행과 실패 재시도를 고려해 원본 데이터와 비밀값을 훼손하거나 로그로 노출하지 않도록 경계를 유지합니다.
+ */
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 

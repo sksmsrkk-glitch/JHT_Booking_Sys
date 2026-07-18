@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: `quotation` 기능이 사용하는 Supabase 조회와 영속 데이터 매핑을 한곳에 모읍니다.
+ * RLS가 보장하는 접근 범위를 유지하면서 목록 상한·필터·정렬을 DB에 위임하고 화면에는 안정된 도메인 모델만 반환합니다.
+ */
 import type {
   QuoteCaseDetail,
   QuoteCaseFilters,
@@ -67,6 +71,7 @@ export async function listQuoteCases(
   return (data ?? []).map(mapQuoteCaseListItem);
 }
 
+/** 정확한 filtered count와 현재 페이지 행을 같은 필터로 조회해 페이지 수와 목록 내용의 불일치를 막습니다. */
 export async function listQuoteCasePage(
   supabase: SupabaseClientLike,
   filters: QuoteCaseFilters,
@@ -92,6 +97,7 @@ export async function listQuoteCasePage(
   return { items, pagination: buildPaginationMeta(pagination, count, items.length) };
 }
 
+/** 버전별 하위 데이터를 한 견적 케이스 범위로 조회하고 공개·내부 스냅샷을 화면 모델에서 분리합니다. */
 export async function getQuoteCaseDetail(
   supabase: SupabaseClientLike,
   quoteCaseId: string
@@ -166,6 +172,7 @@ function resolveInternals(row: any): { internal_total_cost_krw?: number; interna
   return internals ?? {};
 }
 
+/** Supabase 중첩 relation과 별도 internal 테이블 결과를 안정된 camelCase 버전 모델로 평탄화합니다. */
 function mapQuoteVersionDetail(row: any): QuoteVersionDetail {
   const presentationBlocks = (row.quote_presentation_blocks ?? []).map(mapQuotePresentationBlockDetail);
 

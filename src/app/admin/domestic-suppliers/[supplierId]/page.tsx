@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: Next.js App Router의 `/admin/domestic-suppliers/[supplierId]` 화면 또는 라우트 레이아웃을 구성합니다.
+ * JHT 내부 운영자에게 허용된 데이터만 준비하고, 로딩·오류·탐색 상태가 서버 렌더링과 클라이언트 상호작용에서 일관되게 이어지도록 합니다.
+ */
 import type { Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -20,6 +24,10 @@ type LoadState =
   | { status: "not-found" }
   | { status: "error"; message: string };
 
+/**
+ * 국내 공급사의 연락처, 상품, 반복 가격 규칙 및 미디어를 공급사 ID 경계로 조회합니다.
+ * 호텔·식사·관광지처럼 가격 구조가 다른 상품도 공통 상품 아래의 타입별 스펙으로 구분해 표시합니다.
+ */
 export default async function DomesticSupplierDetailPage({ params }: PageProps) {
   const { supplierId } = await params;
   const loadState = await loadSupplier(supplierId);
@@ -232,6 +240,7 @@ export default async function DomesticSupplierDetailPage({ params }: PageProps) 
   );
 }
 
+/** 기간·요일·인원·객실 또는 티켓 조건이 다른 가격 행을 손실 없이 비교 가능한 표로 표시합니다. */
 function PriceTable({ prices }: { prices: SupplierDetail["products"][number]["prices"] }) {
   if (prices.length === 0) {
     return <p className="subtext">No active or archived prices are registered.</p>;

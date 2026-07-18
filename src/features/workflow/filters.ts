@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: `workflow` 업무 기능의 입력 정규화, 상태 변환 또는 화면용 데이터를 구성합니다.
+ * 여러 화면과 API가 같은 규칙을 재사용하도록 도메인 결정을 모으고, 공급사 원가와 파트너 공개 데이터의 경계를 유지합니다.
+ */
 import type { WorkflowThreadSummary } from "./types";
 
 export type WorkflowFilters = {

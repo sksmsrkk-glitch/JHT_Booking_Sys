@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: `supplier messages` 도메인의 프레임워크 독립적인 계산·검증·상태 전이 규칙을 구현합니다.
+ * API와 UI가 같은 업무 결정을 사용하도록 순수 함수 중심으로 유지하며, 금액·권한·멱등성 관련 예외를 호출자에게 명확히 전달합니다.
+ */
 export const SUPPLIER_MESSAGE_TYPES = [
   "booking_request",
   "confirmation_request",
@@ -64,6 +68,7 @@ export function renderSupplierTemplate(template, data) {
 }
 
 export function buildSupplierMessageDraft(input) {
+  // 초안은 예약·공급사·메시지 종류와 revision 번호를 함께 고정해 이후 승인 대상이 바뀌지 않게 합니다.
   if (!SUPPLIER_MESSAGE_TYPES.includes(input.messageType)) {
     throw new Error(`Unsupported supplier message type: ${input.messageType}`);
   }
@@ -150,6 +155,7 @@ export function buildSupplierMessageIdempotencyKey(input) {
 }
 
 export function assertSupplierMessageCanSend(message) {
+  // 승인 단계와 취소 고위험 재승인을 모두 통과한 메시지만 전송 워커에 진입할 수 있습니다.
   if (!message.approved_by || !message.approved_at) {
     throw new Error("Supplier message must be approved before send");
   }
@@ -213,6 +219,7 @@ export function buildSupplierProviderCallbackUpdate({ eventType, providerMessage
 }
 
 export function buildSupplierMessageDeliveryAttempt({ message, env = {}, now = new Date() }) {
+  // dry-run과 실제 프로바이더 호출 계약을 같은 결과 모델로 만들어 워커의 상태 전이 로직을 단순화합니다.
   if (!message?.id) {
     throw new Error("message.id is required");
   }

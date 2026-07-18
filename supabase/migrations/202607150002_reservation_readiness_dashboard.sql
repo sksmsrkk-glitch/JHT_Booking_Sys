@@ -1,3 +1,6 @@
+-- @file 한글 책임: Supabase 마이그레이션 `reservation readiness dashboard`의 스키마, 함수, 권한 또는 데이터 무결성 규칙을 순서대로 반영합니다.
+-- 운영 DB와 로컬 DB가 같은 이력을 재현해야 하므로 이미 배포된 구문을 수정하지 않고 후속 마이그레이션으로 변경합니다.
+
 -- 예약 운영 준비 상태를 작업 변경 시점에 계산해 대시보드의 반복 스캔을 제거합니다.
 alter table reservations
   add column if not exists operation_ready boolean not null default false,

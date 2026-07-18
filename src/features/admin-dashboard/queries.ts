@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: `admin-dashboard` 기능이 사용하는 Supabase 조회와 영속 데이터 매핑을 한곳에 모읍니다.
+ * RLS가 보장하는 접근 범위를 유지하면서 목록 상한·필터·정렬을 DB에 위임하고 화면에는 안정된 도메인 모델만 반환합니다.
+ */
 type SupabaseClientLike = {
   rpc: (name: string, args?: Record<string, unknown>) => any;
 };

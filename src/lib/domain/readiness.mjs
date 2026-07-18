@@ -1,3 +1,8 @@
+/**
+ * @file 한글 책임: `readiness` 도메인의 프레임워크 독립적인 계산·검증·상태 전이 규칙을 구현합니다.
+ * API와 UI가 같은 업무 결정을 사용하도록 순수 함수 중심으로 유지하며, 금액·권한·멱등성 관련 예외를 호출자에게 명확히 전달합니다.
+ */
+// 필수 환경값은 존재 여부만 검사하며 토큰·비밀번호의 실제 값은 리포트에 포함하지 않습니다.
 export const READINESS_ENV_CHECKS = [
   {
     key: "supabase_url",
@@ -162,6 +167,7 @@ export const READINESS_ENV_CHECKS = [
   }
 ];
 
+// 업무 게이트는 문의부터 정산까지 다음 단계로 넘어가기 위한 최소 데이터 조건을 표현합니다.
 export const READINESS_WORKFLOW_CHECKS = [
   {
     key: "auth_cookie_session",
@@ -431,6 +437,7 @@ export const READINESS_STORAGE_CHECKS = [
 ];
 
 export function buildReadinessReport(env = process.env) {
+  // 개별 검사 정의를 공개 가능한 결과 모델로 축약해 관리자 화면과 배포 검증이 같은 판정을 사용합니다.
   const envChecks = READINESS_ENV_CHECKS.map((check) => {
     const configured = isConfigured(env[check.envName]);
     return {

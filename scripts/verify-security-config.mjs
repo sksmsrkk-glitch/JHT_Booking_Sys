@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: `verify security config` 검증기는 저장소의 코드·스키마·문서 계약이 배포 기준을 지키는지 자동 확인합니다.
+ * 검사 실패는 사람이 놓치기 쉬운 회귀를 CI와 로컬 검증 단계에서 즉시 차단하도록 명확한 종료 코드로 전달합니다.
+ */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 

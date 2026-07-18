@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: Next.js App Router의 `/admin/quote-cases/[quoteCaseId]` 화면 또는 라우트 레이아웃을 구성합니다.
+ * JHT 내부 운영자에게 허용된 데이터만 준비하고, 로딩·오류·탐색 상태가 서버 렌더링과 클라이언트 상호작용에서 일관되게 이어지도록 합니다.
+ */
 import type { Route } from "next";
 import Link from "next/link";
 import { QuoteExportRetryAction } from "@/components/admin/QuoteExportRetryAction";
@@ -29,6 +33,10 @@ type LoadState =
 const quoteCasesRoute = "/admin/quote-cases" as Route;
 const costSearchRoute = "/admin/costing/search" as Route;
 
+/**
+ * 내부 견적 원가, 공개 견적 버전, 일정, 파트너 요청 이력을 하나의 상세 화면으로 결합합니다.
+ * 공급사 원가와 마진은 내부 사용자에게만 전달하고 파트너 공개 영역과 명시적으로 분리합니다.
+ */
 export default async function AdminQuoteCaseDetailPage({ params }: { params: PageParams }) {
   const { quoteCaseId } = await params;
   const loadState = await loadQuoteCase(quoteCaseId);
@@ -258,6 +266,7 @@ export default async function AdminQuoteCaseDetailPage({ params }: { params: Pag
   );
 }
 
+/** 버전별 공개 금액과 내부 원가표, 일정 및 미디어 블록을 해당 버전 스냅샷 기준으로 표시합니다. */
 function QuoteVersionSection({ version }: { version: QuoteVersionDetail }) {
   return (
     <section className="section-block">

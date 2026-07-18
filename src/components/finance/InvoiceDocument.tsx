@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: `Invoice Document` UI 컴포넌트의 표시 상태와 사용자 상호작용을 담당합니다.
+ * 화면 입력은 서버 권한 검사를 대체하지 않으며, 제출·실패·재시도 상태를 명확히 관리해 중복 요청과 멈춘 버튼을 방지합니다.
+ */
 type InvoicePayment = {
   id: string;
   status: string;
@@ -34,6 +38,10 @@ type InvoiceItineraryDay = {
   remarks?: string | null;
 };
 
+/**
+ * 발행 버전의 청구 라인·입금·잔액과 최종 운영 일정 스냅샷을 파트너용 인보이스 문서로 렌더링합니다.
+ * 금액은 인보이스 통화로만 표시하고 내부 원가나 마진 정보는 문서 모델에 포함하지 않습니다.
+ */
 export function InvoiceDocument({
   invoice,
   billTo,
@@ -289,6 +297,7 @@ function formatDateTime(value: string) {
   return value.replace("T", " ").slice(0, 16);
 }
 
+/** JSONB 일정 행을 문서가 허용하는 필드로 좁히며 필수 Day 값이 없는 행은 출력에서 제외합니다. */
 function mapItineraryDay(value: Record<string, unknown>): InvoiceItineraryDay | null {
   const day = value.day ?? value.dayNo ?? value.day_no;
   if (day === undefined || day === null) return null;

@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: Next.js App Router의 `/admin/agencies` 화면 또는 라우트 레이아웃을 구성합니다.
+ * JHT 내부 운영자에게 허용된 데이터만 준비하고, 로딩·오류·탐색 상태가 서버 렌더링과 클라이언트 상호작용에서 일관되게 이어지도록 합니다.
+ */
 import type { Route } from "next";
 import Link from "next/link";
 import { getPageAuthorization } from "@/lib/api/page-session";
@@ -27,6 +31,10 @@ type LoadState =
 
 const adminRoute = "/admin" as Route;
 
+/**
+ * 파트너 가입 신청과 승인된 해외 에이전시 목록을 같은 관리 화면에서 조회합니다.
+ * 검색·상태·페이지 조건은 API 쿼리에 전달해 전체 에이전시 행을 서버 메모리에 적재하지 않습니다.
+ */
 export default async function AdminAgenciesPage({ searchParams }: { searchParams: SearchParams }) {
   const filters = await searchParams;
   const loadState = await loadAgencies(filters);
@@ -124,6 +132,7 @@ export default async function AdminAgenciesPage({ searchParams }: { searchParams
   );
 }
 
+/** 승인 전 신청 정보와 검토 액션을 분리해 기존 파트너 계정 목록과 혼동되지 않게 표시합니다. */
 function SignupApplicationTable({
   applications,
   selectedStatus

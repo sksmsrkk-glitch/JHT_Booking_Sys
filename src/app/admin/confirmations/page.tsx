@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: Next.js App Router의 `/admin/confirmations` 화면 또는 라우트 레이아웃을 구성합니다.
+ * JHT 내부 운영자에게 허용된 데이터만 준비하고, 로딩·오류·탐색 상태가 서버 렌더링과 클라이언트 상호작용에서 일관되게 이어지도록 합니다.
+ */
 import type { Route } from "next";
 import Link from "next/link";
 import { demoReservations } from "@/features/reservation/demo-data";
@@ -29,6 +33,10 @@ type ConfirmationFilters = {
 
 const adminRoute = "/admin" as Route;
 
+/**
+ * 확정서 생성 대상 예약을 기간·국가·파트너 조건으로 필터링하고 상태 집계를 함께 제공합니다.
+ * 목록과 대시보드는 동일한 필터 결과를 사용해 화면 상단 수치와 실제 행이 어긋나지 않게 합니다.
+ */
 export default async function AdminConfirmationsPage({ searchParams }: { searchParams: SearchParams }) {
   const filters = normalizeFilters(await searchParams);
   const loadState = await loadConfirmationReservations();
@@ -291,6 +299,7 @@ function buildFilterOptions(reservations: ReservationListItem[]) {
   };
 }
 
+/** 현재 필터 결과에서 상태별 단체 수·인원·비중을 한 번만 순회해 계산합니다. */
 function buildConfirmationDashboard(reservations: ReservationListItem[]) {
   const statusMap = new Map<string, { status: string; count: number; pax: number }>();
   const totalPax = reservations.reduce((sum, reservation) => sum + Number(reservation.estimatedPax ?? 0), 0);

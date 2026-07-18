@@ -1,3 +1,6 @@
+-- @file 한글 책임: Supabase 마이그레이션 `quote revision lifecycle`의 스키마, 함수, 권한 또는 데이터 무결성 규칙을 순서대로 반영합니다.
+-- 운영 DB와 로컬 DB가 같은 이력을 재현해야 하므로 이미 배포된 구문을 수정하지 않고 후속 마이그레이션으로 변경합니다.
+
 -- Partner revision requests may only move quote cases that are still in the
 -- quotation lifecycle. Accepted, cancelled, and expired cases must continue
 -- through reservation change/cancellation workflows instead of being reopened.

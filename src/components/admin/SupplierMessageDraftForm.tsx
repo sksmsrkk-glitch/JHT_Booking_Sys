@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: `Supplier Message Draft Form` UI 컴포넌트의 표시 상태와 사용자 상호작용을 담당합니다.
+ * 화면 입력은 서버 권한 검사를 대체하지 않으며, 제출·실패·재시도 상태를 명확히 관리해 중복 요청과 멈춘 버튼을 방지합니다.
+ */
 "use client";
 
 import { safeFetch } from "@/lib/client/safe-fetch";
@@ -13,6 +17,10 @@ import type { ReservationListItem, ReservationSupplierOption } from "@/features/
 import type { SupplierListItem } from "@/features/supplier/types";
 import { buildDefaultSupplierMessageTemplate } from "@/lib/domain/supplier-messages.mjs";
 
+/**
+ * 예약과 공급사를 선택해 템플릿 기반 메시지 초안을 만들고 발송 전 검토에 필요한 revision을 저장합니다.
+ * 이 폼은 초안만 생성하며 승인·취소 재승인·실제 전송은 별도 권한 액션으로 분리합니다.
+ */
 export function SupplierMessageDraftForm({
   disabledReason,
   reservationId,

@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: Next.js App Router의 `/admin/readiness` 화면 또는 라우트 레이아웃을 구성합니다.
+ * JHT 내부 운영자에게 허용된 데이터만 준비하고, 로딩·오류·탐색 상태가 서버 렌더링과 클라이언트 상호작용에서 일관되게 이어지도록 합니다.
+ */
 import type { Route } from "next";
 import Link from "next/link";
 import type { ReadinessReport } from "@/lib/domain/readiness";
@@ -12,6 +16,10 @@ type LoadState =
 
 const adminRoute = "/admin" as Route;
 
+/**
+ * 배포 환경, DB 연결, 핵심 업무 게이트 및 스토리지 상태를 읽기 전용 진단 화면으로 제공합니다.
+ * 비밀값은 표시하지 않고 구성 여부와 실패 이유만 노출해 운영 점검 중 자격 증명 유출을 막습니다.
+ */
 export default async function AdminReadinessPage() {
   const loadState = await loadReadiness();
 

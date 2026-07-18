@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: 요청 경로별 인증 여부와 내부 관리자·해외 파트너 포털의 접근 경계를 미들웨어에서 판정합니다.
+ * 공개 경로, 로그인 리다이렉트 및 언어 정책을 한곳에서 적용해 페이지마다 권한 규칙이 달라지는 것을 방지합니다.
+ */
 import { NextResponse, type NextRequest } from "next/server";
 import {
   ACCESS_TOKEN_COOKIE,

@@ -1,3 +1,6 @@
+-- @file 한글 책임: Supabase 마이그레이션 `quote version internals`의 스키마, 함수, 권한 또는 데이터 무결성 규칙을 순서대로 반영합니다.
+-- 운영 DB와 로컬 DB가 같은 이력을 재현해야 하므로 이미 배포된 구문을 수정하지 않고 후속 마이그레이션으로 변경합니다.
+
 -- 2026-07-03 코드 리뷰 Phase 4 (결정 2): 내부 원가/마진 컬럼을 quote_versions에서
 -- 분리해, agency JWT + anon key로 PostgREST를 직접 호출해도 마진이 노출되지 않게 합니다.
 -- quote_versions 행은 agency가 select할 수 있으므로 컬럼 단위 보호만으로는 부족하고,

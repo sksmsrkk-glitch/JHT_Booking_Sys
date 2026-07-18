@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: Next.js App Router의 `/admin/reservations` 화면 또는 라우트 레이아웃을 구성합니다.
+ * JHT 내부 운영자에게 허용된 데이터만 준비하고, 로딩·오류·탐색 상태가 서버 렌더링과 클라이언트 상호작용에서 일관되게 이어지도록 합니다.
+ */
 import type { Route } from "next";
 import Link from "next/link";
 import {
@@ -45,6 +49,10 @@ type LoadState =
 const adminRoute = "/admin" as Route;
 const tasksRoute = "/admin/operations/tasks" as Route;
 
+/**
+ * 예약 목록·월간 달력·운영 준비도 집계를 한 인증 컨텍스트에서 준비합니다.
+ * 목록 페이지네이션과 달력 범위 조회를 분리해 많은 단체가 있어도 전체 행을 브라우저로 전송하지 않습니다.
+ */
 export default async function AdminReservationsPage({ searchParams }: { searchParams: SearchParams }) {
   const filters = normalizeReservationPageFilters(await searchParams);
   const loadState = await loadReservations(filters);
@@ -272,6 +280,10 @@ function SummaryPanel({ rows, title }: { rows: SummaryRow[]; title: string }) {
   );
 }
 
+/**
+ * 투어 기간을 주 단위 막대로 배치하고, 필수 운영 정보가 부족한 단체를 준비도 색상으로 구분합니다.
+ * 월 경계를 넘는 예약은 현재 주와 겹치는 구간만 잘라 렌더링해 셀 너비와 막대 위치를 안정적으로 유지합니다.
+ */
 function GroupStatusCalendar({
   filters,
   reservations,

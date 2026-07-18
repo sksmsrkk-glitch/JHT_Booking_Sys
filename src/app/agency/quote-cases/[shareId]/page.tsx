@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: Next.js App Router의 `/agency/quote-cases/[shareId]` 화면 또는 라우트 레이아웃을 구성합니다.
+ * 해외 파트너에게 허용된 데이터만 준비하고, 로딩·오류·탐색 상태가 서버 렌더링과 클라이언트 상호작용에서 일관되게 이어지도록 합니다.
+ */
 import type { Route } from "next";
 import Link from "next/link";
 import { QuoteRequestActions } from "@/components/agency/QuoteRequestActions";
@@ -17,6 +21,10 @@ type LoadState =
 
 const quotesRoute = "/agency/quote-cases" as Route;
 
+/**
+ * 파트너에게 전송된 공개 견적 버전만 조회해 일정·금액·변경 요청 진입점을 구성합니다.
+ * 내부 원가, 마진, 공급사 스냅샷은 이 페이지 모델에 포함하지 않아 RLS 외에도 표현 계층에서 재차 차단합니다.
+ */
 export default async function AgencyQuoteDetailPage({ params }: { params: PageParams }) {
   const { shareId } = await params;
   const loadState = await loadQuoteCase(shareId);
@@ -159,6 +167,7 @@ export default async function AgencyQuoteDetailPage({ params }: { params: PagePa
   );
 }
 
+/** 최종 공개 견적을 날짜별 호텔·식사·관광지와 파트너용 약관 중심의 문서 형태로 렌더링합니다. */
 function FinalQuotation({
   quoteCase,
   version

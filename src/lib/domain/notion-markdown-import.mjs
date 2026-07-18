@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: `notion markdown import` 도메인의 프레임워크 독립적인 계산·검증·상태 전이 규칙을 구현합니다.
+ * API와 UI가 같은 업무 결정을 사용하도록 순수 함수 중심으로 유지하며, 금액·권한·멱등성 관련 예외를 호출자에게 명확히 전달합니다.
+ */
 const MEDIA_EXTENSIONS = new Map([
   [".jpg", "image"],
   [".jpeg", "image"],
@@ -14,6 +18,7 @@ const DEFAULT_DOMESTIC_SUPPLIER_ID = "__REPLACE_WITH_DOMESTIC_SUPPLIER_UUID__";
 const DEFAULT_SUPPLIER_PRODUCT_ID = "__REPLACE_WITH_SUPPLIER_PRODUCT_UUID__";
 
 export function parseNotionMarkdownDocument({ content, sourcePath = "", baseDir = "" }) {
+  // Notion 속성 표와 본문·첨부 링크를 분리해 이후 공급사 데이터 변환 단계가 원문 형식에 덜 의존하게 합니다.
   if (typeof content !== "string" || content.trim().length === 0) {
     throw new Error("Notion markdown content is required");
   }
@@ -35,6 +40,7 @@ export function parseNotionMarkdownDocument({ content, sourcePath = "", baseDir 
 }
 
 export function buildSupplierCostMasterFromNotionDocument(document, options = {}) {
+  // 한 Notion 문서에서 공급사 1건, 상품 여러 건, 가격 여러 건의 관계형 입력을 구성합니다.
   const properties = document.properties;
   const pageId = document.pageId || stableSlug(document.title);
   const supplierLookupKey = `notion:${pageId}`;
@@ -108,6 +114,7 @@ export function buildSupplierCostMasterFromNotionDocument(document, options = {}
 }
 
 export function buildNotionMarkdownImportPlan(records, options = {}) {
+  // 전체 변환 결과와 경고를 먼저 제공해 사용자가 실제 DB 반영 전에 누락 필드를 검토할 수 있게 합니다.
   const sourceName = options.sourceName ?? "notion-markdown-export";
   const summary = summarizeRecords(records);
 

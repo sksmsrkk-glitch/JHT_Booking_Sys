@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: Next.js App Router의 `/admin/reservations/[reservationId]` 화면 또는 라우트 레이아웃을 구성합니다.
+ * JHT 내부 운영자에게 허용된 데이터만 준비하고, 로딩·오류·탐색 상태가 서버 렌더링과 클라이언트 상호작용에서 일관되게 이어지도록 합니다.
+ */
 import type { Route } from "next";
 import Link from "next/link";
 import { FinalOperationSnapshotForm } from "@/components/admin/FinalOperationSnapshotForm";
@@ -27,6 +31,10 @@ const tasksRoute = "/admin/operations/tasks" as Route;
 const supplierMessagesRoute = "/admin/supplier-messages" as Route;
 const guideExpensesRoute = "/admin/guide-expenses" as Route;
 
+/**
+ * 확정 견적에서 파생된 예약, 공급사 실행 기록, 객실 배정 및 최종 일정 스냅샷을 함께 표시합니다.
+ * 취소·완료된 예약은 변경 폼을 잠가 과거 운영 기록이 사후 수정되는 것을 화면에서도 방지합니다.
+ */
 export default async function AdminReservationDetailPage({ params }: { params: PageParams }) {
   const { reservationId } = await params;
   const loadState = await loadReservation(reservationId);

@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: `Quote Item Create Form` UI 컴포넌트의 표시 상태와 사용자 상호작용을 담당합니다.
+ * 화면 입력은 서버 권한 검사를 대체하지 않으며, 제출·실패·재시도 상태를 명확히 관리해 중복 요청과 멈춘 버튼을 방지합니다.
+ */
 "use client";
 
 import { safeFetch } from "@/lib/client/safe-fetch";
@@ -16,6 +20,10 @@ const MARGIN_MODES = ["auto_rate", "manual_amount", "manual_total"];
 const SERVICE_SECTIONS = ["hotel", "vehicle", "guide", "meal", "admission", "shopping", "land", "optional", "other"];
 const CALCULATION_MODES = ["auto_formula", "manual_unit", "manual_total", "override"];
 
+/**
+ * 공급사 원가 스냅샷, 엑셀식 수량 계산, 환율 및 마진 규칙을 한 견적 항목 payload로 구성합니다.
+ * 저장 전 계산값은 미리보기일 뿐이며 서버가 동일 규칙으로 재검증해 조작된 판매가가 기록되지 않게 합니다.
+ */
 export function QuoteItemCreateForm({
   costItems = [],
   itineraryDays = [],
@@ -398,6 +406,7 @@ export function QuoteItemCreateForm({
   );
 }
 
+/** 자동 비율·고정 금액·수동 판매가 모드를 서로 배타적인 마진 계약으로 정규화합니다. */
 function buildMargin(mode: string, formData: FormData) {
   if (mode === "manual_total") {
     return { mode, manualTotal: normalizeNumber(formData.get("manualAmount"), 0) };

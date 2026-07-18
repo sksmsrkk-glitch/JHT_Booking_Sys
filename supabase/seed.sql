@@ -1,3 +1,6 @@
+-- @file 한글 책임: 로컬 개발과 통합 검증에 필요한 기준 데이터와 업무 시나리오를 재현 가능한 식별자로 구성합니다.
+-- 운영 데이터로 오인되지 않도록 호스팅 환경 보호 규칙과 업무 테이블 간 참조 순서를 함께 유지합니다.
+
 -- Local v1 demo seed for Jungho Travel operations.
 -- This file is safe to run repeatedly in local Supabase because rows use stable IDs.
 

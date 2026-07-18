@@ -1,3 +1,6 @@
+# @file 한글 책임: 로컬 Supabase 서비스의 포트, 인증, API 및 데이터베이스 실행 조건을 고정합니다.
+# 팀원이 동일한 개발 환경을 재현할 수 있도록 CLI가 읽는 설정값만 관리하며 운영 비밀값은 저장하지 않습니다.
+
 project_id = "jht-operations-platform"
 
 [api]

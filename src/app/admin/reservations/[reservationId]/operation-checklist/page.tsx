@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: Next.js App Router의 `/admin/reservations/[reservationId]/operation-checklist` 화면 또는 라우트 레이아웃을 구성합니다.
+ * JHT 내부 운영자에게 허용된 데이터만 준비하고, 로딩·오류·탐색 상태가 서버 렌더링과 클라이언트 상호작용에서 일관되게 이어지도록 합니다.
+ */
 import type { Route } from "next";
 import Link from "next/link";
 import type {
@@ -80,6 +84,10 @@ const REQUIRED_ACTIONS = [
   }
 ];
 
+/**
+ * 수락된 견적 항목을 예약 실행 체크리스트로 투영해 공급사별 예약·변경·취소·최종 확정 상태를 보여줍니다.
+ * 상태는 고정 문구가 아니라 견적 항목과 공급사 메시지의 최신 DB 값을 기준으로 매 요청마다 계산합니다.
+ */
 export default async function ReservationOperationChecklistPage({ params }: { params: PageParams }) {
   const { reservationId } = await params;
   const loadState = await loadReservation(reservationId);
@@ -286,6 +294,7 @@ function ChecklistContent({ reservation }: { reservation: ReservationDetail }) {
   );
 }
 
+/** 견적 카테고리와 공급사 메시지를 운영 단계별 카드로 묶어 누락된 후속 조치를 계산합니다. */
 function buildWorkflowItems(reservation: ReservationDetail) {
   return REQUIRED_ACTIONS.map((action) => {
     const matchingTasks = reservation.operationTasks.filter(action.matches);

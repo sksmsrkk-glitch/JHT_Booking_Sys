@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: Next.js App Router의 `/admin/agencies/[agencyId]` 화면 또는 라우트 레이아웃을 구성합니다.
+ * JHT 내부 운영자에게 허용된 데이터만 준비하고, 로딩·오류·탐색 상태가 서버 렌더링과 클라이언트 상호작용에서 일관되게 이어지도록 합니다.
+ */
 import type { Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -21,6 +25,10 @@ type LoadState =
 
 const agenciesRoute = "/admin/agencies" as Route;
 
+/**
+ * 한 해외 파트너사의 회사 정보, 담당자, mother/sub 계정 및 상태 변경 이력을 함께 조회합니다.
+ * 계정 관리 액션은 UI에서 직접 Auth를 변경하지 않고 승인된 내부 API를 통해 감사 로그와 함께 수행합니다.
+ */
 export default async function AdminAgencyDetailPage({ params }: PageProps) {
   const { agencyId } = await params;
   const loadState = await loadAgency(agencyId);

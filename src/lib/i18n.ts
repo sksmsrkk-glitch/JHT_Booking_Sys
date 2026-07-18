@@ -1,3 +1,7 @@
+/**
+ * @file 한글 책임: `i18n` 모듈이 담당하는 공통 애플리케이션 규칙과 재사용 가능한 계약을 정의합니다.
+ * 호출 계층이 내부 구현에 직접 의존하지 않도록 입력·출력과 오류 경계를 명확히 유지합니다.
+ */
 export type Locale = "en" | "ko";
 
 export const defaultLocale: Locale = "en";
