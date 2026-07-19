@@ -211,8 +211,9 @@
 ## Browser Session
 
 - `/auth/login` and `/agency/login` sign in with Supabase email/password and post the access token, refresh token, and expiry to `/auth/session`.
-- `POST /auth/session` stores the tokens in separate `jht_access_token` and `jht_refresh_token` HttpOnly cookies, aligns access-cookie Max-Age with the Supabase session expiry, and rejects mismatched `Origin` headers.
-- Middleware refreshes a stale access token through Supabase Auth before serving a protected page and rotates both HttpOnly cookies. A failed refresh clears both cookies and returns the user to the correct internal or partner login page.
+- `POST /auth/session` first verifies that the access token is a non-expired, signed JWT from the configured Supabase project. Only then does it store the tokens in separate `jht_access_token` and `jht_refresh_token` HttpOnly cookies, align access-cookie Max-Age with the Supabase session expiry, and reject mismatched `Origin` headers.
+- Middleware rejects malformed and foreign-project access tokens before page rendering, refreshes a stale access token through Supabase Auth, and rotates both HttpOnly cookies. A failed refresh clears both cookies and returns the user to the correct internal or partner login page.
+- Every protected API and server page passes the request JWT explicitly to `getClaims(jwt)` before querying `user_roles` or `agency_users`; `401` therefore means authentication failed, while `403` means the verified user lacks the required role.
 - The login `next` value is accepted only when it is a same-portal absolute path (`/admin/...` for internal accounts or `/agency/...` for partner accounts); external and cross-portal redirects fall back to the portal home.
 - API routes accept either an `Authorization: Bearer ...` header or the `jht_access_token` cookie.
 - `POST /auth/logout` clears both session cookies. Logout is intentionally not exposed as GET so Next.js link prefetch cannot terminate an active session.

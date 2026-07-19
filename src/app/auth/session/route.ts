@@ -3,7 +3,14 @@
  * 인증 또는 공용 사용자에게 허용된 데이터만 준비하고, 로딩·오류·탐색 상태가 서버 렌더링과 클라이언트 상호작용에서 일관되게 이어지도록 합니다.
  */
 import { NextResponse } from "next/server";
-import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "@/lib/domain/auth-session.mjs";
+import {
+  ACCESS_TOKEN_COOKIE,
+  getVerifiedAccessTokenClaims,
+  isAccessTokenForProject,
+  isAccessTokenStale,
+  REFRESH_TOKEN_COOKIE
+} from "@/lib/domain/auth-session.mjs";
+import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
 const fallbackMaxAgeSeconds = 60 * 60;
 const maximumMaxAgeSeconds = 60 * 60 * 8;
@@ -29,6 +36,9 @@ export async function POST(request: Request) {
   if (payload.refreshToken !== undefined && (typeof payload.refreshToken !== "string" || payload.refreshToken.trim().length === 0)) {
     return jsonResponse({ error: "refreshToken must be a non-empty string" }, { status: 400 });
   }
+  if (!(await isVerifiedAccessToken(payload.accessToken, requestUrl))) {
+    return jsonResponse({ error: "Invalid or expired access token" }, { status: 401 });
+  }
 
   const maxAge = resolveMaxAgeSeconds(payload.expiresIn);
   const response = jsonResponse({ ok: true });
@@ -50,6 +60,24 @@ export async function POST(request: Request) {
     });
   }
   return response;
+}
+
+/** 브라우저가 전달한 토큰을 현재 Supabase 프로젝트의 서명된 사용자 JWT로 확인한 뒤에만 쿠키를 발급합니다. */
+async function isVerifiedAccessToken(accessToken: string, requestUrl: URL) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  if (isAccessTokenStale(accessToken, Math.floor(Date.now() / 1000), 0)) return false;
+  if (!isAccessTokenForProject(accessToken, supabaseUrl)) return false;
+
+  try {
+    const verificationRequest = new Request(requestUrl, {
+      headers: { authorization: `Bearer ${accessToken}` }
+    });
+    const supabase = createRequestSupabaseClient(verificationRequest);
+    const claims = await getVerifiedAccessTokenClaims(supabase.auth, accessToken);
+    return typeof claims?.sub === "string" && claims.sub.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 function jsonResponse(body: unknown, init?: ResponseInit) {

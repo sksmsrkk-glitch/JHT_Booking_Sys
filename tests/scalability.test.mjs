@@ -126,8 +126,14 @@ test("core navigation avoids server self-fetches and full document reloads", asy
 test("deployment and authentication fast paths stay near the database", async () => {
   const vercelConfig = JSON.parse(await readSource("vercel.json"));
   const authSource = await readSource("src/lib/api/auth.ts");
+  const authSessionSource = await readSource("src/lib/domain/auth-session.mjs");
+  const supabaseServerSource = await readSource("src/lib/supabase/server.ts");
   assert.deepEqual(vercelConfig.regions, ["hnd1"]);
-  assert.match(authSource, /supabase\.auth\.getClaims\(\)/);
+  assert.match(authSource, /getRequestAccessToken\(supabase\)/);
+  assert.match(authSource, /getVerifiedAccessTokenClaims\(supabase\.auth, accessToken\)/);
+  assert.match(authSessionSource, /authClient\.getClaims\(accessToken\)/);
+  assert.doesNotMatch(authSessionSource, /getClaims\(\)/);
+  assert.match(supabaseServerSource, /requestAccessTokens\.set\(client, extractBearerToken\(authorization\)\)/);
   assert.doesNotMatch(authSource, /supabase\.auth\.getUser\(\)/);
 });
 

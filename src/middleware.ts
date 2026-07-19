@@ -5,6 +5,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
   ACCESS_TOKEN_COOKIE,
+  isAccessTokenForProject,
   isAccessTokenStale,
   REFRESH_TOKEN_COOKIE
 } from "@/lib/domain/auth-session.mjs";
@@ -43,7 +44,14 @@ export async function middleware(request: NextRequest) {
 
   const accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value ?? "";
   const refreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value ?? "";
-  if (accessToken && !isAccessTokenStale(accessToken)) return continueRequest(request);
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  if (
+    accessToken &&
+    !isAccessTokenStale(accessToken) &&
+    isAccessTokenForProject(accessToken, supabaseUrl)
+  ) {
+    return continueRequest(request);
+  }
 
   if (refreshToken) {
     const refreshed = await refreshSupabaseSession(refreshToken);

@@ -124,18 +124,11 @@ const routeChecks = [
   {
     path: "/auth/session",
     method: "POST",
-    status: 200,
+    status: 401,
     body: { accessToken: "runtime-smoke-token", expiresIn: 120, refreshToken: "runtime-smoke-refresh-token" },
     requestHeaders: { origin: baseUrl, "x-forwarded-proto": "https" },
-    headers: [
-      { name: "set-cookie", includes: "jht_access_token=" },
-      { name: "set-cookie", includes: "jht_refresh_token=" },
-      { name: "set-cookie", includes: "Max-Age=120" },
-      { name: "set-cookie", includes: "HttpOnly" },
-      { name: "set-cookie", includes: "Secure" },
-      { name: "set-cookie", includes: "SameSite=lax" },
-      { name: "cache-control", value: "no-store" }
-    ]
+    headers: [{ name: "cache-control", value: "no-store" }],
+    includes: ["Invalid or expired access token"]
   },
   {
     path: "/auth/session",
@@ -383,9 +376,12 @@ async function waitForServer() {
 }
 
 async function runCheck({ path, method = "GET", status, includes, headers = [] }) {
+  const protectedSurface = isProtectedSurfacePath(path);
   const requestInit = {
     method,
-    headers: path.startsWith("/admin") || path.startsWith("/agency") ? { cookie: "jht_access_token=runtime-smoke-token" } : {},
+    // 스모크 테스트가 가짜 쿠키로 보호 화면을 통과시키면 실제 인증 회귀를 정상으로 오판하게 됩니다.
+    headers: {},
+    redirect: protectedSurface ? "manual" : "follow",
     signal: AbortSignal.timeout(requestTimeoutMs)
   };
   if (!["GET", "HEAD"].includes(method)) {
@@ -396,6 +392,21 @@ async function runCheck({ path, method = "GET", status, includes, headers = [] }
     ...requestInit
   });
   const body = await response.text();
+
+  if (protectedSurface) {
+    const loginPath = path.startsWith("/agency") ? "/agency/login" : "/auth/login";
+    const location = response.headers.get("location") ?? "";
+    const locationPath = location ? new URL(location, baseUrl).pathname : "";
+    if (response.status !== 307 || locationPath !== loginPath) {
+      throw new Error(`${path} expected an unauthenticated redirect to ${loginPath}, got ${response.status} ${location}`);
+    }
+    if (/Authentication is required|role required/i.test(body)) {
+      throw new Error(`${path} rendered an authorization warning instead of redirecting before page data loading`);
+    }
+    console.log(`ok ${method} ${path} -> ${loginPath}`);
+    return;
+  }
+
   if (response.status !== status) {
     throw new Error(`${path} expected HTTP ${status}, got ${response.status}`);
   }
@@ -406,6 +417,21 @@ async function runCheck({ path, method = "GET", status, includes, headers = [] }
   }
   assertHeaders(response, path, headers);
   console.log(`ok ${method} ${path}`);
+}
+
+/** 미들웨어와 동일한 공개/보호 화면 경계를 스모크 테스트에도 적용합니다. */
+function isProtectedSurfacePath(path) {
+  const publicAgencyPaths = new Set([
+    "/agency",
+    "/agency/login",
+    "/agency/signup",
+    "/agency/forgot-email",
+    "/agency/forgot-password",
+    "/agency/reset-password"
+  ]);
+  if (path.startsWith("/agency")) return !publicAgencyPaths.has(path);
+  if (path.startsWith("/admin")) return path !== "/admin/bootstrap";
+  return false;
 }
 
 async function runRouteCheck({ path, method = "GET", status, body, requestHeaders = {}, headers = [], includes = [] }) {

@@ -3,6 +3,8 @@
  * 민감 정보가 응답과 로그에 노출되지 않도록 내부 오류와 외부 메시지를 분리하고 모든 라우트가 같은 보안 경계를 사용하게 합니다.
  */
 import { HttpError } from "./http";
+import { getVerifiedAccessTokenClaims } from "@/lib/domain/auth-session.mjs";
+import { getRequestAccessToken } from "@/lib/supabase/server";
 
 /*
  * API 권한 경계입니다.
@@ -28,9 +30,9 @@ export async function requireCurrentUser(supabase: any) {
    * getUser()처럼 매 요청마다 Auth 서버를 왕복하지 않으므로 모든 보호 API의 공통 지연을 줄입니다.
    * 실제 권한과 계정 활성 상태는 아래 user_roles/agency_users 조회에서 계속 확인합니다.
    */
-  const { data, error } = await supabase.auth.getClaims();
-  const claims = data?.claims;
-  if (error || !claims?.sub) {
+  const accessToken = getRequestAccessToken(supabase);
+  const claims = await getVerifiedAccessTokenClaims(supabase.auth, accessToken);
+  if (!claims?.sub) {
     throw new HttpError(401, "Authentication is required");
   }
   return {

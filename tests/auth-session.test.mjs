@@ -5,7 +5,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { isAccessTokenStale, resolvePostLoginPath } from "../src/lib/domain/auth-session.mjs";
+import {
+  extractBearerToken,
+  getVerifiedAccessTokenClaims,
+  isAccessTokenForProject,
+  isAccessTokenStale,
+  resolvePostLoginPath
+} from "../src/lib/domain/auth-session.mjs";
 
 test("post-login redirects stay inside the selected portal", () => {
   assert.equal(resolvePostLoginPath("internal", "/admin/quote-cases?q=thai"), "/admin/quote-cases?q=thai");
@@ -19,15 +25,47 @@ test("session refresh detects expired and near-expiry JWTs", () => {
   const now = 1_800_000_000;
   assert.equal(isAccessTokenStale(jwtWithExpiry(now + 30), now, 60), true);
   assert.equal(isAccessTokenStale(jwtWithExpiry(now + 300), now, 60), false);
-  assert.equal(isAccessTokenStale("runtime-smoke-token", now, 60), false);
+  assert.equal(isAccessTokenStale("runtime-smoke-token", now, 60), true);
+});
+
+test("middleware token checks reject another Supabase project", () => {
+  const projectUrl = "https://current-project.supabase.co";
+  const currentToken = jwtWithClaims({ exp: 1_900_000_000, iss: `${projectUrl}/auth/v1`, sub: "user-1" });
+  const oldToken = jwtWithClaims({ exp: 1_900_000_000, iss: "https://old-project.supabase.co/auth/v1", sub: "user-1" });
+
+  assert.equal(isAccessTokenForProject(currentToken, projectUrl), true);
+  assert.equal(isAccessTokenForProject(oldToken, projectUrl), false);
+  assert.equal(isAccessTokenForProject("not-a-jwt", projectUrl), false);
+});
+
+test("request claims verification always passes the explicit bearer token", async () => {
+  let receivedToken = "";
+  const authClient = {
+    async getClaims(token) {
+      receivedToken = token;
+      return { data: { claims: { sub: "user-1" } }, error: null };
+    }
+  };
+
+  const claims = await getVerifiedAccessTokenClaims(authClient, "signed-access-token");
+  assert.equal(receivedToken, "signed-access-token");
+  assert.equal(claims.sub, "user-1");
+  assert.equal(extractBearerToken("Bearer signed-access-token"), "signed-access-token");
+  assert.equal(extractBearerToken("Basic credentials"), "");
 });
 
 test("middleware keeps partner landing public while protecting partner records", async () => {
   const { readFile } = await import("node:fs/promises");
   const middleware = await readFile(new URL("../src/middleware.ts", import.meta.url), "utf8");
+  const runtimeSmoke = await readFile(new URL("../scripts/runtime-smoke.mjs", import.meta.url), "utf8");
+  const sessionRoute = await readFile(new URL("../src/app/auth/session/route.ts", import.meta.url), "utf8");
   assert.match(middleware, /"\/agency"/);
   assert.match(middleware, /REFRESH_TOKEN_COOKIE/);
   assert.match(middleware, /refreshSupabaseSession/);
+  assert.match(runtimeSmoke, /isProtectedSurfacePath/);
+  assert.doesNotMatch(runtimeSmoke, /cookie:\s*"jht_access_token=runtime-smoke-token"/);
+  assert.match(sessionRoute, /isVerifiedAccessToken\(payload\.accessToken, requestUrl\)/);
+  assert.match(sessionRoute, /getVerifiedAccessTokenClaims\(supabase\.auth, accessToken\)/);
 });
 
 test("logout cannot be triggered by Next.js link prefetch", async () => {
@@ -42,6 +80,10 @@ test("logout cannot be triggered by Next.js link prefetch", async () => {
 });
 
 function jwtWithExpiry(exp) {
-  const payload = Buffer.from(JSON.stringify({ exp })).toString("base64url");
+  return jwtWithClaims({ exp });
+}
+
+function jwtWithClaims(claims) {
+  const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
   return `header.${payload}.signature`;
 }
