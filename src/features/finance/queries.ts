@@ -20,33 +20,7 @@ import {
 
 type SupabaseClientLike = {
   from: (table: string) => any;
-  rpc?: (name: string, args?: Record<string, unknown>) => any;
 };
-
-export type AdminFinanceKpis = {
-  settlementDoneCount: number;
-  receivableCount: number;
-  receivableAmount: number;
-};
-
-export async function getAdminFinanceKpis(
-  supabase: SupabaseClientLike,
-  filters: { country?: string; agencyAccountId?: string; from?: string; to?: string }
-): Promise<AdminFinanceKpis> {
-  if (!supabase.rpc) throw new Error("Supabase RPC client is required");
-  const { data, error } = await supabase.rpc("get_admin_finance_kpis", {
-    p_country: filters.country ?? null,
-    p_agency_account_id: filters.agencyAccountId ?? null,
-    p_from: filters.from ?? null,
-    p_to: filters.to ?? null
-  });
-  if (error) throw new Error(error.message);
-  return {
-    settlementDoneCount: Number(data?.settlementDoneCount ?? 0),
-    receivableCount: Number(data?.receivableCount ?? 0),
-    receivableAmount: Number(data?.receivableAmount ?? 0)
-  };
-}
 
 const invoiceListColumns =
   "id, reservation_id, invoice_no, tour_code, version_no, status, currency, total_amount, issued_at, due_date, payment_deadline, collection_timing, collection_status, deposit_required, deposit_amount, storage_path, created_at, reservations(reservation_code, quote_cases(tour_name), agency_accounts(name), expenses(id), settlements(status, final_profit_amount)), payments(id, status, amount)";

@@ -13,16 +13,15 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 
 const readinessMigration = read("supabase/migrations/202607150002_reservation_readiness_dashboard.sql");
 const requestSecurityMigration = read("supabase/migrations/202607180001_partner_request_payment_security.sql");
-const financeKpiMigration = read("supabase/migrations/202607180002_admin_finance_kpis.sql");
 const supplierSafetyMigration = read("supabase/migrations/202607180003_supplier_message_delivery_safety.sql");
 const revisionLifecycleMigration = read("supabase/migrations/202607180004_quote_revision_lifecycle.sql");
 const dashboardAnalyticsMigration = read("supabase/migrations/202607180005_admin_dashboard_analytics.sql");
+const legacyFinanceKpiCleanupMigration = read("supabase/migrations/202607190001_remove_legacy_admin_finance_kpis.sql");
 const bookingRoute = read("src/app/api/agency/quote-cases/[id]/booking-request/route.ts");
 const revisionRoute = read("src/app/api/agency/quote-cases/[id]/revision-request/route.ts");
 const httpHelpers = read("src/lib/api/http.ts");
 const paymentRoute = read("src/app/api/finance/invoices/[id]/payments/route.ts");
 const dashboardPage = read("src/app/admin/page.tsx");
-const financeQueries = read("src/features/finance/queries.ts");
 const supplierWorker = read("src/app/api/automation/supplier-messages/run/route.ts");
 const supplierRequeueRoute = read("src/app/api/supplier-messages/[id]/requeue/route.ts");
 
@@ -161,13 +160,6 @@ test("safeFetch converts HTML gateway failures and malformed JSON into parseable
   }
 });
 
-test("finance KPI RPC aggregates the full dataset without a page limit", () => {
-  assert.match(financeKpiMigration, /create or replace function get_admin_finance_kpis/i);
-  assert.match(financeKpiMigration, /from public\.invoices|from invoices/i);
-  assert.doesNotMatch(financeKpiMigration, /limit\s+100/i);
-  assert.match(financeQueries, /\.rpc\("get_admin_finance_kpis"/);
-});
-
 test("every admin dashboard KPI and breakdown is sourced from the unpaged analytics RPC", () => {
   assert.match(dashboardAnalyticsMigration, /create or replace function public\.get_admin_dashboard_analytics/i);
   assert.match(dashboardAnalyticsMigration, /country_grouped/i);
@@ -178,6 +170,11 @@ test("every admin dashboard KPI and breakdown is sourced from the unpaged analyt
   assert.match(dashboardPage, /getAdminDashboardAnalytics/);
   assert.doesNotMatch(dashboardPage, /pageSize:\s*100/);
   assert.doesNotMatch(dashboardPage, /listQuoteCasePage|listReservationPage|listInvoicePage|listSettlements/);
+  assert.match(
+    legacyFinanceKpiCleanupMigration,
+    /drop function if exists public\.get_admin_finance_kpis\(text, uuid, date, date\)/i
+  );
+  assert.doesNotMatch(read("src/features/finance/queries.ts"), /get_admin_finance_kpis|getAdminFinanceKpis/);
 });
 
 test("supplier delivery logging cannot reverse a finalized message or permit unsafe requeue", () => {

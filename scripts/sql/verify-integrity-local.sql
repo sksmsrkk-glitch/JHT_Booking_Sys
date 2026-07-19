@@ -381,23 +381,13 @@ select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000002001
 
 do $$
 declare
-  kpis jsonb;
   analytics jsonb;
   partner_row jsonb;
   country_row jsonb;
   reservation_status_row jsonb;
 begin
-  kpis := public.get_admin_finance_kpis(
-    null,
-    '00000000-0000-4000-8000-000000003001',
-    date '2035-01-01',
-    date '2035-01-31'
-  );
-  if (kpis ->> 'receivableCount')::integer <> 101 then
-    raise exception 'Expected 101 receivable groups, got %', kpis ->> 'receivableCount';
-  end if;
-  if (kpis ->> 'receivableAmount')::numeric <> 10100 then
-    raise exception 'Expected receivable amount 10100, got %', kpis ->> 'receivableAmount';
+  if to_regprocedure('public.get_admin_finance_kpis(text,uuid,date,date)') is not null then
+    raise exception 'Legacy get_admin_finance_kpis RPC still exists';
   end if;
 
   analytics := public.get_admin_dashboard_analytics(
@@ -417,6 +407,9 @@ begin
   end if;
   if (analytics #>> '{metrics,receivableCount}')::integer <> 101 then
     raise exception 'Dashboard receivable KPI was truncated: %', analytics #>> '{metrics,receivableCount}';
+  end if;
+  if (analytics #>> '{metrics,receivableAmount}')::numeric <> 10100 then
+    raise exception 'Dashboard receivable amount was truncated: %', analytics #>> '{metrics,receivableAmount}';
   end if;
 
   select row into partner_row
