@@ -123,6 +123,19 @@ test("core navigation avoids server self-fetches and full document reloads", asy
   for (const source of componentFiles) assert.doesNotMatch(source, /window\.location\.reload\(\)/);
 });
 
+test("reservation creation marks partner booking requests as reserved", async () => {
+  const reservationsRoute = await readSource("src/app/api/reservations/route.ts");
+  const quoteDetailPage = await readSource("src/app/admin/quote-cases/[quoteCaseId]/page.tsx");
+
+  // 예약 생성/기존 예약 경로 모두에서 booking request를 reserved로 정리해야 합니다.
+  assert.match(reservationsRoute, /markBookingRequestsReserved/);
+  assert.match(reservationsRoute, /inquiry_type/);
+  assert.match(reservationsRoute, /status: "reserved"/);
+  // 견적 상세는 미처리 booking request를 전환 지점에 노출해야 합니다.
+  assert.match(quoteDetailPage, /pendingBookingRequest/);
+  assert.match(quoteDetailPage, /booking_request/);
+});
+
 test("locale date inputs render as text without post-hydration DOM mutation", async () => {
   const localeInput = await readSource("src/components/LocaleDateInput.tsx");
   const enforcer = await readSource("src/components/CalendarLocaleEnforcer.tsx");

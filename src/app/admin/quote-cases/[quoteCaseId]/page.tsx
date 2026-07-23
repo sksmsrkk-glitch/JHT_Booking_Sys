@@ -67,6 +67,12 @@ export default async function AdminQuoteCaseDetailPage({ params }: { params: Pag
   const latestVersion = quoteCase.versions[0] ?? null;
   const editableVersion = quoteCase.versions.find((version) => version.status === "draft") ?? null;
   const acceptedVersion = quoteCase.versions.find((version) => version.status === "accepted") ?? null;
+  // 아직 예약으로 전환되지 않은 파트너 booking request. 예약을 만들면 서버가 'reserved'로
+  // 표시하므로 여기서 자동으로 사라집니다.
+  const pendingBookingRequest =
+    quoteCase.requestTimeline.find(
+      (request) => request.inquiryType === "booking_request" && ["new", "in_review"].includes(request.status)
+    ) ?? null;
 
   return (
     <>
@@ -148,6 +154,15 @@ export default async function AdminQuoteCaseDetailPage({ params }: { params: Pag
         <div>
           <h2>Reservation Conversion</h2>
           <p>Convert the accepted quote version into an internal reservation request for operations follow-up.</p>
+          {pendingBookingRequest ? (
+            <p className="warning-text">
+              Partner submitted a booking request on {formatDateTime(pendingBookingRequest.createdAt)}
+              {typeof pendingBookingRequest.requestPayload?.message === "string"
+                ? `: "${pendingBookingRequest.requestPayload.message}"`
+                : ""}
+              . Convert it to a reservation below.
+            </p>
+          ) : null}
         </div>
         <ReservationCreateFromQuoteAction
           acceptedQuoteVersionId={acceptedVersion?.id ?? null}

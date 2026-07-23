@@ -64,6 +64,8 @@ export async function POST(request: Request) {
 
     if (existingError) throw new HttpError(500, existingError.message);
     if (existingReservation) {
+      // 예약이 이미 있으면 남아 있는 booking request도 처리됨으로 정리해 스레드에 'new'로 남지 않게 합니다.
+      await markBookingRequestsReserved(supabase, quoteCase.id);
       return ok({ reservation: existingReservation, existing: true });
     }
 
@@ -99,6 +101,10 @@ export async function POST(request: Request) {
       .eq("workflow_code", quoteCase.case_code);
     if (workflowLinkError) throw new HttpError(500, workflowLinkError.message);
 
+    // 파트너 booking request를 예약으로 전환했으니 처리됨(reserved)으로 표시합니다.
+    // 그래야 요청 스레드에 'new'로 계속 쌓이지 않고, 파트너 화면에도 예약 전환이 보입니다.
+    await markBookingRequestsReserved(supabase, quoteCase.id);
+
     await writeAuditLog(supabase, {
       actorProfileId: internalUser.profileId,
       action: "reservation.created_from_quote",
@@ -111,6 +117,16 @@ export async function POST(request: Request) {
   } catch (error) {
     return fail(error);
   }
+}
+
+async function markBookingRequestsReserved(supabase: any, quoteCaseId: string) {
+  const { error } = await supabase
+    .from("agency_inquiries")
+    .update({ status: "reserved" })
+    .eq("related_quote_case_id", quoteCaseId)
+    .eq("inquiry_type", "booking_request")
+    .in("status", ["new", "in_review"]);
+  if (error) throw new HttpError(500, error.message);
 }
 
 async function resolveAcceptedVersion(supabase: any, quoteCaseId: string, rawQuoteVersionId: unknown) {
