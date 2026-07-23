@@ -4,6 +4,7 @@
  */
 "use client";
 
+import { LocaleDateInput } from "@/components/LocaleDateInput";
 import { safeFetch } from "@/lib/client/safe-fetch";
 
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
@@ -78,11 +79,11 @@ export function RoomAssignmentCreateForm({
         </label>
         <label>
           Check In
-          <input disabled={isBusy || Boolean(disabledReason)} name="checkIn" type="date" />
+          <LocaleDateInput disabled={isBusy || Boolean(disabledReason)} name="checkIn" />
         </label>
         <label>
           Check Out
-          <input disabled={isBusy || Boolean(disabledReason)} name="checkOut" type="date" />
+          <LocaleDateInput disabled={isBusy || Boolean(disabledReason)} name="checkOut" />
         </label>
       </div>
 

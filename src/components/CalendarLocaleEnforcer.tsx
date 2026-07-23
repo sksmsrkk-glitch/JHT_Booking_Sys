@@ -6,10 +6,10 @@
 
 import { useEffect } from "react";
 
-const englishCalendarLocale = "en-US";
-const dateInputSelector = 'input[type="date"], input[data-jht-original-type="date"]';
-const monthInputSelector = 'input[type="month"], input[data-jht-original-type="month"]';
-const localeOnlySelector = ['input[type="datetime-local"]', 'input[type="week"]', 'input[type="time"]'].join(",");
+// LocaleDateInput이 서버·클라이언트 동일하게 렌더한 text 입력을 data 마커로 찾습니다.
+// 예전처럼 input[type="date"]를 런타임에 type="text"로 바꾸지 않으므로 하이드레이션 불일치가 없습니다.
+const dateInputSelector = 'input[data-jht-calendar="date"]';
+const monthInputSelector = 'input[data-jht-calendar="month"]';
 const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -93,22 +93,17 @@ export function CalendarLocaleEnforcer() {
     const enhanceRoot = (root: ParentNode | Element) => {
       const dateInputs = collectInputs(root, dateInputSelector);
       const monthInputs = collectInputs(root, monthInputSelector);
-      const localeOnlyInputs = collectInputs(root, localeOnlySelector);
 
       for (const input of dateInputs) enhancePickerInput(input, "date", openPicker);
       for (const input of monthInputs) enhancePickerInput(input, "month", openPicker);
-      for (const input of localeOnlyInputs) applyLocaleOnly(input);
     };
 
     enhanceRoot(document);
 
+    // data 마커는 렌더 시점에 이미 존재하므로 attribute 감시는 필요 없고,
+    // 조건부로 새로 나타나는 폼 입력을 잡기 위해 childList/subtree만 관찰합니다.
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
-        if (mutation.type === "attributes" && mutation.target instanceof Element) {
-          enhanceRoot(mutation.target);
-          continue;
-        }
-
         for (const node of mutation.addedNodes) {
           if (node instanceof Element) enhanceRoot(node);
         }
@@ -116,8 +111,6 @@ export function CalendarLocaleEnforcer() {
     });
 
     observer.observe(document.body, {
-      attributes: true,
-      attributeFilter: ["type"],
       childList: true,
       subtree: true
     });
@@ -170,42 +163,23 @@ function collectInputs(root: ParentNode | Element, selector: string) {
   return inputs;
 }
 
+// 바인딩 여부를 DOM 데이터 속성이 아니라 메모리 WeakSet으로 추적합니다.
+// React가 소유한 input의 속성을 하이드레이션 이후에 바꾸면 불일치 경고가 나므로,
+// 이 컴포넌트는 input의 어떤 속성도 변경하지 않고 이벤트 리스너만 부착합니다.
+const boundInputs = new WeakSet<HTMLInputElement>();
+
 function enhancePickerInput(
   input: HTMLInputElement,
   mode: PickerMode,
   openPicker: (input: HTMLInputElement, mode: PickerMode) => void
 ) {
-  if (input.dataset.jhtCalendarEnhanced === mode && input.type === "text") {
-    applyEnglishCalendarAttributes(input, mode);
-    return;
-  }
-
-  input.dataset.jhtOriginalType = mode;
-  input.type = "text";
-  input.autocomplete = "off";
-  input.inputMode = "numeric";
-  input.placeholder = mode === "month" ? "YYYY-MM" : "YYYY-MM-DD";
-  input.classList.add("jht-english-calendar-input");
-  input.dataset.jhtCalendarEnhanced = mode;
-  applyEnglishCalendarAttributes(input, mode);
+  // 입력은 LocaleDateInput이 text + lang="en-US" + data 마커까지 서버·클라이언트 동일하게 렌더합니다.
+  // 여기서는 속성을 건드리지 않고 리스너만 한 번 부착합니다.
+  if (boundInputs.has(input)) return;
+  boundInputs.add(input);
 
   input.addEventListener("focus", () => openPicker(input, mode));
   input.addEventListener("click", () => openPicker(input, mode));
-}
-
-function applyLocaleOnly(input: HTMLInputElement) {
-  input.lang = englishCalendarLocale;
-  input.setAttribute("lang", englishCalendarLocale);
-  input.setAttribute("data-calendar-locale", englishCalendarLocale);
-}
-
-function applyEnglishCalendarAttributes(input: HTMLInputElement, mode: PickerMode) {
-  input.lang = englishCalendarLocale;
-  input.setAttribute("lang", englishCalendarLocale);
-  input.setAttribute("data-calendar-locale", englishCalendarLocale);
-  if (!input.hasAttribute("aria-label") && !input.closest("label") && !input.hasAttribute("aria-labelledby")) {
-    input.setAttribute("aria-label", mode === "month" ? "Month" : "Date");
-  }
 }
 
 function renderDatePicker(

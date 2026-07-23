@@ -4,6 +4,7 @@
  */
 "use client";
 
+import { LocaleDateInput } from "@/components/LocaleDateInput";
 import { safeFetch } from "@/lib/client/safe-fetch";
 
 import { useRouter } from "next/navigation";
@@ -163,9 +164,8 @@ export function FinalOperationSnapshotForm({
                   />
                 </td>
                 <td>
-                  <input
+                  <LocaleDateInput
                     aria-label="Date"
-                    type="date"
                     value={day.date}
                     onChange={(event) => updateDay(index, { date: event.target.value })}
                   />
@@ -288,7 +288,7 @@ export function FinalOperationSnapshotForm({
                   <input value={flight.flightNo} onChange={(event) => updateFlight(index, { flightNo: event.target.value })} />
                 </td>
                 <td>
-                  <input type="date" value={flight.date} onChange={(event) => updateFlight(index, { date: event.target.value })} />
+                  <LocaleDateInput value={flight.date} onChange={(event) => updateFlight(index, { date: event.target.value })} />
                 </td>
                 <td>
                   <input type="time" value={flight.time} onChange={(event) => updateFlight(index, { time: event.target.value })} />

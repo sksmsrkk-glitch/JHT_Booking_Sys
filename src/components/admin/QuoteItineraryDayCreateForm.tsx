@@ -4,6 +4,7 @@
  */
 "use client";
 
+import { LocaleDateInput } from "@/components/LocaleDateInput";
 import { safeFetch } from "@/lib/client/safe-fetch";
 
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
@@ -72,7 +73,7 @@ export function QuoteItineraryDayCreateForm({
         </label>
         <label>
           Service Date
-          <input disabled={!quoteVersionId || isBusy} name="serviceDate" type="date" />
+          <LocaleDateInput disabled={!quoteVersionId || isBusy} name="serviceDate" />
         </label>
         <label>
           Title

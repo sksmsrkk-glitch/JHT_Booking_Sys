@@ -2,6 +2,7 @@
  * @file 한글 책임: Next.js App Router의 `/admin/confirmations` 화면 또는 라우트 레이아웃을 구성합니다.
  * JHT 내부 운영자에게 허용된 데이터만 준비하고, 로딩·오류·탐색 상태가 서버 렌더링과 클라이언트 상호작용에서 일관되게 이어지도록 합니다.
  */
+import { LocaleDateInput } from "@/components/LocaleDateInput";
 import type { Route } from "next";
 import Link from "next/link";
 import { demoReservations } from "@/features/reservation/demo-data";
@@ -116,11 +117,11 @@ function ConfirmationFilterPanel({
         </label>
         <label>
           From
-          <input type="date" name="from" defaultValue={filters.from} />
+          <LocaleDateInput name="from" defaultValue={filters.from} />
         </label>
         <label>
           To
-          <input type="date" name="to" defaultValue={filters.to} />
+          <LocaleDateInput name="to" defaultValue={filters.to} />
         </label>
         <label>
           Country

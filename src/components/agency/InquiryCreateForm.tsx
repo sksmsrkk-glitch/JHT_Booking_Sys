@@ -4,6 +4,7 @@
  */
 "use client";
 
+import { LocaleDateInput } from "@/components/LocaleDateInput";
 import { safeFetch } from "@/lib/client/safe-fetch";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
@@ -192,11 +193,11 @@ export function InquiryCreateForm() {
         </label>
         <label>
           Arrival Date
-          <input name="arrivalDate" type="date" />
+          <LocaleDateInput name="arrivalDate" />
         </label>
         <label>
           Departure Date
-          <input name="departureDate" type="date" />
+          <LocaleDateInput name="departureDate" />
         </label>
         <label>
           Preferred Language

@@ -4,6 +4,7 @@
  */
 "use client";
 
+import { LocaleDateInput } from "@/components/LocaleDateInput";
 import { safeFetch } from "@/lib/client/safe-fetch";
 
 import { useMemo, useState } from "react";
@@ -220,11 +221,11 @@ export function GuideExpenseReportForm({
         </label>
         <label>
           Start
-          <input type="date" value={report.tourStartDate} onChange={(event) => updateReport("tourStartDate", event.target.value)} />
+          <LocaleDateInput value={report.tourStartDate} onChange={(event) => updateReport("tourStartDate", event.target.value)} />
         </label>
         <label>
           End
-          <input type="date" value={report.tourEndDate} onChange={(event) => updateReport("tourEndDate", event.target.value)} />
+          <LocaleDateInput value={report.tourEndDate} onChange={(event) => updateReport("tourEndDate", event.target.value)} />
         </label>
         <label>
           Currency
@@ -277,7 +278,7 @@ export function GuideExpenseReportForm({
                   .filter(({ line }) => line.section === section)
                   .map(({ line, index }) => (
                     <tr key={`${section}-${index}`}>
-                      <td><input type="date" value={line.expenseDate} onChange={(event) => updateLine(index, "expenseDate", event.target.value)} /></td>
+                      <td><LocaleDateInput value={line.expenseDate} onChange={(event) => updateLine(index, "expenseDate", event.target.value)} /></td>
                       <td><input type="number" value={line.dayNo} onChange={(event) => updateLine(index, "dayNo", event.target.value)} /></td>
                       <td><input value={line.vendorName} onChange={(event) => updateLine(index, "vendorName", event.target.value)} /></td>
                       <td><input value={line.description} onChange={(event) => updateLine(index, "description", event.target.value)} /></td>

@@ -4,6 +4,7 @@
  */
 "use client";
 
+import { LocaleDateInput } from "@/components/LocaleDateInput";
 import { safeFetch } from "@/lib/client/safe-fetch";
 
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
@@ -119,7 +120,7 @@ export function ExchangeRateCreateForm({ countries = [] }: { countries?: Country
         </label>
         <label>
           적용일
-          <input defaultValue={new Date().toISOString().slice(0, 10)} disabled={isBusy} name="effectiveDate" type="date" />
+          <LocaleDateInput defaultValue={new Date().toISOString().slice(0, 10)} disabled={isBusy} name="effectiveDate" />
         </label>
         <label className="exchange-rate-source-field">
           출처

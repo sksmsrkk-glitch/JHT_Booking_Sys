@@ -4,6 +4,7 @@
  */
 "use client";
 
+import { LocaleDateInput } from "@/components/LocaleDateInput";
 import { safeFetch } from "@/lib/client/safe-fetch";
 
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
@@ -686,18 +687,16 @@ export function QuoteCaseCreateForm({
         </label>
         <label>
           Start Date
-          <input
+          <LocaleDateInput
             name="startDate"
-            type="date"
             value={caseFields.startDate}
             onChange={(event) => updateCaseField("startDate", event.target.value)}
           />
         </label>
         <label>
           End Date
-          <input
+          <LocaleDateInput
             name="endDate"
-            type="date"
             value={caseFields.endDate}
             onChange={(event) => updateCaseField("endDate", event.target.value)}
           />
@@ -815,9 +814,8 @@ export function QuoteCaseCreateForm({
                     />
                   </td>
                   <td>
-                    <input
+                    <LocaleDateInput
                       aria-label="FX effective date"
-                      type="date"
                       value={row.effectiveDate}
                       onChange={(event) => updateExchangeRateRow(row.id, { effectiveDate: event.target.value })}
                     />
@@ -1285,9 +1283,8 @@ export function QuoteCaseCreateForm({
                     />
                   </td>
                   <td>
-                    <input
+                    <LocaleDateInput
                       aria-label="Itinerary service date"
-                      type="date"
                       value={row.serviceDate}
                       onChange={(event) => updateItineraryRow(row.id, { serviceDate: event.target.value })}
                     />

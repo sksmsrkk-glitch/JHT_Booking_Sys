@@ -4,6 +4,7 @@
  */
 "use client";
 
+import { LocaleDateInput } from "@/components/LocaleDateInput";
 import { safeFetch } from "@/lib/client/safe-fetch";
 
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
@@ -199,11 +200,11 @@ export function CostMasterQuickCreateForm({
         </label>
         <label>
           Valid From
-          <input disabled={isBusy} name="validFrom" type="date" />
+          <LocaleDateInput disabled={isBusy} name="validFrom" />
         </label>
         <label>
           Valid To
-          <input disabled={isBusy} name="validTo" type="date" />
+          <LocaleDateInput disabled={isBusy} name="validTo" />
         </label>
         <label>
           Pax Range

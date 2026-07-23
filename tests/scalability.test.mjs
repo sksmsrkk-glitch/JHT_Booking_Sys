@@ -123,6 +123,32 @@ test("core navigation avoids server self-fetches and full document reloads", asy
   for (const source of componentFiles) assert.doesNotMatch(source, /window\.location\.reload\(\)/);
 });
 
+test("locale date inputs render as text without post-hydration DOM mutation", async () => {
+  const localeInput = await readSource("src/components/LocaleDateInput.tsx");
+  const enforcer = await readSource("src/components/CalendarLocaleEnforcer.tsx");
+
+  // 컴포넌트가 서버·클라이언트 동일하게 text + data 마커로 렌더해야 합니다.
+  assert.match(localeInput, /type="text"/);
+  assert.match(localeInput, /data-jht-calendar=\{mode\}/);
+
+  // Enforcer는 input의 type이나 data 속성을 런타임에 바꾸면 안 됩니다(하이드레이션 불일치 원인).
+  assert.doesNotMatch(enforcer, /input\.type\s*=\s*"text"/);
+  assert.doesNotMatch(enforcer, /setAttribute\("data-calendar-locale"/);
+  assert.doesNotMatch(enforcer, /dataset\.jhtCalendarBound/);
+  assert.match(enforcer, /new WeakSet<HTMLInputElement>/);
+
+  // 원시 type="date"/type="month" 입력이 남아 있으면 다시 하이드레이션 불일치가 생깁니다.
+  for (const file of [
+    "src/app/admin/page.tsx",
+    "src/components/admin/QuoteCaseCreateForm.tsx",
+    "src/components/agency/InquiryCreateForm.tsx"
+  ]) {
+    const source = await readSource(file);
+    assert.doesNotMatch(source, /type="date"/, `${file} still uses a raw native date input`);
+    assert.doesNotMatch(source, /type="month"/, `${file} still uses a raw native month input`);
+  }
+});
+
 test("deployment and authentication fast paths stay near the database", async () => {
   const vercelConfig = JSON.parse(await readSource("vercel.json"));
   const authSource = await readSource("src/lib/api/auth.ts");
