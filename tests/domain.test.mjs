@@ -22,7 +22,7 @@ import {
   buildSupplierMessageDraft
 } from "../src/lib/domain/supplier-messages.mjs";
 import { scoreGmailMatch } from "../src/lib/domain/gmail-match.mjs";
-import { normalizeRoomingPassengerRows, parseRoomingListText } from "../src/lib/domain/rooming-list.mjs";
+import { normalizeBirthDate, normalizeRoomingPassengerRows, parseRoomingListText } from "../src/lib/domain/rooming-list.mjs";
 import {
   assertFinanceAdjustmentAllowed,
   assertFinanceEntryAllowed,
@@ -483,6 +483,28 @@ test("rooming list upload normalization fills passenger numbers and requires nam
   assert.equal(result.rows[1].passengerNo, "2");
   assert.deepEqual(result.rows[1].metadata, { roomType: "Twin" });
   assert.match(result.errors.join("\n"), /passengers\[2\]\.fullName is required/);
+});
+
+test("passenger birth date normalization is day-first for overseas partners", () => {
+  // 둘 다 12 이하로 모호하면 DD/MM(day-first)로 해석합니다: 1/2/1990 = 2월 1일.
+  assert.equal(normalizeBirthDate("1/2/1990"), "1990-02-01");
+  // 한 부분이 12를 넘으면 그 값을 '일'로 확정합니다.
+  assert.equal(normalizeBirthDate("25/12/1990"), "1990-12-25");
+  assert.equal(normalizeBirthDate("12/25/1990"), "1990-12-25");
+  // 하이픈 구분자도 동일 규칙.
+  assert.equal(normalizeBirthDate("07-08-1985"), "1985-08-07");
+  // 이미 ISO면 그대로 둡니다.
+  assert.equal(normalizeBirthDate("1990-02-01"), "1990-02-01");
+  // 범위를 벗어나거나 알 수 없는 형식은 원본을 보존해 상위 검증에 맡깁니다.
+  assert.equal(normalizeBirthDate("32/1/1990"), "32/1/1990");
+  assert.equal(normalizeBirthDate(""), "");
+});
+
+test("rooming list JSON upload normalizes ambiguous birth dates to ISO day-first", () => {
+  const result = normalizeRoomingPassengerRows([
+    { passengerNo: "1", fullName: "Tan Ah Kow", dateOfBirth: "1/2/1990" }
+  ]);
+  assert.equal(result.rows[0].dateOfBirth, "1990-02-01");
 });
 
 test("invoice payment summary counts confirmed payments toward balance only", () => {

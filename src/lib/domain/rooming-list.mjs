@@ -54,7 +54,7 @@ export function parseRoomingListText(text, options = {}) {
       const field = headers[columnIndex];
       const value = cell.trim();
       if (field && value) {
-        passenger[field] = field === "dateOfBirth" ? normalizeDate(value) : value;
+        passenger[field] = field === "dateOfBirth" ? normalizeBirthDate(value) : value;
       }
     });
 
@@ -95,7 +95,7 @@ export function normalizeRoomingPassengerRows(passengers = []) {
       passengerNo,
       fullName,
       gender: normalizeOptionalText(passenger?.gender),
-      dateOfBirth: normalizeOptionalText(passenger?.dateOfBirth),
+      dateOfBirth: normalizeBirthDateOrNull(normalizeOptionalText(passenger?.dateOfBirth)),
       dietaryRequirements: normalizeOptionalText(passenger?.dietaryRequirements),
       passportNo: normalizeOptionalText(passenger?.passportNo),
       coachLabel: normalizeOptionalText(passenger?.coachLabel),
@@ -179,13 +179,55 @@ function normalizeHeader(value) {
   return HEADER_ALIASES.get(key) ?? null;
 }
 
-function normalizeDate(value) {
+/*
+ * 승객 생년월일을 ISO(YYYY-MM-DD)로 정규화합니다.
+ *
+ * 이 시스템의 파트너는 대부분 DD/MM 표기 문화권(말레이시아 등)입니다. 예전에는
+ * 슬래시 날짜를 미국식 MM/DD로 강제 해석해서 "1/2/1990"(2월 1일)이 1월 2일로
+ * 뒤바뀌어 저장됐고, 여권 대조·항공 발권에서 생년월일 불일치를 유발했습니다.
+ *
+ * 규칙:
+ *  - 이미 ISO(YYYY-MM-DD)면 그대로 둡니다.
+ *  - 슬래시/하이픈 + 4자리 연도면 한 부분이 12를 넘으면 그 값을 '일'로 확정합니다.
+ *  - 둘 다 12 이하로 모호하면 파트너 표기에 맞춰 day-first(DD/MM)로 해석합니다.
+ *  - 월/일 범위를 벗어나면 원본을 그대로 반환해 상위 검증/DB가 거르도록 둡니다.
+ */
+function normalizeBirthDateOrNull(value) {
+  if (value === null || value === undefined) return null;
+  const normalized = normalizeBirthDate(value);
+  return normalized === "" ? null : normalized;
+}
+
+export function normalizeBirthDate(value) {
   const trimmed = String(value ?? "").trim();
-  const slashMatch = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(trimmed);
-  if (slashMatch) {
-    return `${slashMatch[3]}-${slashMatch[1].padStart(2, "0")}-${slashMatch[2].padStart(2, "0")}`;
+  if (!trimmed) return trimmed;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+
+  const parts = /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/.exec(trimmed);
+  if (!parts) return trimmed;
+
+  const first = Number(parts[1]);
+  const second = Number(parts[2]);
+  const year = parts[3];
+
+  let day;
+  let month;
+  if (first > 12 && second <= 12) {
+    day = first;
+    month = second;
+  } else if (second > 12 && first <= 12) {
+    month = first;
+    day = second;
+  } else {
+    // 둘 다 모호: 파트너 표기(DD/MM) 우선.
+    day = first;
+    month = second;
   }
-  return trimmed;
+
+  if (month < 1 || month > 12 || day < 1 || day > 31) return trimmed;
+
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
 function countUnquoted(line, delimiter) {
