@@ -6,6 +6,7 @@ import { buildInvoiceFromFinalQuote } from "@/features/finance/auto-invoice";
 import { requireInternalUser } from "@/lib/api/auth";
 import { writeAuditLog } from "@/lib/api/audit";
 import { created, fail, HttpError, ok, readJson } from "@/lib/api/http";
+import { findFinalSnapshotIssueBlocker } from "@/lib/domain/final-operation-snapshot.mjs";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -60,6 +61,13 @@ export async function POST(request: Request, context: RouteContext) {
       created_by: internalUser.profileId,
       updated_by: internalUser.profileId
     };
+
+    // 인보이스 발행 요청이면 프론트 검증과 별개로 서버에서도 플레이스홀더/빈 값을 거부합니다.
+    // (프로젝트 규칙: 인보이스 발행 같은 고위험 로직은 프론트 검증만 신뢰하지 않습니다)
+    if (status === "finalized" && body.issueInvoice === true) {
+      const blocker = findFinalSnapshotIssueBlocker(snapshotInput);
+      if (blocker) throw new HttpError(422, blocker);
+    }
 
     const { data: snapshot, error: snapshotError } = await supabase
       .from("reservation_final_operation_snapshots")

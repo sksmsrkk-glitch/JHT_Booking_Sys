@@ -34,6 +34,7 @@ import {
   summarizeGuideExpenseReport
 } from "../src/lib/domain/guide-expenses.mjs";
 import { buildInvoiceFromFinalQuote } from "../src/features/finance/auto-invoice.ts";
+import { findFinalSnapshotIssueBlocker } from "../src/lib/domain/final-operation-snapshot.mjs";
 import {
   READINESS_SMOKE_TABLES,
   buildReadinessReport,
@@ -505,6 +506,46 @@ test("rooming list JSON upload normalizes ambiguous birth dates to ISO day-first
     { passengerNo: "1", fullName: "Tan Ah Kow", dateOfBirth: "1/2/1990" }
   ]);
   assert.equal(result.rows[0].dateOfBirth, "1990-02-01");
+});
+
+test("final snapshot invoice issuance rejects placeholders and empty required fields", () => {
+  const goodBank = { payableTo: "JUNGHOTRAVEL CO., LTD.", bankName: "Woori Bank", accountNo: "1002-123-456789" };
+
+  // 실제 값이 채워지면 통과합니다.
+  assert.equal(
+    findFinalSnapshotIssueBlocker({
+      day_snapshots: [{ day: 1, date: "2026-09-10", hotel: "Lotte Hotel Seoul" }],
+      bank_account_snapshot: goodBank
+    }),
+    null
+  );
+
+  // 확정된 날짜/호텔이 하나도 없으면 거부합니다.
+  assert.match(
+    findFinalSnapshotIssueBlocker({ day_snapshots: [], bank_account_snapshot: goodBank }) ?? "",
+    /confirmed date and hotel/i
+  );
+
+  // 유효한 날이 있어도, 다른 날에 플레이스홀더 호텔명이 남아 있으면 거부합니다.
+  assert.match(
+    findFinalSnapshotIssueBlocker({
+      day_snapshots: [
+        { day: 1, date: "2026-09-10", hotel: "Lotte Hotel Seoul" },
+        { day: 2, date: "2026-09-11", hotel: "Confirmed hotel name" }
+      ],
+      bank_account_snapshot: goodBank
+    }) ?? "",
+    /placeholder hotel/i
+  );
+
+  // 계좌번호가 TBA/빈 값이면 거부합니다.
+  assert.match(
+    findFinalSnapshotIssueBlocker({
+      day_snapshots: [{ day: 1, date: "2026-09-10", hotel: "Lotte Hotel Seoul" }],
+      bank_account_snapshot: { payableTo: "JHT", bankName: "Woori", accountNo: "TBA" }
+    }) ?? "",
+    /account number/i
+  );
 });
 
 test("invoice payment summary counts confirmed payments toward balance only", () => {

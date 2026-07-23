@@ -51,16 +51,31 @@ export function FinalOperationSnapshotForm({
   previewMode?: boolean;
 }) {
   const router = useRouter();
-  const [days, setDays] = useState<DayRow[]>(defaultDays);
-  const [flights, setFlights] = useState<FlightRow[]>(defaultFlights);
-  const [bank, setBank] = useState(defaultBank);
+  // 데모(previewMode)에서만 샘플 값을 채우고, 실제 운영에서는 빈 값으로 시작합니다.
+  // 예전에는 "Confirmed hotel name"·"TBA"·샘플 날짜가 기본값이라, 미편집 상태로
+  // Finalize를 누르면 플레이스홀더가 그대로 인보이스로 발행될 위험이 있었습니다.
+  const [days, setDays] = useState<DayRow[]>(() => (previewMode ? defaultDays : emptyDays));
+  const [flights, setFlights] = useState<FlightRow[]>(() => (previewMode ? defaultFlights : emptyFlights));
+  const [bank, setBank] = useState(() => (previewMode ? defaultBank : emptyBank));
   const [operatorNotes, setOperatorNotes] = useState("");
   const [message, setMessage] = useState("");
+  const [messageIsError, setMessageIsError] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
 
   async function submit(status: "draft" | "finalized", issueInvoice: boolean) {
+    // 인보이스 발행(finalize)은 되돌리기 어려우므로, 확정 전에 필수 값과 플레이스홀더를 검증합니다.
+    if (status === "finalized") {
+      const validationError = findFinalizeBlocker(days, flights, bank);
+      if (validationError) {
+        setMessage(validationError);
+        setMessageIsError(true);
+        return;
+      }
+    }
+
     setIsBusy(true);
     setMessage("");
+    setMessageIsError(false);
 
     // 표 형태 입력값을 DB에 저장할 JSON 스냅샷으로 변환합니다.
     // 예전 JSON textarea를 업무자가 직접 수정하던 방식보다 실수를 줄이기 위한 구조입니다.
@@ -121,6 +136,7 @@ export function FinalOperationSnapshotForm({
 
     if (!response.ok) {
       setMessage(result.error ?? "Final operation snapshot save failed");
+      setMessageIsError(true);
       setIsBusy(false);
       return;
     }
@@ -132,6 +148,7 @@ export function FinalOperationSnapshotForm({
       return;
     }
     setMessage(status === "finalized" ? "Final snapshot saved." : "Draft saved.");
+    setMessageIsError(false);
     setIsBusy(false);
   }
 
@@ -353,7 +370,7 @@ export function FinalOperationSnapshotForm({
           Finalize & Issue Invoice
         </button>
         {disabledReason ? <span className="warning-text">{disabledReason}</span> : null}
-        {message ? <span className={message.includes("failed") ? "danger-text" : "success-text"}>{message}</span> : null}
+        {message ? <span className={messageIsError ? "danger-text" : "success-text"}>{message}</span> : null}
       </div>
     </div>
   );
@@ -424,6 +441,74 @@ function emptyToNull(value: string) {
   const text = value.trim();
   return text.length > 0 ? text : null;
 }
+
+// 인보이스로 발행되면 안 되는 플레이스홀더 토큰들. 확정 전 검증에서 이 값들을 거부합니다.
+const PLACEHOLDER_TOKENS = ["tba", "tbd", "confirmed hotel name", "confirmed dinner menu"];
+
+function isPlaceholder(value: string) {
+  const text = value.trim().toLowerCase();
+  return text.length === 0 || PLACEHOLDER_TOKENS.includes(text);
+}
+
+/*
+ * Finalize(인보이스 발행) 직전 필수 값·플레이스홀더 검증입니다. 문제가 있으면 사용자에게
+ * 보여줄 메시지를 반환하고, 없으면 null을 반환합니다. 서버에도 동일 취지의 검증이 있습니다.
+ */
+function findFinalizeBlocker(days: DayRow[], flights: FlightRow[], bank: typeof emptyBank): string | null {
+  const hasRealDay = days.some((day) => day.date.trim() && !isPlaceholder(day.hotel));
+  if (!hasRealDay) {
+    return "Enter a real date and hotel for at least one day before issuing the invoice.";
+  }
+  for (const day of days) {
+    if (day.date.trim() && isPlaceholder(day.hotel)) {
+      return `Day ${day.day}: replace the placeholder hotel name with the confirmed hotel.`;
+    }
+  }
+  for (const flight of flights) {
+    if (flight.flightNo.trim() && isPlaceholder(flight.flightNo)) {
+      return "Replace placeholder flight numbers (e.g. TBA) with the confirmed flight before finalizing.";
+    }
+  }
+  if (!bank.payableTo.trim() || !bank.bankName.trim()) {
+    return "Bank payable-to and bank name are required before issuing the invoice.";
+  }
+  if (isPlaceholder(bank.accountNo)) {
+    return "Enter the real bank account number (not TBA) before issuing the invoice.";
+  }
+  return null;
+}
+
+const emptyDays: DayRow[] = [makeEmptyDay(1)];
+
+function makeEmptyDay(day: number): DayRow {
+  // 고정 id를 써서 서버·클라이언트 렌더가 동일하도록(Date.now() 하이드레이션 불일치 방지) 합니다.
+  return {
+    id: `day-${day}`,
+    day,
+    date: "",
+    title: "",
+    hotel: "",
+    roomType: "",
+    breakfast: "",
+    lunch: "",
+    dinner: "",
+    attractions: "",
+    description: "",
+    specialNotes: ""
+  };
+}
+
+const emptyFlights: FlightRow[] = [
+  { id: "flight-1", type: "Arrival", flightNo: "", date: "", time: "", route: "" }
+];
+
+// JHT 자사 정보는 상수로 유지하되, 계좌번호는 반드시 오퍼레이터가 확인 입력하도록 비워 둡니다.
+const emptyBank = {
+  payableTo: "JUNGHOTRAVEL CO., LTD.",
+  bankName: "",
+  accountNo: "",
+  swiftCode: ""
+};
 
 const defaultDays: DayRow[] = [
   {
