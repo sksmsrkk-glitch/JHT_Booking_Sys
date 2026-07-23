@@ -20,7 +20,7 @@ type LoadState =
   | { status: "error"; message: string };
 
 const agencyRoute = "/agency" as Route;
-type SearchParams = Promise<{ page?: string; pageSize?: string }>;
+type SearchParams = Promise<{ page?: string; pageSize?: string; q?: string }>;
 
 export default async function AgencyQuoteCasesPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
@@ -65,8 +65,17 @@ export default async function AgencyQuoteCasesPage({ searchParams }: { searchPar
 
       {loadState.status === "ready" ? (
         <>
+          <form className="toolbar" action="/agency/quote-cases">
+            <label>
+              Search
+              <input type="search" name="q" defaultValue={params.q ?? ""} placeholder="Tour name, quote code, share id" />
+            </label>
+            <button className="button-primary" type="submit">
+              Search
+            </button>
+          </form>
           <QuoteDatabase pagination={loadState.pagination} quoteCases={loadState.quoteCases} />
-          <PaginationControls action="/agency/quote-cases" pagination={loadState.pagination} />
+          <PaginationControls action="/agency/quote-cases" pagination={loadState.pagination} searchParams={{ q: params.q }} />
         </>
       ) : null}
 
@@ -194,13 +203,15 @@ function QuoteDatabase({ quoteCases, pagination }: { quoteCases: AgencyQuoteList
   );
 }
 
-async function loadQuoteCases(params: { page?: string; pageSize?: string }): Promise<LoadState> {
+async function loadQuoteCases(params: { page?: string; pageSize?: string; q?: string }): Promise<LoadState> {
   try {
     const { supabase, user } = await getAgencyPageContext();
     const searchParams = new URLSearchParams();
     if (params.page) searchParams.set("page", params.page);
     if (params.pageSize) searchParams.set("pageSize", params.pageSize);
-    const page = await listAgencyQuoteCasePage(supabase, user.agencyAccountId, parsePagination(searchParams));
+    const page = await listAgencyQuoteCasePage(supabase, user.agencyAccountId, parsePagination(searchParams), {
+      q: params.q
+    });
     return { status: "ready", quoteCases: page.items, pagination: page.pagination };
   } catch (error) {
     const failure = classifyPageDataError(error);

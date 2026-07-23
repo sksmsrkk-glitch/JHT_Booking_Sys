@@ -67,6 +67,27 @@ test("feature queries route list search through the shared token-AND helper", as
   }
 });
 
+test("partner portal list pages expose search on public-safe fields", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const read = (p) => readFile(new URL(`../${p}`, import.meta.url), "utf8");
+
+  // 파트너 4개 리스트 페이지에 검색 입력이 있어야 합니다.
+  for (const page of [
+    "src/app/agency/quote-cases/page.tsx",
+    "src/app/agency/reservations/page.tsx",
+    "src/app/agency/invoices/page.tsx",
+    "src/app/agency/inquiries/page.tsx"
+  ]) {
+    const source = await read(page);
+    assert.match(source, /type="search" name="q"/, `${page} should render a search box`);
+  }
+
+  // 파트너 쿼리는 공용 검색 유틸을 쓰고, 공개 안전 필드만 검색해야 합니다(원가·마진 필드 없음).
+  const portal = await read("src/features/agency-portal/queries.ts");
+  assert.match(portal, /from "@\/lib\/search\.mjs"/);
+  assert.doesNotMatch(portal, /applySearch\([^)]*(supplier_cost|margin|internal_total)/);
+});
+
 test("applySearch chains one .or() per token (AND semantics)", () => {
   const calls = [];
   const fakeQuery = {

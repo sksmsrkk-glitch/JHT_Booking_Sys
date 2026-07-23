@@ -20,7 +20,7 @@ type LoadState =
   | { status: "error"; message: string };
 
 const agencyRoute = "/agency" as Route;
-type SearchParams = Promise<{ page?: string; pageSize?: string }>;
+type SearchParams = Promise<{ page?: string; pageSize?: string; q?: string }>;
 
 export default async function AgencyInquiriesPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
@@ -77,8 +77,17 @@ export default async function AgencyInquiriesPage({ searchParams }: { searchPara
 
       {loadState.status === "ready" ? (
         <>
+          <form className="toolbar" action="/agency/inquiries">
+            <label>
+              Search
+              <input type="search" name="q" defaultValue={params.q ?? ""} placeholder="Inquiry title or tour code" />
+            </label>
+            <button className="button-primary" type="submit">
+              Search
+            </button>
+          </form>
           <InquiryDatabase inquiries={loadState.inquiries} pagination={loadState.pagination} />
-          <PaginationControls action="/agency/inquiries" pagination={loadState.pagination} />
+          <PaginationControls action="/agency/inquiries" pagination={loadState.pagination} searchParams={{ q: params.q }} />
         </>
       ) : null}
 
@@ -185,13 +194,15 @@ function InquiryDatabase({ inquiries, pagination }: { inquiries: AgencyInquirySu
   );
 }
 
-async function loadInquiries(params: { page?: string; pageSize?: string }): Promise<LoadState> {
+async function loadInquiries(params: { page?: string; pageSize?: string; q?: string }): Promise<LoadState> {
   try {
     const { supabase, user } = await getAgencyPageContext();
     const searchParams = new URLSearchParams();
     if (params.page) searchParams.set("page", params.page);
     if (params.pageSize) searchParams.set("pageSize", params.pageSize);
-    const page = await listAgencyInquiryPage(supabase, user.agencyAccountId, parsePagination(searchParams));
+    const page = await listAgencyInquiryPage(supabase, user.agencyAccountId, parsePagination(searchParams), {
+      q: params.q
+    });
     return { status: "ready", inquiries: page.items, pagination: page.pagination };
   } catch (error) {
     const failure = classifyPageDataError(error);

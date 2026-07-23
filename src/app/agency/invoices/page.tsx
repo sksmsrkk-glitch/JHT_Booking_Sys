@@ -20,7 +20,7 @@ type LoadState =
   | { status: "error"; message: string };
 
 const agencyRoute = "/agency" as Route;
-type SearchParams = Promise<{ page?: string; pageSize?: string }>;
+type SearchParams = Promise<{ page?: string; pageSize?: string; q?: string }>;
 
 export default async function AgencyInvoicesPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
@@ -64,8 +64,17 @@ export default async function AgencyInvoicesPage({ searchParams }: { searchParam
 
       {loadState.status === "ready" ? (
         <>
+          <form className="toolbar" action="/agency/invoices">
+            <label>
+              Search
+              <input type="search" name="q" defaultValue={params.q ?? ""} placeholder="Invoice number or tour code" />
+            </label>
+            <button className="button-primary" type="submit">
+              Search
+            </button>
+          </form>
           <InvoiceDatabase invoices={loadState.invoices} pagination={loadState.pagination} />
-          <PaginationControls action="/agency/invoices" pagination={loadState.pagination} />
+          <PaginationControls action="/agency/invoices" pagination={loadState.pagination} searchParams={{ q: params.q }} />
         </>
       ) : null}
 
@@ -192,13 +201,15 @@ function InvoiceDatabase({ invoices, pagination }: { invoices: AgencyInvoiceList
   );
 }
 
-async function loadInvoices(params: { page?: string; pageSize?: string }): Promise<LoadState> {
+async function loadInvoices(params: { page?: string; pageSize?: string; q?: string }): Promise<LoadState> {
   try {
     const { supabase, user } = await getAgencyPageContext();
     const searchParams = new URLSearchParams();
     if (params.page) searchParams.set("page", params.page);
     if (params.pageSize) searchParams.set("pageSize", params.pageSize);
-    const page = await listAgencyInvoicePage(supabase, user.agencyAccountId, parsePagination(searchParams));
+    const page = await listAgencyInvoicePage(supabase, user.agencyAccountId, parsePagination(searchParams), {
+      q: params.q
+    });
     return { status: "ready", invoices: page.items, pagination: page.pagination };
   } catch (error) {
     const failure = classifyPageDataError(error);

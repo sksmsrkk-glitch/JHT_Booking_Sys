@@ -17,6 +17,7 @@ import type {
   AgencyRoomingListItem
 } from "./types";
 import type { AgencyInquirySummary } from "@/features/agency/types";
+import { applySearch, tokenizeSearch } from "@/lib/search.mjs";
 import { convertKrwToQuoteCurrency } from "@/lib/domain/currency.mjs";
 import {
   buildPaginationMeta,
@@ -55,10 +56,11 @@ export type AgencyInquiryListItem = AgencyInquirySummary & {
 export async function listAgencyInquiryPage(
   supabase: SupabaseClientLike,
   agencyAccountId: string,
-  pagination: PaginationInput
+  pagination: PaginationInput,
+  filters: { q?: string } = {}
 ): Promise<PaginatedResult<AgencyInquiryListItem>> {
   const { from, to } = paginationRange(pagination);
-  const { data, error, count } = await supabase
+  let query = supabase
     .from("agency_inquiries")
     .select(
       "id, inquiry_type, title, tour_code, period_text, requested_start_date, requested_end_date, pax_count, tour_type, status, created_at",
@@ -68,6 +70,9 @@ export async function listAgencyInquiryPage(
     .order("created_at", { ascending: false })
     .range(from, to);
 
+  query = applySearch(query, normalizeAgencySearch(filters.q), ["title", "tour_code"]);
+
+  const { data, error, count } = await query;
   if (error) throw new Error(error.message);
   const items = (data ?? []).map((row: any) => ({
     id: row.id,
@@ -89,10 +94,11 @@ export async function listAgencyInquiryPage(
 export async function listAgencyQuoteCasePage(
   supabase: SupabaseClientLike,
   agencyAccountId: string,
-  pagination: PaginationInput
+  pagination: PaginationInput,
+  filters: { q?: string } = {}
 ): Promise<PaginatedResult<AgencyQuoteListItem>> {
   const { from, to } = paginationRange(pagination);
-  const { data, error, count } = await supabase
+  let query = supabase
     .from("quote_cases")
     .select(
       "id, case_code, share_id, tour_name, tour_type, status, currency, estimated_pax, start_date, end_date, created_at, quote_versions(id, version_no, status, currency, exchange_rate_to_krw, public_total_amount, sent_at, accepted_at)",
@@ -103,6 +109,10 @@ export async function listAgencyQuoteCasePage(
     .order("created_at", { ascending: false })
     .range(from, to);
 
+  // 공개 안전 필드만 검색합니다(원가·마진 비노출 유지).
+  query = applySearch(query, normalizeAgencySearch(filters.q), ["case_code", "tour_name", "share_id"]);
+
+  const { data, error, count } = await query;
   if (error) throw new Error(error.message);
   const items = (data ?? []).map(mapAgencyQuoteListItem);
   return { items, pagination: buildPaginationMeta(pagination, count, items.length) };
@@ -165,10 +175,13 @@ export async function listAgencyReservations(
 export async function listAgencyReservationPage(
   supabase: SupabaseClientLike,
   agencyAccountId: string,
-  pagination: PaginationInput
+  pagination: PaginationInput,
+  filters: { q?: string } = {}
 ): Promise<PaginatedResult<AgencyReservationListItem>> {
   const { from, to } = paginationRange(pagination);
-  const { data, error, count } = await supabase
+  const q = normalizeAgencySearch(filters.q);
+
+  let query = supabase
     .from("reservations")
     .select(
       "id, reservation_code, status, tour_start_date, tour_end_date, quote_case_id, created_at, quote_cases(case_code, tour_name), reservation_status_history(id), rooming_lists(id)",
@@ -178,6 +191,24 @@ export async function listAgencyReservationPage(
     .order("created_at", { ascending: false })
     .range(from, to);
 
+  if (q) {
+    // 예약코드(직접) 또는 투어명/견적코드(견적 스코프)로 검색합니다. 모두 공개 안전 필드입니다.
+    let scopeQuery = supabase.from("quote_cases").select("id").eq("agency_account_id", agencyAccountId).limit(200);
+    scopeQuery = applySearch(scopeQuery, q, ["case_code", "tour_name"]);
+    const { data: quoteCases, error: scopeError } = await scopeQuery;
+    if (scopeError) throw new Error(scopeError.message);
+    const quoteCaseIds = (quoteCases ?? []).map((row: any) => String(row.id));
+
+    const codeTokens = tokenizeSearch(q).map((token) => `reservation_code.ilike.%${token}%`);
+    const clauses: string[] = [];
+    if (codeTokens.length === 1) clauses.push(codeTokens[0]);
+    else if (codeTokens.length > 1) clauses.push(`and(${codeTokens.join(",")})`);
+    if (quoteCaseIds.length > 0) clauses.push(`quote_case_id.in.(${quoteCaseIds.join(",")})`);
+    // 매칭 후보가 전혀 없으면(예약코드 토큰도 없고 견적도 없음) 결과가 없도록 불가능 조건을 겁니다.
+    query = clauses.length > 0 ? query.or(clauses.join(",")) : query.eq("id", "00000000-0000-0000-0000-000000000000");
+  }
+
+  const { data, error, count } = await query;
   if (error) throw new Error(error.message);
   const items = (data ?? []).map(mapAgencyReservationListItem);
   return { items, pagination: buildPaginationMeta(pagination, count, items.length) };
@@ -260,10 +291,11 @@ export async function listAgencyInvoices(
 export async function listAgencyInvoicePage(
   supabase: SupabaseClientLike,
   agencyAccountId: string,
-  pagination: PaginationInput
+  pagination: PaginationInput,
+  filters: { q?: string } = {}
 ): Promise<PaginatedResult<AgencyInvoiceListItem>> {
   const { from, to } = paginationRange(pagination);
-  const { data, error, count } = await supabase
+  let query = supabase
     .from("invoices")
     .select(
       "id, invoice_no, tour_code, version_no, reservation_id, status, currency, total_amount, issued_at, due_date, payment_deadline, collection_timing, collection_status, deposit_required, deposit_amount, storage_path, created_at, reservations!inner(id, reservation_code, agency_account_id, quote_cases(tour_name), agency_accounts(name)), payments(id, status, amount)",
@@ -274,6 +306,10 @@ export async function listAgencyInvoicePage(
     .order("created_at", { ascending: false })
     .range(from, to);
 
+  // 공개 안전 필드(인보이스 번호·투어 코드)만 검색합니다.
+  query = applySearch(query, normalizeAgencySearch(filters.q), ["invoice_no", "tour_code"]);
+
+  const { data, error, count } = await query;
   if (error) throw new Error(error.message);
   const items = (data ?? []).map(mapAgencyInvoiceListItem);
   return { items, pagination: buildPaginationMeta(pagination, count, items.length) };
@@ -541,4 +577,10 @@ function asObjectArray(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value)
     ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
     : [];
+}
+
+function normalizeAgencySearch(value: string | undefined) {
+  // 트림과 길이 상한만 적용합니다. LIKE 이스케이프·토큰 분리는 applySearch가 처리합니다.
+  if (!value) return "";
+  return value.trim().slice(0, 80);
 }
