@@ -116,7 +116,7 @@ export async function getQuoteCaseDetail(
   const { data: versions, error: versionError } = await supabase
     .from("quote_versions")
     .select(
-      "id, version_no, status, margin_mode, currency, exchange_rate_to_krw, agency_visible_summary, public_fare_options, excel_source_summary, public_total_amount, terms_and_conditions, sent_at, accepted_at, created_at, quote_version_internals(internal_total_cost_krw, internal_total_margin_krw, default_margin_rate), quote_itinerary_days(id, day_no, service_date, title, public_description, internal_notes, route_segments(id, seq, origin_label, destination_label, travel_minutes, distance_meters, provider, manual_override)), quote_items(id, item_category, snapshot_item_name, snapshot_supplier_name, snapshot_cost_currency, snapshot_unit_cost_amount, exchange_rate_to_krw, pricing_unit, quantity, pax_count, margin_mode, margin_rate, manual_margin_amount, total_cost_krw, total_sell_amount, partner_visible_notes, internal_notes, service_section, calculation_mode, excel_cell_ref, excel_formula, manual_override, supplier_cost_breakdown, public_breakdown), quote_presentation_blocks(id, quote_itinerary_day_id, source_supplier_media_id, block_type, display_context, title, description, image_storage_path, image_url, alt_text, sort_order, is_public, metadata), quote_exports(id, export_type, storage_path, status, error_message, created_at)"
+      "id, version_no, status, margin_mode, currency, exchange_rate_to_krw, agency_visible_summary, public_fare_options, public_total_amount, terms_and_conditions, sent_at, accepted_at, created_at, quote_version_internals(internal_total_cost_krw, internal_total_margin_krw, default_margin_rate, excel_source_summary), quote_itinerary_days(id, day_no, service_date, title, public_description, quote_itinerary_day_internals(internal_notes), route_segments(id, seq, origin_label, destination_label, travel_minutes, distance_meters, provider, manual_override)), quote_items(id, item_category, snapshot_item_name, snapshot_supplier_name, snapshot_cost_currency, snapshot_unit_cost_amount, exchange_rate_to_krw, pricing_unit, quantity, pax_count, margin_mode, margin_rate, manual_margin_amount, total_cost_krw, total_sell_amount, partner_visible_notes, internal_notes, service_section, calculation_mode, excel_cell_ref, excel_formula, manual_override, supplier_cost_breakdown, public_breakdown), quote_presentation_blocks(id, quote_itinerary_day_id, source_supplier_media_id, block_type, display_context, title, description, image_storage_path, image_url, alt_text, sort_order, is_public, metadata), quote_exports(id, export_type, storage_path, status, error_message, created_at)"
     )
     .eq("quote_case_id", quoteCaseId)
     .order("version_no", { ascending: false });
@@ -165,11 +165,24 @@ function mapQuoteCaseListItem(row: any): QuoteCaseListItem {
   };
 }
 
-function resolveInternals(row: any): { internal_total_cost_krw?: number; internal_total_margin_krw?: number; default_margin_rate?: number } {
+function resolveInternals(row: any): {
+  internal_total_cost_krw?: number;
+  internal_total_margin_krw?: number;
+  default_margin_rate?: number;
+  excel_source_summary?: Record<string, unknown>;
+} {
   // PostgREST 1:1 임베드는 객체 또는 단일 요소 배열로 올 수 있어 둘 다 처리합니다.
   const internals = row.quote_version_internals;
   if (Array.isArray(internals)) return internals[0] ?? {};
   return internals ?? {};
+}
+
+function resolveDayInternalNotes(row: any): string | null {
+  // internal_notes는 파트너 비노출 테이블(quote_itinerary_day_internals)로 분리되어 임베드됩니다.
+  const embedded = row.quote_itinerary_day_internals;
+  const record = Array.isArray(embedded) ? embedded[0] : embedded;
+  const notes = record?.internal_notes;
+  return typeof notes === "string" && notes.length > 0 ? notes : null;
 }
 
 /** Supabase 중첩 relation과 별도 internal 테이블 결과를 안정된 camelCase 버전 모델로 평탄화합니다. */
@@ -186,7 +199,7 @@ function mapQuoteVersionDetail(row: any): QuoteVersionDetail {
     exchangeRateToKrw: Number(row.exchange_rate_to_krw ?? 1),
     agencyVisibleSummary: row.agency_visible_summary ?? {},
     publicFareOptions: Array.isArray(row.public_fare_options) ? row.public_fare_options : [],
-    excelSourceSummary: row.excel_source_summary ?? {},
+    excelSourceSummary: resolveInternals(row).excel_source_summary ?? {},
     publicTotalAmount: Number(row.public_total_amount ?? 0),
     internalTotalCostKrw: Number(resolveInternals(row).internal_total_cost_krw ?? 0),
     internalTotalMarginKrw: Number(resolveInternals(row).internal_total_margin_krw ?? 0),
@@ -227,7 +240,7 @@ function mapQuoteItineraryDayDetail(
     serviceDate: row.service_date ?? null,
     title: row.title ?? null,
     publicDescription: row.public_description ?? null,
-    internalNotes: row.internal_notes ?? null,
+    internalNotes: resolveDayInternalNotes(row),
     routeSegments: (row.route_segments ?? []).map(mapQuoteRouteSegmentDetail),
     presentationBlocks
   };

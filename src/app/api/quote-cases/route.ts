@@ -88,7 +88,6 @@ export async function POST(request: Request) {
         exchange_rate_to_krw: optionalNumber(body.exchangeRateToKrw) ?? 1,
         agency_visible_summary: body.agencyVisibleSummary ?? {},
         public_fare_options: Array.isArray(body.publicFareOptions) ? body.publicFareOptions : [],
-        excel_source_summary: normalizeObject(body.excelSourceSummary),
         public_total_amount: roundMoney(totals.sell),
         terms_and_conditions: optionalString(body.termsAndConditions),
         created_by: internalUser.profileId
@@ -103,7 +102,8 @@ export async function POST(request: Request) {
       quote_version_id: version.id,
       internal_total_cost_krw: roundMoney(totals.cost),
       internal_total_margin_krw: roundMoney(totals.margin),
-      default_margin_rate: optionalNumber(body.defaultMarginRate) ?? 0
+      default_margin_rate: optionalNumber(body.defaultMarginRate) ?? 0,
+      excel_source_summary: normalizeObject(body.excelSourceSummary)
     });
 
     if (internalsError) throw new HttpError(500, internalsError.message);
@@ -130,28 +130,45 @@ export async function POST(request: Request) {
       if (exchangeRateError) throw new HttpError(500, exchangeRateError.message);
     }
 
-    const itineraryRows = body.itineraryDays
+    const itineraryInputs = body.itineraryDays
       ? requireArray<Record<string, unknown>>(body.itineraryDays, "itineraryDays").map((day) => ({
-          quote_version_id: version.id,
-          day_no: Number(day.dayNo),
-          service_date: day.serviceDate ?? null,
-          title: day.title ?? null,
-          meal_summary: day.mealSummary ?? {},
-          public_description: day.publicDescription ?? null,
-          internal_notes: day.internalNotes ?? null
+          row: {
+            quote_version_id: version.id,
+            day_no: Number(day.dayNo),
+            service_date: day.serviceDate ?? null,
+            title: day.title ?? null,
+            meal_summary: day.mealSummary ?? {},
+            public_description: day.publicDescription ?? null
+          },
+          internalNotes: optionalString(day.internalNotes)
         }))
       : [];
 
     const dayIdByDayNo = new Map<number, string>();
 
-    if (itineraryRows.length > 0) {
+    if (itineraryInputs.length > 0) {
       const { data: insertedDays, error: itineraryError } = await supabase
         .from("quote_itinerary_days")
-        .insert(itineraryRows)
+        .insert(itineraryInputs.map((entry) => entry.row))
         .select("id, day_no");
       if (itineraryError) throw new HttpError(500, itineraryError.message);
       for (const day of insertedDays ?? []) {
         dayIdByDayNo.set(Number(day.day_no), day.id);
+      }
+
+      // 내부 메모는 파트너 비노출 테이블에 별도 저장합니다.
+      const dayInternals = itineraryInputs
+        .filter((entry) => entry.internalNotes)
+        .map((entry) => ({
+          quote_itinerary_day_id: dayIdByDayNo.get(entry.row.day_no),
+          internal_notes: entry.internalNotes
+        }))
+        .filter((entry) => entry.quote_itinerary_day_id);
+      if (dayInternals.length > 0) {
+        const { error: dayInternalsError } = await supabase
+          .from("quote_itinerary_day_internals")
+          .insert(dayInternals);
+        if (dayInternalsError) throw new HttpError(500, dayInternalsError.message);
       }
     }
 

@@ -38,10 +38,9 @@ export async function POST(request: Request, context: RouteContext) {
         service_date: optionalString(body.serviceDate),
         title: optionalString(body.title),
         meal_summary: parseMealSummary(body.mealSummary),
-        public_description: requireString(body.publicDescription, "publicDescription"),
-        internal_notes: optionalString(body.internalNotes)
+        public_description: requireString(body.publicDescription, "publicDescription")
       })
-      .select("id, quote_version_id, day_no, service_date, title, public_description, internal_notes")
+      .select("id, quote_version_id, day_no, service_date, title, public_description")
       .single();
 
     if (error) {
@@ -51,15 +50,25 @@ export async function POST(request: Request, context: RouteContext) {
       throw new HttpError(500, error.message);
     }
 
+    // 내부 메모는 파트너 비노출 테이블에 별도 저장합니다.
+    const internalNotes = optionalString(body.internalNotes);
+    if (internalNotes) {
+      const { error: internalsError } = await supabase
+        .from("quote_itinerary_day_internals")
+        .insert({ quote_itinerary_day_id: data.id, internal_notes: internalNotes });
+      if (internalsError) throw new HttpError(500, internalsError.message);
+    }
+
+    const responseData = { ...data, internal_notes: internalNotes };
     await writeAuditLog(supabase, {
       actorProfileId: internalUser.profileId,
       action: "quote_itinerary_day.created",
       entityTable: "quote_itinerary_days",
       entityId: data.id,
-      afterData: data
+      afterData: responseData
     });
 
-    return created(data);
+    return created(responseData);
   } catch (error) {
     return fail(error);
   }

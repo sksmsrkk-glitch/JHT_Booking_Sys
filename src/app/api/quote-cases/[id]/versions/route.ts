@@ -33,7 +33,6 @@ export async function POST(request: Request, context: RouteContext) {
         exchange_rate_to_krw: Number(sourceVersion?.exchange_rate_to_krw ?? 1),
         agency_visible_summary: sourceVersion?.agency_visible_summary ?? {},
         public_fare_options: sourceVersion?.public_fare_options ?? [],
-        excel_source_summary: sourceVersion?.excel_source_summary ?? {},
         public_total_amount: Number(sourceVersion?.public_total_amount ?? 0),
         terms_and_conditions: sourceVersion?.terms_and_conditions ?? null,
         created_by: internalUser.profileId
@@ -49,7 +48,8 @@ export async function POST(request: Request, context: RouteContext) {
       quote_version_id: version.id,
       internal_total_cost_krw: Number(sourceInternals?.internal_total_cost_krw ?? 0),
       internal_total_margin_krw: Number(sourceInternals?.internal_total_margin_krw ?? 0),
-      default_margin_rate: Number(sourceInternals?.default_margin_rate ?? 0)
+      default_margin_rate: Number(sourceInternals?.default_margin_rate ?? 0),
+      excel_source_summary: sourceInternals?.excel_source_summary ?? {}
     });
 
     if (internalsError) throw new HttpError(500, internalsError.message);
@@ -82,7 +82,7 @@ export async function POST(request: Request, context: RouteContext) {
 async function getVersionInternals(supabase: any, quoteVersionId: string) {
   const { data, error } = await supabase
     .from("quote_version_internals")
-    .select("internal_total_cost_krw, internal_total_margin_krw, default_margin_rate")
+    .select("internal_total_cost_krw, internal_total_margin_krw, default_margin_rate, excel_source_summary")
     .eq("quote_version_id", quoteVersionId)
     .maybeSingle();
 
@@ -119,7 +119,7 @@ async function resolveVersionPlan(supabase: any, quoteCaseId: string, rawCopyFro
   const { data: latestVersion, error: latestError } = await supabase
     .from("quote_versions")
     .select(
-      "id, quote_case_id, version_no, margin_mode, currency, exchange_rate_to_krw, agency_visible_summary, public_fare_options, excel_source_summary, public_total_amount, terms_and_conditions"
+      "id, quote_case_id, version_no, margin_mode, currency, exchange_rate_to_krw, agency_visible_summary, public_fare_options, public_total_amount, terms_and_conditions"
     )
     .eq("quote_case_id", quoteCaseId)
     .order("version_no", { ascending: false })
@@ -135,7 +135,7 @@ async function resolveVersionPlan(supabase: any, quoteCaseId: string, rawCopyFro
   const { data: sourceVersion, error: sourceError } = await supabase
     .from("quote_versions")
     .select(
-      "id, quote_case_id, version_no, margin_mode, currency, exchange_rate_to_krw, agency_visible_summary, public_fare_options, excel_source_summary, public_total_amount, terms_and_conditions"
+      "id, quote_case_id, version_no, margin_mode, currency, exchange_rate_to_krw, agency_visible_summary, public_fare_options, public_total_amount, terms_and_conditions"
     )
     .eq("id", copyFromVersionId)
     .maybeSingle();
@@ -152,7 +152,7 @@ async function copyVersionChildren(supabase: any, sourceVersionId: string, targe
   const dayIdMap = new Map<string, string>();
   const { data: sourceDays, error: dayError } = await supabase
     .from("quote_itinerary_days")
-    .select("id, day_no, service_date, title, meal_summary, public_description, internal_notes")
+    .select("id, day_no, service_date, title, meal_summary, public_description, quote_itinerary_day_internals(internal_notes)")
     .eq("quote_version_id", sourceVersionId)
     .order("day_no", { ascending: true });
 
@@ -167,20 +167,36 @@ async function copyVersionChildren(supabase: any, sourceVersionId: string, targe
         service_date: day.service_date,
         title: day.title,
         meal_summary: day.meal_summary ?? {},
-        public_description: day.public_description,
-        internal_notes: day.internal_notes
+        public_description: day.public_description
       })
       .select("id")
       .single();
 
     if (copyDayError) throw new HttpError(500, copyDayError.message);
     dayIdMap.set(day.id, copiedDay.id);
+
+    // 내부 메모(파트너 비노출 테이블)도 함께 복사합니다.
+    const sourceNotes = extractDayInternalNotes(day);
+    if (sourceNotes) {
+      const { error: copyNotesError } = await supabase
+        .from("quote_itinerary_day_internals")
+        .insert({ quote_itinerary_day_id: copiedDay.id, internal_notes: sourceNotes });
+      if (copyNotesError) throw new HttpError(500, copyNotesError.message);
+    }
+
     await copyRouteSegments(supabase, day.id, copiedDay.id);
   }
 
   const itemCount = await copyQuoteItems(supabase, sourceVersionId, targetVersionId, dayIdMap);
   const presentationBlockCount = await copyPresentationBlocks(supabase, sourceVersionId, targetVersionId, dayIdMap);
   return { dayCount: sourceDays?.length ?? 0, itemCount, presentationBlockCount };
+}
+
+function extractDayInternalNotes(day: any): string | null {
+  const embedded = day?.quote_itinerary_day_internals;
+  const record = Array.isArray(embedded) ? embedded[0] : embedded;
+  const notes = record?.internal_notes;
+  return typeof notes === "string" && notes.trim().length > 0 ? notes : null;
 }
 
 async function copyRouteSegments(supabase: any, sourceDayId: string, targetDayId: string) {

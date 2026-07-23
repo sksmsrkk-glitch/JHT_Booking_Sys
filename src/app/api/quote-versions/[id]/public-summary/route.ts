@@ -21,7 +21,6 @@ export async function PATCH(request: Request, context: RouteContext) {
     const update = {
       agency_visible_summary: normalizeObject(body.agencyVisibleSummary),
       public_fare_options: normalizeArray(body.publicFareOptions),
-      excel_source_summary: normalizeObject(body.excelSourceSummary),
       terms_and_conditions: optionalString(body.termsAndConditions)
     };
 
@@ -29,21 +28,30 @@ export async function PATCH(request: Request, context: RouteContext) {
       .from("quote_versions")
       .update(update)
       .eq("id", quoteVersionId)
-      .select("id, quote_case_id, version_no, agency_visible_summary, public_fare_options, excel_source_summary, terms_and_conditions")
+      .select("id, quote_case_id, version_no, agency_visible_summary, public_fare_options, terms_and_conditions")
       .single();
 
     if (error) throw new HttpError(500, error.message);
 
+    // 내부 엑셀 원가모델 요약은 파트너 비노출 테이블(quote_version_internals)에 저장합니다.
+    const excelSourceSummary = normalizeObject(body.excelSourceSummary);
+    const { error: internalsError } = await supabase
+      .from("quote_version_internals")
+      .update({ excel_source_summary: excelSourceSummary })
+      .eq("quote_version_id", quoteVersionId);
+    if (internalsError) throw new HttpError(500, internalsError.message);
+
+    const responseData = { ...data, excel_source_summary: excelSourceSummary };
     await writeAuditLog(supabase, {
       actorProfileId: internalUser.profileId,
       action: "quote_version.public_summary_updated",
       entityTable: "quote_versions",
       entityId: quoteVersionId,
       beforeData: before,
-      afterData: data
+      afterData: responseData
     });
 
-    return ok(data);
+    return ok(responseData);
   } catch (error) {
     return fail(error);
   }
@@ -52,7 +60,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 async function getQuoteVersion(supabase: any, quoteVersionId: string) {
   const { data, error } = await supabase
     .from("quote_versions")
-    .select("id, quote_case_id, version_no, status, agency_visible_summary, public_fare_options, excel_source_summary, terms_and_conditions")
+    .select("id, quote_case_id, version_no, status, agency_visible_summary, public_fare_options, terms_and_conditions, quote_version_internals(excel_source_summary)")
     .eq("id", quoteVersionId)
     .maybeSingle();
 
@@ -61,7 +69,19 @@ async function getQuoteVersion(supabase: any, quoteVersionId: string) {
   if (!["draft", "review"].includes(data.status)) {
     throw new HttpError(409, `Public summary can only be edited while quote version is ${data.status}`);
   }
-  return data;
+  const internals = Array.isArray(data.quote_version_internals)
+    ? data.quote_version_internals[0]
+    : data.quote_version_internals;
+  return {
+    id: data.id,
+    quote_case_id: data.quote_case_id,
+    version_no: data.version_no,
+    status: data.status,
+    agency_visible_summary: data.agency_visible_summary,
+    public_fare_options: data.public_fare_options,
+    terms_and_conditions: data.terms_and_conditions,
+    excel_source_summary: internals?.excel_source_summary ?? {}
+  };
 }
 
 function normalizeArray(value: unknown) {

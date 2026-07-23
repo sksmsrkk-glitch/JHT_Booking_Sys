@@ -608,8 +608,7 @@ insert into quote_itinerary_days (
   service_date,
   title,
   meal_summary,
-  public_description,
-  internal_notes
+  public_description
 )
 values
   (
@@ -619,8 +618,7 @@ values
     '2026-09-10',
     'Arrival in Seoul',
     '{"lunch":"own arrangement","dinner":"welcome dinner"}'::jsonb,
-    'Airport arrival, guide meet-and-greet, and transfer to hotel.',
-    'Confirm coach parking permit before arrival.'
+    'Airport arrival, guide meet-and-greet, and transfer to hotel.'
   ),
   (
     '00000000-0000-4000-8000-000000008202',
@@ -629,14 +627,20 @@ values
     '2026-09-11',
     'Busan program',
     '{"lunch":"local restaurant","dinner":"seafood course"}'::jsonb,
-    'KTX to Busan, hotel check-in, and seafood dinner.',
-    'Restaurant requires final pax 7 days prior.'
+    'KTX to Busan, hotel check-in, and seafood dinner.'
   )
 on conflict (id) do update set
   service_date = excluded.service_date,
   title = excluded.title,
   meal_summary = excluded.meal_summary,
-  public_description = excluded.public_description,
+  public_description = excluded.public_description;
+
+-- 내부 메모는 파트너 비노출 테이블에 저장합니다.
+insert into quote_itinerary_day_internals (quote_itinerary_day_id, internal_notes)
+values
+  ('00000000-0000-4000-8000-000000008201', 'Confirm coach parking permit before arrival.'),
+  ('00000000-0000-4000-8000-000000008202', 'Restaurant requires final pax 7 days prior.')
+on conflict (quote_itinerary_day_id) do update set
   internal_notes = excluded.internal_notes;
 
 insert into route_segments (

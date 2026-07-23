@@ -79,6 +79,10 @@ const signupBillingCurrencyMigration = readFileSync(
   new URL("../supabase/migrations/202607070001_signup_application_billing_currency.sql", import.meta.url),
   "utf8"
 );
+const quoteInternalColumnPrivacyMigration = readFileSync(
+  new URL("../supabase/migrations/202607180006_quote_internal_column_privacy.sql", import.meta.url),
+  "utf8"
+);
 const accountRecoveryMigration = readFileSync(
   new URL("../supabase/migrations/202607130003_account_recovery.sql", import.meta.url),
   "utf8"
@@ -410,6 +414,18 @@ test("internal quote margins are split into an internal-only table and dropped f
   assert.doesNotMatch(quoteVersionInternalsMigration, /quote version internals agency/);
   // 내부 값도 sent 이후 불변이어야 합니다.
   assert.match(quoteVersionInternalsMigration, /create trigger quote_version_internals_immutable/);
+});
+
+test("internal quote columns are moved off agency-readable rows", () => {
+  // excel_source_summary는 quote_versions(파트너 select 가능)에서 internal-only 테이블로 이동합니다.
+  assert.match(quoteInternalColumnPrivacyMigration, /add column if not exists excel_source_summary jsonb not null default '\{\}'::jsonb/);
+  assert.match(quoteInternalColumnPrivacyMigration, /alter table quote_versions drop column if exists excel_source_summary/);
+  // internal_notes는 quote_itinerary_days(파트너 select 가능)에서 internal-only 테이블로 이동합니다.
+  assert.match(quoteInternalColumnPrivacyMigration, /create table if not exists quote_itinerary_day_internals/);
+  assert.match(quoteInternalColumnPrivacyMigration, /create policy "quote itinerary day internals internal only"/);
+  assert.match(quoteInternalColumnPrivacyMigration, /alter table quote_itinerary_days drop column if exists internal_notes/);
+  // 새 내부 테이블에 agency 정책이 있으면 안 됩니다.
+  assert.doesNotMatch(quoteInternalColumnPrivacyMigration, /quote itinerary day internals agency/);
 });
 
 test("api error responses do not expose internal server messages", () => {
