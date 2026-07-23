@@ -5,8 +5,10 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { getPageAuthorization } from "@/lib/api/page-session";
-import { OPERATION_TASK_STATUSES, OPERATION_TEAMS } from "@/features/operations/queries";
-import type { OperationTaskListItem } from "@/features/operations/types";
+import { getInternalPageContext } from "@/lib/api/server-page-context";
+import { OPERATION_TASK_STATUSES, OPERATION_TEAMS, listRecentNotifications } from "@/features/operations/queries";
+import type { NotificationListItem, OperationTaskListItem } from "@/features/operations/types";
+import { NotificationInbox } from "@/components/admin/NotificationInbox";
 import { OperationTaskActions, type OperationTaskSupplierOption } from "@/components/admin/OperationTaskActions";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +20,7 @@ type SearchParams = Promise<{
 }>;
 
 type LoadState =
-  | { status: "ready"; tasks: OperationTaskListItem[]; suppliers: OperationTaskSupplierOption[] }
+  | { status: "ready"; tasks: OperationTaskListItem[]; suppliers: OperationTaskSupplierOption[]; notifications: NotificationListItem[] }
   | { status: "auth-required"; message: string }
   | { status: "error"; message: string };
 
@@ -103,6 +105,8 @@ export default async function AdminOperationTasksPage({ searchParams }: { search
           <p>{loadState.message}</p>
         </section>
       ) : null}
+
+      {loadState.status === "ready" ? <NotificationInbox notifications={loadState.notifications} /> : null}
 
       {loadState.status === "ready" ? <TaskBoard suppliers={loadState.suppliers} tasks={loadState.tasks} /> : null}
 
@@ -239,6 +243,16 @@ async function loadTasks(filters: { q?: string; team?: string; status?: string }
     };
   }
 
+  // 운영 리마인더 알림은 자체 API로 왕복하지 않고 같은 인증 컨텍스트에서 직접 조회합니다.
+  let notifications: NotificationListItem[] = [];
+  try {
+    const { supabase } = await getInternalPageContext();
+    notifications = await listRecentNotifications(supabase, { limit: 50 });
+  } catch {
+    // 알림 조회 실패가 태스크 보드 전체를 막지 않도록 빈 목록으로 처리합니다.
+    notifications = [];
+  }
+
   return {
     status: "ready",
     tasks: payload.data ?? [],
@@ -246,7 +260,8 @@ async function loadTasks(filters: { q?: string; team?: string; status?: string }
       id: supplier.id,
       nameKo: supplier.nameKo,
       category: supplier.category
-    }))
+    })),
+    notifications
   };
 }
 

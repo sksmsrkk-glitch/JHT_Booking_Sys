@@ -26,3 +26,15 @@ export type OperationTaskFilters = {
   status?: string;
   q?: string;
 };
+
+export type NotificationListItem = {
+  id: string;
+  title: string;
+  body: string | null;
+  channel: string;
+  status: string;
+  operationTaskId: string | null;
+  taskTitle: string | null;
+  reservationCode: string | null;
+  createdAt: string;
+};

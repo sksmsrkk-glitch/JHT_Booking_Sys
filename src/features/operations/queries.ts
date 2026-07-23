@@ -2,7 +2,7 @@
  * @file 한글 책임: `operations` 기능이 사용하는 Supabase 조회와 영속 데이터 매핑을 한곳에 모읍니다.
  * RLS가 보장하는 접근 범위를 유지하면서 목록 상한·필터·정렬을 DB에 위임하고 화면에는 안정된 도메인 모델만 반환합니다.
  */
-import type { OperationTaskFilters, OperationTaskListItem } from "./types";
+import type { NotificationListItem, OperationTaskFilters, OperationTaskListItem } from "./types";
 
 type SupabaseClientLike = {
   from: (table: string) => any;
@@ -52,6 +52,48 @@ export async function listOperationTasks(
   }
 
   return (data ?? []).map(mapOperationTaskListItem);
+}
+
+export const NOTIFICATION_ACTIVE_STATUSES = ["queued", "sent"];
+
+/*
+ * 운영 리마인더는 notifications에 큐잉만 되고 소비되는 화면이 없어 사실상 어디에도
+ * 도달하지 않았습니다. 이 조회로 내부 운영자가 대기 중 알림을 실제로 확인합니다.
+ */
+export async function listRecentNotifications(
+  supabase: SupabaseClientLike,
+  options: { limit?: number; activeOnly?: boolean } = {}
+): Promise<NotificationListItem[]> {
+  const limit = Math.min(Math.max(options.limit ?? 50, 1), 200);
+  let query = supabase
+    .from("notifications")
+    .select(
+      "id, title, body, channel, status, operation_task_id, created_at, operation_tasks(title, reservations(reservation_code))"
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (options.activeOnly) {
+    query = query.in("status", NOTIFICATION_ACTIVE_STATUSES);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapNotificationListItem);
+}
+
+function mapNotificationListItem(row: any): NotificationListItem {
+  return {
+    id: row.id,
+    title: row.title,
+    body: row.body ?? null,
+    channel: row.channel,
+    status: row.status,
+    operationTaskId: row.operation_task_id ?? null,
+    taskTitle: row.operation_tasks?.title ?? null,
+    reservationCode: row.operation_tasks?.reservations?.reservation_code ?? null,
+    createdAt: row.created_at
+  };
 }
 
 function mapOperationTaskListItem(row: any): OperationTaskListItem {

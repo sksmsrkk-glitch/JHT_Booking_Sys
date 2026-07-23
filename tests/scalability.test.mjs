@@ -123,6 +123,21 @@ test("core navigation avoids server self-fetches and full document reloads", asy
   for (const source of componentFiles) assert.doesNotMatch(source, /window\.location\.reload\(\)/);
 });
 
+test("operation reminder notifications have a consumer surface", async () => {
+  const opsQueries = await readSource("src/features/operations/queries.ts");
+  const inbox = await readSource("src/components/admin/NotificationInbox.tsx");
+  const ackRoute = await readSource("src/app/api/notifications/[id]/route.ts");
+  const tasksPage = await readSource("src/app/admin/operations/tasks/page.tsx");
+
+  // 큐잉된 알림을 읽는 조회와, 이를 표시하는 화면, 확인 API가 모두 있어야 dead-end가 아닙니다.
+  assert.match(opsQueries, /listRecentNotifications/);
+  assert.match(opsQueries, /from\("notifications"\)/);
+  assert.match(tasksPage, /NotificationInbox/);
+  assert.match(inbox, /\/api\/notifications\//);
+  // 확인은 대기 상태에서만 전환되어야(중복 확인 방지) 합니다.
+  assert.match(ackRoute, /\.in\("status", \["queued", "sent"\]\)/);
+});
+
 test("reservation creation marks partner booking requests as reserved", async () => {
   const reservationsRoute = await readSource("src/app/api/reservations/route.ts");
   const quoteDetailPage = await readSource("src/app/admin/quote-cases/[quoteCaseId]/page.tsx");
