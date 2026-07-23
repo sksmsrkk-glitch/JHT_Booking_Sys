@@ -12,11 +12,16 @@ const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
 
 test("partner requests ignore the administrator Korean locale", async () => {
   const middleware = await readSource("src/middleware.ts");
-  const translator = await readSource("src/components/GlobalTextTranslator.tsx");
+  const layout = await readSource("src/app/layout.tsx");
+  const topbar = await readSource("src/components/AppTopbar.tsx");
   const shell = await readSource("src/components/agency/PartnerWorkspaceShell.tsx");
 
   assert.match(middleware, /requestHeaders\.set\("x-jht-locale", "en"\)/);
-  assert.match(translator, /locale !== "ko" \|\| isAgencySurface/);
+  // 관리자 한국어 번역은 서버 렌더 시점에 적용됩니다. 하이드레이션 이후 DOM 텍스트를 바꾸던
+  // GlobalTextTranslator는 제거되어 더 이상 마운트되지 않습니다(불일치·깜빡임 원인 제거).
+  assert.doesNotMatch(layout, /GlobalTextTranslator/);
+  // 파트너 화면은 effectiveLocale을 en으로 고정해 관리자 KOR 설정을 무시합니다.
+  assert.match(topbar, /const effectiveLocale = isAgencySurface \? "en" : locale/);
   assert.match(shell, /document\.documentElement\.lang = "en-US"/);
   assert.match(shell, /lang="en-US"/);
 });

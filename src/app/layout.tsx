@@ -7,7 +7,6 @@ import { cookies } from "next/headers";
 import { headers } from "next/headers";
 import { AppTopbar } from "@/components/AppTopbar";
 import { CalendarLocaleEnforcer } from "@/components/CalendarLocaleEnforcer";
-import { GlobalTextTranslator } from "@/components/GlobalTextTranslator";
 import { RouteRefreshBridge } from "@/components/RouteRefreshBridge";
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "@/lib/domain/auth-session.mjs";
 import { normalizeLocale } from "@/lib/i18n";
@@ -36,7 +35,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <main className="main">{children}</main>
           <RouteRefreshBridge />
           <CalendarLocaleEnforcer />
-          <GlobalTextTranslator locale={locale} />
         </div>
       </body>
     </html>

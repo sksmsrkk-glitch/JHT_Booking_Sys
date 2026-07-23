@@ -140,6 +140,20 @@ test("core navigation avoids server self-fetches and full document reloads", asy
   for (const source of componentFiles) assert.doesNotMatch(source, /window\.location\.reload\(\)/);
 });
 
+test("admin Korean labels are applied at server render, not by DOM mutation", async () => {
+  const dashboard = await readSource("src/app/admin/page.tsx");
+  const topbar = await readSource("src/components/AppTopbar.tsx");
+  const adminUiText = await readSource("src/lib/admin-ui-text.ts");
+
+  // 서버 렌더 시점 번역 헬퍼를 써야 하이드레이션 불일치·깜빡임이 없습니다.
+  assert.match(dashboard, /translateAdminUi\(locale/);
+  assert.match(topbar, /translateAdminUi\(effectiveLocale/);
+  assert.match(adminUiText, /export function translateAdminUi/);
+  // 하이드레이션 이후 텍스트 노드를 걷어 바꾸던 방식은 다시 도입되면 안 됩니다.
+  assert.doesNotMatch(dashboard, /createTreeWalker/);
+  assert.doesNotMatch(adminUiText, /createTreeWalker|MutationObserver/);
+});
+
 test("operation reminder notifications have a consumer surface", async () => {
   const opsQueries = await readSource("src/features/operations/queries.ts");
   const inbox = await readSource("src/components/admin/NotificationInbox.tsx");

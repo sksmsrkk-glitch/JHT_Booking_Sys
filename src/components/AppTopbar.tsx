@@ -12,6 +12,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { TopNavMore } from "@/components/TopNavMore";
 import type { Locale } from "@/lib/i18n";
 import { commonText } from "@/lib/i18n";
+import { translateAdminUi } from "@/lib/admin-ui-text";
 
 type AppTopbarProps = {
   isSignedIn: boolean;
@@ -37,16 +38,17 @@ export function AppTopbar({ isSignedIn, locale }: AppTopbarProps) {
   const communicationLabel = "Communication";
   const loginLabel = isSignedIn ? text.signOut : text.signIn;
   const loginHref = (isAgencySurface ? "/agency/login" : "/auth/login") as Route;
+  const tr = (value: string) => translateAdminUi(effectiveLocale, value);
   const moreItems = [
     { href: "/admin/domestic-suppliers" as Route, label: text.domesticSuppliers },
     { href: "/admin/exchange-rates" as Route, label: text.exchangeRates },
-    { href: "/admin/workflows" as Route, label: "Workflows" },
-    { href: "/admin/confirmations" as Route, label: "Confirmations" },
-    { href: "/admin/guide-expenses" as Route, label: "Guide Expenses" },
+    { href: "/admin/workflows" as Route, label: tr("Workflows") },
+    { href: "/admin/confirmations" as Route, label: tr("Confirmations") },
+    { href: "/admin/guide-expenses" as Route, label: tr("Guide Expenses") },
     { href: "/agency", label: text.overseasAgencyPortal },
-    { href: "/admin/users" as Route, label: "Users" },
-    { href: "/admin/account-recovery" as Route, label: "Account Recovery" },
-    { href: "/admin/audit" as Route, label: "Audit" }
+    { href: "/admin/users" as Route, label: tr("Users") },
+    { href: "/admin/account-recovery" as Route, label: tr("Account Recovery") },
+    { href: "/admin/audit" as Route, label: tr("Audit") }
   ];
 
   return (

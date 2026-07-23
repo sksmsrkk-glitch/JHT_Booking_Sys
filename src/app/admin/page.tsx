@@ -21,6 +21,8 @@ import {
   requirePageFinanceRole
 } from "@/lib/api/server-page-context";
 import { normalizeLocale } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n";
+import { translateAdminUi } from "@/lib/admin-ui-text";
 
 export const dynamic = "force-dynamic";
 
@@ -88,7 +90,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
         </div>
       </div>
 
-      <AdminDashboard filters={filters} loadState={loadState} />
+      <AdminDashboard filters={filters} loadState={loadState} locale={locale} />
 
       <Link
         aria-label={locale === "ko" ? "파트너 소통 워크플로우 열기" : "Open partner communication workflow"}
@@ -119,12 +121,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
 
 function AdminDashboard({
   filters,
-  loadState
+  loadState,
+  locale
 }: {
   filters: DashboardFilters;
   loadState: DashboardLoadState;
+  locale: Locale;
 }) {
   const { metrics: metric, countryRows, partnerRows, periodRows, statusRows, agencyOptions } = loadState.analytics;
+  const tr = (value: string) => translateAdminUi(locale, value);
   const activeRows =
     filters.view === "country"
       ? countryRows
@@ -140,15 +145,19 @@ function AdminDashboard({
     <section className="admin-dashboard-shell" aria-label="Internal admin dashboard">
       <div className="section-heading dashboard-title-row">
         <div>
-          <h2>Operations Dashboard</h2>
-          <p>Filter by country, partner, and period. Switch views like a Notion database.</p>
+          <h2>{tr("Operations Dashboard")}</h2>
+          <p>
+            {locale === "ko"
+              ? "국가, 파트너, 기간으로 필터링하고 Notion 데이터베이스처럼 보기를 전환합니다."
+              : "Filter by country, partner, and period. Switch views like a Notion database."}
+          </p>
         </div>
         <Link className="button-secondary" href={"/admin/quote-cases" as Route}>
-          Open Quotes
+          {tr("Open Quotes")}
         </Link>
       </div>
 
-      <DashboardFilterBar agencies={agencyOptions} filters={filters} />
+      <DashboardFilterBar agencies={agencyOptions} filters={filters} locale={locale} />
 
       {loadState.status === "auth-required" ? (
         <section className="notice warning compact-notice">
@@ -166,54 +175,54 @@ function AdminDashboard({
 
       <div className="dashboard-kpi-grid">
         <MetricCard
-          label="Partner quote inquiries"
+          label={tr("Partner quote inquiries")}
           value={metric.quoteInquiryCount}
           hint="new, revision, product inquiries"
         />
         <MetricCard
           href={buildMetricHref("/admin/reservations", filters, { status: "confirmed" })}
-          label="Confirmed groups"
+          label={tr("Confirmed groups")}
           value={metric.confirmedCount}
           hint="confirmed, on tour, completed"
           tone="good"
         />
         <MetricCard
           href={buildMetricHref("/admin/reservations", filters, { status: "cancelled" })}
-          label="Cancelled groups"
+          label={tr("Cancelled groups")}
           value={metric.cancelledCount}
           hint="cancelled reservations and quote cases"
           tone="danger"
         />
         <MetricCard
           href={buildMetricHref("/admin/agencies", filters)}
-          label="All inquiries"
+          label={tr("All inquiries")}
           value={metric.totalInquiryCount}
           hint="agency inquiry count from partner master"
         />
         <MetricCard
           href={buildMetricHref("/admin/quote-cases", filters)}
-          label="Quote cases"
+          label={tr("Quote cases")}
           value={metric.quoteCaseCount}
           hint="quote case records in selected scope"
         />
-        <MetricCard label="Total pax" value={metric.paxCount || "-"} hint="estimated quote and reservation pax" />
+        <MetricCard label={tr("Total pax")} value={metric.paxCount || "-"} hint="estimated quote and reservation pax" />
         <MetricCard
           href={buildMetricHref("/admin/finance/settlements", filters, { status: "approved" })}
-          label="Settlement done"
+          label={tr("Settlement done")}
           value={metric.settlementDoneCount}
           hint="approved or closed settlement rows"
           tone="good"
         />
         <MetricCard
           href={buildMetricHref("/admin/finance/invoices", filters)}
-          label="Receivable groups"
+          label={tr("Receivable groups")}
           value={metric.receivableCount}
           hint="issued invoices with unpaid balance"
           tone="danger"
         />
         <MetricCard
           href={buildMetricHref("/admin/finance/invoices", filters)}
-          label="Receivable amount"
+          label={tr("Receivable amount")}
           value={formatMoney(metric.receivableAmount)}
           hint="invoice total minus confirmed payments"
           tone="danger"
@@ -229,29 +238,38 @@ function AdminDashboard({
             key={view.value}
             role="listitem"
           >
-            {view.label}
+            {tr(view.label)}
           </Link>
         ))}
       </div>
 
       <div className="dashboard-layout-grid">
-        <DashboardTable rows={activeRows} title={resolveViewTitle(filters.view)} />
-        <DashboardBoard countryRows={countryRows} partnerRows={partnerRows} statusRows={statusRows} />
+        <DashboardTable rows={activeRows} title={resolveViewTitle(filters.view, locale)} />
+        <DashboardBoard countryRows={countryRows} partnerRows={partnerRows} statusRows={statusRows} locale={locale} />
       </div>
     </section>
   );
 }
 
-function DashboardFilterBar({ agencies, filters }: { agencies: AdminDashboardAgencyOption[]; filters: DashboardFilters }) {
+function DashboardFilterBar({
+  agencies,
+  filters,
+  locale
+}: {
+  agencies: AdminDashboardAgencyOption[];
+  filters: DashboardFilters;
+  locale: Locale;
+}) {
   const countries = [...new Set(agencies.map((agency) => agency.countryCode).filter(Boolean) as string[])].sort();
+  const tr = (value: string) => translateAdminUi(locale, value);
 
   return (
     <form className="toolbar dashboard-toolbar" action="/admin">
       <input name="view" type="hidden" value={filters.view} />
       <label>
-        Country
+        {tr("Country")}
         <select name="country" defaultValue={filters.country ?? ""}>
-          <option value="">All countries</option>
+          <option value="">{tr("All countries")}</option>
           {countries.map((country) => (
             <option key={country} value={country}>
               {country}
@@ -260,9 +278,9 @@ function DashboardFilterBar({ agencies, filters }: { agencies: AdminDashboardAge
         </select>
       </label>
       <label>
-        Partner
+        {tr("Partner")}
         <select name="agencyAccountId" defaultValue={filters.agencyAccountId ?? ""}>
-          <option value="">All partners</option>
+          <option value="">{tr("All partners")}</option>
           {agencies.map((agency) => (
             <option key={agency.id} value={agency.id}>
               {agency.name}
@@ -271,15 +289,15 @@ function DashboardFilterBar({ agencies, filters }: { agencies: AdminDashboardAge
         </select>
       </label>
       <label>
-        From
+        {tr("From")}
         <LocaleDateInput name="from" defaultValue={filters.from ?? ""} />
       </label>
       <label>
-        To
+        {tr("To")}
         <LocaleDateInput name="to" defaultValue={filters.to ?? ""} />
       </label>
       <button className="button-primary" type="submit">
-        Filter
+        {tr("Filter")}
       </button>
     </form>
   );
@@ -370,22 +388,25 @@ function DashboardTable({ rows, title }: { rows: DashboardRow[]; title: string }
 function DashboardBoard({
   countryRows,
   partnerRows,
-  statusRows
+  statusRows,
+  locale
 }: {
   countryRows: DashboardRow[];
   partnerRows: DashboardRow[];
   statusRows: DashboardRow[];
+  locale: Locale;
 }) {
+  const tr = (value: string) => translateAdminUi(locale, value);
   return (
     <article className="dashboard-data-card">
       <div className="section-heading">
-        <h2>Dynamic Board</h2>
+        <h2>{tr("Dynamic Board")}</h2>
         <span>Notion-style</span>
       </div>
       <div className="dashboard-board">
-        <DashboardBoardColumn title="Top Countries" rows={countryRows.slice(0, 4)} />
-        <DashboardBoardColumn title="Top Partners" rows={partnerRows.slice(0, 4)} />
-        <DashboardBoardColumn title="By Status" rows={statusRows.slice(0, 5)} />
+        <DashboardBoardColumn title={tr("Top Countries")} rows={countryRows.slice(0, 4)} />
+        <DashboardBoardColumn title={tr("Top Partners")} rows={partnerRows.slice(0, 4)} />
+        <DashboardBoardColumn title={tr("By Status")} rows={statusRows.slice(0, 5)} />
       </div>
     </article>
   );
@@ -441,12 +462,13 @@ function formatMoney(value: number) {
   return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
-function resolveViewTitle(view: DashboardView) {
-  if (view === "country") return "Country View";
-  if (view === "partner") return "Partner View";
-  if (view === "period") return "Period View";
-  if (view === "status") return "Status View";
-  return "Overview Table";
+function resolveViewTitle(view: DashboardView, locale: Locale) {
+  const tr = (value: string) => translateAdminUi(locale, value);
+  if (view === "country") return tr("Country View");
+  if (view === "partner") return tr("Partner View");
+  if (view === "period") return tr("Period View");
+  if (view === "status") return tr("Status View");
+  return tr("Overview Table");
 }
 
 function buildDashboardHref(filters: DashboardFilters, patch: Partial<DashboardFilters>) {
