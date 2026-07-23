@@ -20,6 +20,7 @@ import {
 
 type SupabaseClientLike = {
   from: (table: string) => any;
+  rpc?: (name: string, args?: Record<string, unknown>) => any;
 };
 
 const invoiceListColumns =
@@ -121,23 +122,21 @@ export async function listSettlements(
   const status = normalizeEnum(filters.status, SETTLEMENT_STATUSES);
   const q = normalizeSearchTerm(filters.q);
 
-  let query = supabase
-    .from("settlements")
-    .select(
-      "id, reservation_id, status, total_invoice_amount, total_payment_amount, total_expense_amount, total_extra_revenue_amount, total_shopping_commission_amount, final_profit_amount, approved_at, created_at, reservations(reservation_code, quote_cases(tour_name), agency_accounts(name))"
-    )
-    .limit(150);
-
-  if (status) query = query.eq("status", status);
-
-  const { data, error } = await query.order("created_at", { ascending: false });
+  /*
+   * 검색어(reservation_code, tour_name, agency name)가 2단계 중첩 관계라 PostgREST 단일 쿼리로는
+   * 여러 중첩 경로를 OR 검색할 수 없습니다. 예전에는 최신 150건만 가져와 JS로 필터링해서
+   * 그 뒤 정산은 검색에서 누락됐습니다. DB 함수가 전체 정산을 대상으로 조인+검색+페이지네이션합니다.
+   */
+  if (!supabase.rpc) throw new Error("Supabase RPC client is required for settlement search");
+  const { data, error } = await supabase.rpc("search_settlements", {
+    p_status: status ?? null,
+    p_q: q ?? null,
+    p_limit: 150,
+    p_offset: 0
+  });
   if (error) throw new Error(error.message);
 
-  const rows = (data ?? []).map(mapSettlementListItem);
-  if (!q) return rows;
-  return rows.filter((row: SettlementListItem) =>
-    [row.reservationCode, row.agencyName, row.tourName].some((value) => value?.toLowerCase().includes(q.toLowerCase()))
-  );
+  return (Array.isArray(data) ? data : []).map(mapSettlementListItem);
 }
 
 function mapInvoiceListItem(row: any): InvoiceListItem {

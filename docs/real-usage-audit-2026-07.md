@@ -116,9 +116,9 @@
 - **W-1 notifications 미전달**(MEDIUM) — 오퍼레이션 페이지 알림 인박스 + acknowledge API(queued→read, 중복 409). 라이브 검증. 135/135.
 - **P-1 확장성 인덱스**(MEDIUM) — FK hot-path 인덱스 38개 선별 추가(`202607190002`). EXPLAIN으로 payments.invoice_id 등 인덱스 사용 확인. 136/136.
 
-### 남은 후속 (범위·리스크로 이번 미포함)
-- **U-3 GlobalTextTranslator**(LOW) — 사전 기반 전역 텍스트 치환 → next-intl 카탈로그 이전(별도 i18n 트랙).
-- **P-1 페이지네이션 잔여**(LOW) — `listSettlements`의 nested-join 검색(reservation_code/tour_name/agency)이 최신 150건 내로 제한. 다단계 임베드 검색 재작성은 리스크가 있어 별도 처리 권장(정산 볼륨이 커지기 전까지 실害 낮음).
+### 완료·커밋·검증 (3차 라운드 — 후속 항목 완주)
+- **U-3 GlobalTextTranslator**(LOW) — 전역 DOM 텍스트 치환 제거 → 서버측 `translateAdminUi` 헬퍼로 nav more-menu·대시보드(KPI/뷰탭/필터/보드) 번역. 라이브: KO 대시보드 서버측 한국어·하이드레이션 에러 0건, EN·파트너 영향 없음. 137/137.
+- **P-1 잔여 검색**(LOW) — `listSettlements`의 최신 150건 내 JS 검색 → `search_settlements` RPC(reservation_code/tour_name/agency 3필드를 전체 대상에 DB ILIKE + 페이지네이션, finance 역할 게이트). 라이브: 3필드 검색·상태필터·권한(anon 42501)·작은 limit에도 오래된 매칭 검색 확인. 138/138.
 
 ---
 

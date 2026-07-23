@@ -140,6 +140,22 @@ test("core navigation avoids server self-fetches and full document reloads", asy
   for (const source of componentFiles) assert.doesNotMatch(source, /window\.location\.reload\(\)/);
 });
 
+test("settlement search runs in the database across all rows, not a capped JS filter", async () => {
+  const financeQueries = await readSource("src/features/finance/queries.ts");
+  const migration = await readSource("supabase/migrations/202607190003_search_settlements.sql");
+
+  // 검색은 DB 함수에서 처리해야 최신 150건 truncation이 사라집니다.
+  assert.match(financeQueries, /\.rpc\("search_settlements"/);
+  // 예전의 최신 150건 fetch + JS 필터 패턴이 다시 들어오면 안 됩니다.
+  assert.doesNotMatch(financeQueries, /\.from\("settlements"\)[\s\S]*\.limit\(150\)/);
+  // 함수는 3개 검색 필드를 전체 대상에 ILIKE로 적용하고 finance 역할로 게이트되어야 합니다.
+  assert.match(migration, /create or replace function public\.search_settlements/);
+  assert.match(migration, /reservation_code ilike/);
+  assert.match(migration, /tour_name ilike/);
+  assert.match(migration, /if not has_finance_role\(\) then/);
+  assert.match(migration, /revoke all on function public\.search_settlements/);
+});
+
 test("admin Korean labels are applied at server render, not by DOM mutation", async () => {
   const dashboard = await readSource("src/app/admin/page.tsx");
   const topbar = await readSource("src/components/AppTopbar.tsx");
