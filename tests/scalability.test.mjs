@@ -70,6 +70,23 @@ test("search and ordering indexes match the large-list access paths", async () =
   }
 });
 
+test("foreign-key hot paths are indexed for joins and cascades", async () => {
+  const migration = await readSource("supabase/migrations/202607190002_fk_hotpath_indexes.sql");
+  // restrict FK와 예약 범위 집계 조인은 인덱스 없이는 seq scan이 됩니다.
+  for (const requiredIndex of [
+    "payments_invoice_id_idx",
+    "expenses_reservation_id_idx",
+    "extra_revenues_reservation_id_idx",
+    "shopping_commissions_reservation_id_idx",
+    "reservation_status_history_reservation_id_idx",
+    "notifications_operation_task_id_idx",
+    "quote_items_itinerary_day_id_idx",
+    "audit_logs_entity_idx"
+  ]) {
+    assert.match(migration, new RegExp(`create index if not exists ${requiredIndex}`));
+  }
+});
+
 test("reservation readiness and dashboard aggregation stay inside the database", async () => {
   const migration = await readSource("supabase/migrations/202607150002_reservation_readiness_dashboard.sql");
   const queries = await readSource("src/features/reservation/queries.ts");
