@@ -20,6 +20,7 @@ import {
   type PaginatedResult,
   type PaginationInput
 } from "@/lib/api/pagination";
+import { applySearch } from "@/lib/search.mjs";
 
 type SupabaseClientLike = {
   from: (table: string) => any;
@@ -59,9 +60,7 @@ export async function listQuoteCases(
     query = query.eq("agency_account_id", filters.agencyAccountId);
   }
 
-  if (q) {
-    query = query.or(`case_code.ilike.%${q}%,tour_name.ilike.%${q}%,share_id.ilike.%${q}%`);
-  }
+  query = applySearch(query, q, ["case_code", "tour_name", "share_id"]);
 
   const { data, error } = await query.order("created_at", { ascending: false });
   if (error) {
@@ -89,7 +88,7 @@ export async function listQuoteCasePage(
 
   if (status) query = query.eq("status", status);
   if (filters.agencyAccountId) query = query.eq("agency_account_id", filters.agencyAccountId);
-  if (q) query = query.or(`case_code.ilike.%${q}%,tour_name.ilike.%${q}%,share_id.ilike.%${q}%`);
+  query = applySearch(query, q, ["case_code", "tour_name", "share_id"]);
 
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
@@ -322,8 +321,9 @@ function mapQuoteRequestTimelineItem(row: any): QuoteRequestTimelineItem {
 }
 
 function normalizeSearchTerm(value: string | undefined) {
+  // 트림과 길이 상한만 적용합니다. LIKE 이스케이프·토큰 분리는 applySearch가 처리합니다.
   if (!value) return "";
-  return value.trim().replace(/[,%]/g, " ").slice(0, 80);
+  return value.trim().slice(0, 80);
 }
 
 function normalizeEnum<T extends string>(value: string | undefined, allowed: readonly T[]) {

@@ -2,6 +2,7 @@
  * @file 한글 책임: `reservation` 기능이 사용하는 Supabase 조회와 영속 데이터 매핑을 한곳에 모읍니다.
  * RLS가 보장하는 접근 범위를 유지하면서 목록 상한·필터·정렬을 DB에 위임하고 화면에는 안정된 도메인 모델만 반환합니다.
  */
+import { applySearch, tokenizeSearch } from "@/lib/search.mjs";
 import type {
   ReservationDetail,
   ReservationDashboardData,
@@ -68,9 +69,7 @@ export async function listReservations(
     query = query.eq("agency_account_id", filters.agencyAccountId);
   }
 
-  if (q) {
-    query = query.or(`reservation_code.ilike.%${q}%`);
-  }
+  query = applySearch(query, q, ["reservation_code"]);
 
   const { data, error } = await query.order("created_at", { ascending: false });
   if (error) {
@@ -318,16 +317,27 @@ function applyReservationSort(query: any, sortBy: string | undefined) {
 }
 
 function applyReservationSearch(query: any, q: string, scope: { quoteCaseIds: string[]; agencyAccountIds: string[] }) {
-  const clauses = [`reservation_code.ilike.%${q}%`];
+  // 예약은 여러 테이블에 걸쳐 검색합니다: 예약코드(모든 토큰 포함) OR 매칭된 견적/파트너 집합.
+  // reservation_code 토큰-AND는 and(...) 그룹으로, 견적/파트너는 미리 해석된 id 집합(IN)으로 결합합니다.
+  const codeTokens = tokenizeSearch(q).map((token) => `reservation_code.ilike.%${token}%`);
+  const clauses: string[] = [];
+  if (codeTokens.length === 1) clauses.push(codeTokens[0]);
+  else if (codeTokens.length > 1) clauses.push(`and(${codeTokens.join(",")})`);
   if (scope.quoteCaseIds.length > 0) clauses.push(`quote_case_id.in.(${scope.quoteCaseIds.join(",")})`);
   if (scope.agencyAccountIds.length > 0) clauses.push(`agency_account_id.in.(${scope.agencyAccountIds.join(",")})`);
+  if (clauses.length === 0) return query;
   return query.or(clauses.join(","));
 }
 
 async function resolveReservationSearchScope(supabase: SupabaseClientLike, q: string) {
+  // 견적(case_code, tour_name)과 파트너(name)를 각각 토큰-AND로 검색해, 어순·인접에 무관하게 매칭합니다.
+  let quoteQuery = supabase.from("quote_cases").select("id").limit(250);
+  quoteQuery = applySearch(quoteQuery, q, ["case_code", "tour_name"]);
+  let agencyQuery = supabase.from("agency_accounts").select("id").limit(250);
+  agencyQuery = applySearch(agencyQuery, q, ["name"]);
   const [{ data: quoteCases, error: quoteError }, { data: agencies, error: agencyError }] = await Promise.all([
-    supabase.from("quote_cases").select("id").or(`case_code.ilike.%${q}%,tour_name.ilike.%${q}%`).limit(250),
-    supabase.from("agency_accounts").select("id").ilike("name", `%${q}%`).limit(250)
+    quoteQuery,
+    agencyQuery
   ]);
   if (quoteError) throw new Error(quoteError.message);
   if (agencyError) throw new Error(agencyError.message);
@@ -499,8 +509,9 @@ function mapReservationSupplierContactOption(row: any): ReservationSupplierConta
 }
 
 function normalizeSearchTerm(value: string | undefined) {
+  // 트림과 길이 상한만 적용합니다. LIKE 이스케이프·토큰 분리는 applySearch가 처리합니다.
   if (!value) return "";
-  return value.trim().replace(/[,%]/g, " ").slice(0, 80);
+  return value.trim().slice(0, 80);
 }
 
 function normalizeEnum<T extends string>(value: string | undefined, allowed: readonly T[]) {

@@ -2,6 +2,7 @@
  * @file 한글 책임: `costing` 기능이 사용하는 Supabase 조회와 영속 데이터 매핑을 한곳에 모읍니다.
  * RLS가 보장하는 접근 범위를 유지하면서 목록 상한·필터·정렬을 DB에 위임하고 화면에는 안정된 도메인 모델만 반환합니다.
  */
+import { applySearch } from "@/lib/search.mjs";
 import type { CostSearchItem } from "./types";
 
 type SupabaseClientLike = {
@@ -29,7 +30,7 @@ export async function searchCostItems(
     .eq("domestic_suppliers.status", "active")
     .limit(limit);
 
-  if (q) query = query.or(`search_name.ilike.%${q}%,name_ko.ilike.%${q}%,name_en.ilike.%${q}%`);
+  query = applySearch(query, q, ["search_name", "name_ko", "name_en"]);
   if (filters.category) query = query.eq("domestic_suppliers.category", filters.category);
   if (filters.region) query = query.eq("domestic_suppliers.region_level1", filters.region);
 
@@ -39,6 +40,7 @@ export async function searchCostItems(
 }
 
 function normalizeSearchTerm(value: string | null | undefined) {
+  // 트림과 길이 상한만 적용합니다. LIKE 이스케이프·토큰 분리는 applySearch가 처리합니다.
   if (!value) return "";
-  return value.trim().replace(/[,%]/g, " ").slice(0, 80);
+  return value.trim().slice(0, 80);
 }

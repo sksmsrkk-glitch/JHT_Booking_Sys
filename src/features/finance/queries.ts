@@ -2,6 +2,7 @@
  * @file 한글 책임: `finance` 기능이 사용하는 Supabase 조회와 영속 데이터 매핑을 한곳에 모읍니다.
  * RLS가 보장하는 접근 범위를 유지하면서 목록 상한·필터·정렬을 DB에 위임하고 화면에는 안정된 도메인 모델만 반환합니다.
  */
+import { applySearch } from "@/lib/search.mjs";
 import type {
   InvoiceDetail,
   InvoiceFilters,
@@ -51,7 +52,7 @@ export async function listInvoices(
     .limit(150);
 
   if (status) query = query.eq("status", status);
-  if (q) query = query.or(`invoice_no.ilike.%${q}%`);
+  query = applySearch(query, q, ["invoice_no"]);
 
   const { data, error } = await query.order("created_at", { ascending: false });
   if (error) {
@@ -77,7 +78,7 @@ export async function listInvoicePage(
     .range(from, to);
 
   if (status) query = query.eq("status", status);
-  if (q) query = query.or(`invoice_no.ilike.%${q}%,tour_code.ilike.%${q}%`);
+  query = applySearch(query, q, ["invoice_no", "tour_code"]);
 
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
@@ -234,8 +235,9 @@ function mapPaymentListItem(row: any): PaymentListItem {
 }
 
 function normalizeSearchTerm(value: string | undefined) {
+  // 트림과 길이 상한만 적용합니다. LIKE 이스케이프·토큰 분리는 applySearch가 처리합니다.
   if (!value) return "";
-  return value.trim().replace(/[,%]/g, " ").slice(0, 80);
+  return value.trim().slice(0, 80);
 }
 
 function normalizeEnum<T extends string>(value: string | undefined, allowed: readonly T[]) {

@@ -2,6 +2,7 @@
  * @file 한글 책임: `supplier` 기능이 사용하는 Supabase 조회와 영속 데이터 매핑을 한곳에 모읍니다.
  * RLS가 보장하는 접근 범위를 유지하면서 목록 상한·필터·정렬을 DB에 위임하고 화면에는 안정된 도메인 모델만 반환합니다.
  */
+import { applySearch } from "@/lib/search.mjs";
 import type {
   RecordStatus,
   SupplierCategory,
@@ -68,11 +69,7 @@ export async function listDomesticSuppliers(
     query = query.eq("category", category);
   }
 
-  if (q) {
-    query = query.or(
-      `name_ko.ilike.%${q}%,name_en.ilike.%${q}%,search_keywords.ilike.%${q}%,region_level1.ilike.%${q}%,region_level2.ilike.%${q}%`
-    );
-  }
+  query = applySearch(query, q, ["name_ko", "name_en", "search_keywords", "region_level1", "region_level2"]);
 
   const { data, error } = await query.order("name_ko", { ascending: true });
   if (error) {
@@ -100,11 +97,7 @@ export async function listDomesticSupplierPage(
     .range(from, to);
 
   if (category) query = query.eq("category", category);
-  if (q) {
-    query = query.or(
-      `name_ko.ilike.%${q}%,name_en.ilike.%${q}%,search_keywords.ilike.%${q}%,region_level1.ilike.%${q}%,region_level2.ilike.%${q}%`
-    );
-  }
+  query = applySearch(query, q, ["name_ko", "name_en", "search_keywords", "region_level1", "region_level2"]);
 
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
@@ -201,8 +194,9 @@ function mapSupplierListItem(row: any): SupplierListItem {
 }
 
 function normalizeSearchTerm(value: string | undefined) {
+  // 트림과 길이 상한만 적용합니다. LIKE 이스케이프·토큰 분리는 applySearch가 처리합니다.
   if (!value) return "";
-  return value.trim().replace(/[,%]/g, " ").slice(0, 80);
+  return value.trim().slice(0, 80);
 }
 
 function normalizeEnum<T extends string>(value: string | undefined, allowed: readonly T[]) {
