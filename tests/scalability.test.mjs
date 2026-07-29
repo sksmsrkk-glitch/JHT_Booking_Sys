@@ -34,6 +34,19 @@ test("route segments do not introduce loading.tsx suspense boundaries", async ()
   assert.deepEqual(found, [], `route-level loading.tsx breaks hydration of streamed page content: ${found.join(", ")}`);
 });
 
+test("collapsible sidebar groups actually hide when collapsed", async () => {
+  const css = await readSource("src/app/globals.css");
+  const sidebar = await readSource("src/components/AdminWorkspaceSidebar.tsx");
+
+  // 접기 상태는 hidden 속성으로 표현합니다.
+  assert.match(sidebar, /hidden=\{!isOpen\}/);
+  /*
+   * display를 지정한 요소는 브라우저 기본 [hidden] { display: none } 규칙을 이깁니다.
+   * 같은 요소에 [hidden] 규칙을 다시 두지 않으면 토글을 눌러도 화면이 그대로입니다.
+   */
+  assert.match(css, /\.admin-workspace-nav-items\[hidden\]\s*\{[^}]*display:\s*none/);
+});
+
 test("shared pagination enforces bounded database reads", async () => {
   const source = await readSource("src/lib/api/pagination.ts");
   assert.match(source, /DEFAULT_PAGE_SIZE = 20/);
