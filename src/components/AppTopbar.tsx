@@ -9,10 +9,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { TopNavMore } from "@/components/TopNavMore";
 import type { Locale } from "@/lib/i18n";
 import { commonText } from "@/lib/i18n";
-import { translateAdminUi } from "@/lib/admin-ui-text";
 
 type AppTopbarProps = {
   isSignedIn: boolean;
@@ -30,26 +28,16 @@ export function AppTopbar({ isSignedIn, locale }: AppTopbarProps) {
   // 파트너 포털은 해외 업체가 쓰는 고객 화면이므로 전역 KOR 설정과 무관하게 영문 UI만 노출합니다.
   const effectiveLocale = isAgencySurface ? "en" : locale;
   const text = commonText[effectiveLocale];
-  const dashboardLabel = effectiveLocale === "ko" ? "대시보드" : "Dashboard";
-  const financeLabel = effectiveLocale === "ko" ? "재무" : "Finance";
-  const moreLabel = effectiveLocale === "ko" ? "더보기" : "More";
   const agencyHomeLabel = "Portal Home";
   const agencyNewInquiryLabel = "New Inquiry";
   const communicationLabel = "Communication";
   const loginLabel = isSignedIn ? text.signOut : text.signIn;
   const loginHref = (isAgencySurface ? "/agency/login" : "/auth/login") as Route;
-  const tr = (value: string) => translateAdminUi(effectiveLocale, value);
-  const moreItems = [
-    { href: "/admin/domestic-suppliers" as Route, label: text.domesticSuppliers },
-    { href: "/admin/exchange-rates" as Route, label: text.exchangeRates },
-    { href: "/admin/workflows" as Route, label: tr("Workflows") },
-    { href: "/admin/confirmations" as Route, label: tr("Confirmations") },
-    { href: "/admin/guide-expenses" as Route, label: tr("Guide Expenses") },
-    { href: "/agency", label: text.overseasAgencyPortal },
-    { href: "/admin/users" as Route, label: tr("Users") },
-    { href: "/admin/account-recovery" as Route, label: tr("Account Recovery") },
-    { href: "/admin/audit" as Route, label: tr("Audit") }
-  ];
+  /*
+   * 어드민 목적지는 좌측 사이드바(AdminWorkspaceSidebar)에 전부 펼쳐 두었으므로,
+   * 상단바에는 파트너 포털 이동 같은 화면 전환 링크만 남깁니다.
+   */
+  const portalLinkLabel = text.overseasAgencyPortal;
 
   return (
     <header className="topbar">
@@ -74,11 +62,7 @@ export function AppTopbar({ isSignedIn, locale }: AppTopbarProps) {
         </nav>
       ) : (
         <nav className="nav primary-nav" aria-label="Primary navigation">
-          <Link href="/admin">{dashboardLabel}</Link>
-          <Link href={"/admin/quote-cases" as Route}>{text.quotes}</Link>
-          <Link href={"/admin/reservations" as Route}>{text.reservations}</Link>
-          <Link href={"/admin/finance/invoices" as Route}>{financeLabel}</Link>
-          <TopNavMore items={moreItems} label={moreLabel} />
+          <Link href={"/agency" as Route}>{portalLinkLabel}</Link>
         </nav>
       )}
       <div className="topbar-controls">

@@ -14,6 +14,8 @@ import {
   type AdminDashboardAnalytics,
   type AdminDashboardRow as DashboardRow
 } from "@/features/admin-dashboard/queries";
+import { WorkQueue } from "@/components/admin/WorkQueue";
+import { listAdminWorkQueue, type WorkQueueItem } from "@/features/admin-dashboard/work-queue";
 import { adminRoutes } from "@/features/v1/site-map";
 import {
   classifyPageDataError,
@@ -48,13 +50,15 @@ type DashboardLoadState =
   | {
       status: "ready";
       analytics: AdminDashboardAnalytics;
+      workQueue: WorkQueueItem[];
     }
   | {
       status: "auth-required";
       message: string;
       analytics: AdminDashboardAnalytics;
+      workQueue: WorkQueueItem[];
     }
-  | { status: "error"; message: string; analytics: AdminDashboardAnalytics };
+  | { status: "error"; message: string; analytics: AdminDashboardAnalytics; workQueue: WorkQueueItem[] };
 
 const dashboardViews: Array<{ value: DashboardView; label: string }> = [
   { value: "overview", label: "Overview" },
@@ -143,6 +147,9 @@ function AdminDashboard({
 
   return (
     <section className="admin-dashboard-shell" aria-label="Internal admin dashboard">
+      {/* 숫자 성적표보다 먼저 "지금 처리할 것"을 보여줍니다. 필터와 무관하게 항상 전체 기준입니다. */}
+      {loadState.status === "ready" ? <WorkQueue items={loadState.workQueue} locale={locale} /> : null}
+
       <div className="section-heading dashboard-title-row">
         <div>
           <h2>{tr("Operations Dashboard")}</h2>
@@ -436,12 +443,17 @@ async function loadDashboardData(filters: DashboardFilters): Promise<DashboardLo
 
     // KPI와 모든 분해 행은 PostgreSQL에서 전체 필터 범위를 집계합니다.
     // 운영 목록의 첫 페이지가 대시보드 수치에 섞이지 않도록 경계를 분리합니다.
-    const analytics = await getAdminDashboardAnalytics(supabase, filters);
-    return { status: "ready", analytics };
+    // 할 일 큐는 필터와 무관하게 "지금 처리해야 하는 것"을 그대로 보여줍니다.
+    const [analytics, workQueue] = await Promise.all([
+      getAdminDashboardAnalytics(supabase, filters),
+      listAdminWorkQueue(supabase)
+    ]);
+    return { status: "ready", analytics, workQueue };
   } catch (error) {
     return {
       ...classifyPageDataError(error),
-      analytics: emptyAdminDashboardAnalytics()
+      analytics: emptyAdminDashboardAnalytics(),
+      workQueue: []
     };
   }
 }

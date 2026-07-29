@@ -7,35 +7,55 @@
 }
 
 :root {
-  /* JHT 전체 화면에서 공통으로 쓰는 UI 리프레시 토큰입니다. 기존 변수는 아래에서 새 토큰에 연결해 기존 화면 구조를 유지합니다. */
-  --jht-bg: #f2f4f6;
-  --jht-bg-soft: #f9fafb;
+  /*
+   * Notion 디자인 언어 토큰 (2026-07 이관).
+   * 규율: 파랑(--jht-primary)은 "주요 버튼 + 링크 + 선택됨"에만 씁니다.
+   * 스티커 색(--jht-sticker-*)은 장식·카테고리 표시 전용이며 버튼을 칠하지 않습니다.
+   * 기존 변수는 아래에서 새 토큰에 연결해 기존 화면 구조를 유지합니다.
+   */
+  --jht-bg: #f6f5f4;
+  --jht-bg-soft: #ffffff;
   --jht-surface: #ffffff;
-  --jht-surface-subtle: #f9fafb;
-  --jht-line: #e5e8eb;
-  --jht-line-soft: #f2f4f6;
-  --jht-line-strong: #d1d6db;
-  --jht-text-primary: #191f28;
-  --jht-text-secondary: #4e5968;
-  --jht-text-tertiary: #8b95a1;
-  --jht-text-disabled: #b0b8c1;
-  --jht-primary: #3182f6;
-  --jht-primary-hover: #2272eb;
-  --jht-primary-active: #1b64da;
-  --jht-primary-weak: #e8f3ff;
-  --jht-success: #03b26c;
-  --jht-success-weak: #f0faf6;
-  --jht-warning: #fe9800;
-  --jht-warning-weak: #fff6e5;
-  --jht-danger: #f04452;
-  --jht-danger-weak: #ffeeee;
-  --jht-radius-sm: 10px;
-  --jht-radius-md: 14px;
-  --jht-radius-lg: 18px;
-  --jht-radius-xl: 24px;
+  --jht-surface-subtle: #f6f5f4;
+  --jht-line: #e6e6e6;
+  --jht-line-soft: #f0efee;
+  --jht-line-strong: #d8d6d3;
+  --jht-text-primary: #000000;
+  --jht-text-secondary: #31302e;
+  --jht-text-tertiary: #615d59;
+  --jht-text-disabled: #a39e98;
+  --jht-primary: #0075de;
+  --jht-primary-hover: #0069c8;
+  --jht-primary-active: #005bab;
+  --jht-primary-weak: #e8f2fc;
+  --jht-secondary-deep: #213183;
+  /* 스티커 팔레트: 장식/카테고리 전용 */
+  --jht-sticker-sky: #62aef0;
+  --jht-sticker-purple: #d6b6f6;
+  --jht-sticker-pink: #ff64c8;
+  --jht-sticker-orange: #dd5b00;
+  --jht-sticker-teal: #2a9d99;
+  --jht-sticker-green: #1aae39;
+  /* 의미색: 운영툴에 필요한 최소 4종. 성공/주의는 스티커 팔레트에서 차용합니다. */
+  --jht-success: #1aae39;
+  --jht-success-weak: #eaf7ed;
+  --jht-warning: #dd5b00;
+  --jht-warning-weak: #fdf0e6;
+  /*
+   * 위험(연체·취소·차단)용 빨강은 Notion 팔레트에 없어 의도적으로 추가한 예외입니다.
+   * 예약 시스템에서 이 상태는 반드시 즉시 식별되어야 하므로 별도 색을 유지합니다.
+   */
+  --jht-danger: #d93025;
+  --jht-danger-weak: #fdecea;
+  --jht-radius-sm: 5px;
+  --jht-radius-md: 8px;
+  --jht-radius-lg: 12px;
+  --jht-radius-xl: 16px;
   --jht-radius-pill: 999px;
-  --jht-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --jht-shadow-floating: 0 8px 24px rgba(25, 31, 40, 0.08);
+  /* Notion 방식: 진한 그림자 하나가 아니라 거의 투명한 여러 겹으로 종이 위에 살짝 띄웁니다. */
+  --jht-shadow-card: 0 0.175px 1.041px rgba(0, 0, 0, 0.01), 0 0.8px 2.925px rgba(0, 0, 0, 0.02);
+  --jht-shadow-floating: 0 0.175px 1.041px rgba(0, 0, 0, 0.01), 0 0.8px 2.925px rgba(0, 0, 0, 0.02),
+    0 2.025px 7.847px rgba(0, 0, 0, 0.027), 0 4px 18px rgba(0, 0, 0, 0.04);
   --bg: var(--jht-bg);
   --surface: var(--jht-surface);
   --surface-strong: var(--jht-surface);
@@ -50,37 +70,41 @@
   --primary: var(--jht-primary);
   --primary-contrast: #ffffff;
   --warning-bg: var(--jht-warning-weak);
-  --warning-text: #a15c00;
+  --warning-text: #793400;
   --danger-bg: var(--jht-danger-weak);
-  --danger-border: #ffd0d5;
-  --danger-text: var(--jht-danger);
+  --danger-border: #f5c4c0;
+  --danger-text: #a81f16;
   --notice-blue-bg: var(--jht-primary-weak);
-  --notice-blue-border: #c9e2ff;
+  --notice-blue-border: #b9d9f5;
   color-scheme: light;
 }
 
 html.dark {
-  --jht-bg: #111827;
-  --jht-bg-soft: #172033;
-  --jht-surface: #182230;
-  --jht-surface-subtle: #202b3a;
-  --jht-line: #2f3b4c;
-  --jht-line-soft: #243040;
-  --jht-line-strong: #425064;
-  --jht-text-primary: #f8fafc;
-  --jht-text-secondary: #cbd5e1;
-  --jht-text-tertiary: #94a3b8;
-  --jht-text-disabled: #64748b;
-  --jht-primary: #5aa2ff;
-  --jht-primary-hover: #7bb6ff;
-  --jht-primary-active: #3d8df5;
-  --jht-primary-weak: #102b4f;
-  --jht-success: #4ade80;
-  --jht-success-weak: #133324;
-  --jht-warning: #fbbf24;
-  --jht-warning-weak: #35260c;
-  --jht-danger: #fb7185;
-  --jht-danger-weak: #3a1620;
+  /*
+   * 다크 모드도 Notion 톤을 따릅니다. 라이트가 "따뜻한 종이"이므로 다크는 차가운 남색이 아니라
+   * 중성에 가까운 따뜻한 먹색으로 두고, 파랑·의미색만 어두운 배경에서 읽히도록 밝기를 올립니다.
+   */
+  --jht-bg: #191918;
+  --jht-bg-soft: #202020;
+  --jht-surface: #212120;
+  --jht-surface-subtle: #2a2a28;
+  --jht-line: #35342f;
+  --jht-line-soft: #2c2b27;
+  --jht-line-strong: #4a4842;
+  --jht-text-primary: #f7f6f3;
+  --jht-text-secondary: #d6d3cd;
+  --jht-text-tertiary: #a39e98;
+  --jht-text-disabled: #7a756e;
+  --jht-primary: #5aa9f0;
+  --jht-primary-hover: #7cbcf5;
+  --jht-primary-active: #3d92e0;
+  --jht-primary-weak: #12324d;
+  --jht-success: #58c96f;
+  --jht-success-weak: #14301a;
+  --jht-warning: #ef8f4a;
+  --jht-warning-weak: #3a2413;
+  --jht-danger: #f0776a;
+  --jht-danger-weak: #3d1a16;
   --bg: var(--jht-bg);
   --surface: var(--jht-surface);
   --surface-strong: var(--jht-bg-soft);
@@ -104,11 +128,55 @@ html.dark {
   color-scheme: dark;
 }
 
+/*
+ * 폰트 스택 2종 (2026-07 Notion 디자인 이관)
+ *
+ * - 어드민(한/영 혼용): Inter를 먼저 두어 영문·숫자는 Notion 서체로 렌더하고,
+ *   한글 글리프는 폰트 폴백으로 Pretendard(없으면 OS 기본 한글 서체)가 이어받습니다.
+ * - 파트너 포털(영어 전용): Inter 순정. 한글 서체를 스택에 두지 않아 Notion 규격 그대로입니다.
+ */
+:root {
+  --jht-font-admin: var(--jht-font-inter), Inter, Pretendard, "Pretendard Variable", -apple-system,
+    "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --jht-font-partner: var(--jht-font-inter), Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: Pretendard, Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-family: var(--jht-font-admin);
+}
+
+.partner-workspace,
+.partner-workspace input,
+.partner-workspace select,
+.partner-workspace textarea,
+.partner-workspace button {
+  font-family: var(--jht-font-partner);
+}
+
+/*
+ * Notion 타이포 규격: 제목은 굵기 700 + 크기가 클수록 더 강한 음수 자간을 줍니다.
+ * Inter는 기본 자간이 Notion의 튜닝본(NotionInter)보다 넓어, 자간을 명시하지 않으면
+ * 제목이 늘어져 보입니다.
+ */
+h1,
+h2,
+h3 {
+  font-weight: 700;
+}
+
+h1 {
+  letter-spacing: -1px;
+}
+
+h2 {
+  letter-spacing: -0.625px;
+}
+
+h3 {
+  letter-spacing: -0.25px;
 }
 
 a {
@@ -4304,8 +4372,8 @@ summary:focus-visible {
 .page-header h1 {
   color: var(--jht-text-primary);
   font-size: clamp(26px, 2.4vw, 30px);
-  font-weight: 800;
-  letter-spacing: 0;
+  font-weight: 700;
+  letter-spacing: -0.75px;
 }
 
 .page-header p {
@@ -6233,4 +6301,346 @@ html.dark .jht-calendar-month-grid button {
     min-height: 36px;
     padding: 8px 10px;
   }
+}
+
+/* ─── 어드민 워크스페이스 사이드바 (2026-07 네비게이션 평탄화) ─────────────────
+ * 예전 상단바는 목적지 13개 중 9개를 "더보기" 드롭다운에 숨겼습니다.
+ * Notion의 앱 셸 패턴대로 좌측에 전부 펼치고, 현재 위치는 파란 인디케이터로 표시합니다.
+ */
+.admin-workspace {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 232px minmax(0, 1fr);
+  margin: 0 auto;
+  max-width: 1440px;
+  padding: 24px 24px 56px;
+}
+
+.admin-workspace-main {
+  margin: 0;
+  max-width: none;
+  min-width: 0;
+  padding: 0;
+}
+
+.admin-workspace-sidebar {
+  align-self: start;
+  position: sticky;
+  top: 24px;
+}
+
+.admin-workspace-nav {
+  display: grid;
+  gap: 20px;
+}
+
+.admin-workspace-nav-section {
+  display: grid;
+  gap: 2px;
+}
+
+.admin-workspace-nav-section h2 {
+  color: var(--jht-text-disabled);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.125px;
+  margin: 0 0 6px;
+  padding: 0 10px;
+}
+
+.admin-workspace-link {
+  border-left: 2px solid transparent;
+  border-radius: var(--jht-radius-sm);
+  display: grid;
+  gap: 1px;
+  padding: 7px 10px;
+  transition: background 120ms ease;
+}
+
+.admin-workspace-link span {
+  color: var(--jht-text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.admin-workspace-link small {
+  color: var(--jht-text-disabled);
+  font-size: 12px;
+}
+
+.admin-workspace-link:hover {
+  background: var(--jht-surface-subtle);
+}
+
+.admin-workspace-link.active {
+  background: var(--jht-primary-weak);
+  border-left-color: var(--jht-primary);
+  border-radius: 0 var(--jht-radius-sm) var(--jht-radius-sm) 0;
+}
+
+.admin-workspace-link.active span {
+  color: var(--jht-primary);
+  font-weight: 600;
+}
+
+@media (max-width: 960px) {
+  .admin-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 20px 16px 48px;
+  }
+
+  .admin-workspace-sidebar {
+    position: static;
+  }
+
+  .admin-workspace-nav {
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}
+
+/* ─── 단체 상황판 (Group Cockpit) ─────────────────────────────────────────
+ * 투어 코드 1건의 8단계 진행 + 지금 할 일 + 금액을 한 화면에 모읍니다.
+ */
+.cockpit {
+  background: var(--jht-surface);
+  border: 1px solid var(--jht-line);
+  border-radius: var(--jht-radius-lg);
+  box-shadow: var(--jht-shadow-card);
+  display: grid;
+  gap: 18px;
+  margin-bottom: 20px;
+  padding: 20px 22px;
+}
+
+.cockpit-head {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.cockpit-head h2 {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+.cockpit-code {
+  color: var(--jht-text-tertiary);
+  font-size: 12px;
+  letter-spacing: 0.125px;
+}
+
+.cockpit-stages {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cockpit-stage {
+  display: grid;
+  gap: 4px;
+  text-align: center;
+}
+
+.cockpit-stage-bar {
+  background: var(--jht-line);
+  border-radius: var(--jht-radius-pill);
+  display: block;
+  height: 5px;
+}
+
+.cockpit-stage.is-done .cockpit-stage-bar {
+  background: var(--jht-success);
+}
+
+.cockpit-stage.is-current .cockpit-stage-bar {
+  background: var(--jht-primary);
+}
+
+.cockpit-stage-label {
+  color: var(--jht-text-disabled);
+  font-size: 12px;
+}
+
+.cockpit-stage.is-done .cockpit-stage-label {
+  color: var(--jht-text-secondary);
+}
+
+.cockpit-stage.is-current .cockpit-stage-label {
+  color: var(--jht-primary);
+  font-weight: 600;
+}
+
+.cockpit-stage small {
+  color: var(--jht-text-disabled);
+  font-size: 11px;
+}
+
+.cockpit-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.cockpit-action {
+  align-items: center;
+  background: var(--jht-surface-subtle);
+  border: 1px solid var(--jht-line);
+  border-left: 3px solid var(--jht-line-strong);
+  border-radius: 0 var(--jht-radius-md) var(--jht-radius-md) 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.cockpit-action.tone-danger {
+  border-left-color: var(--jht-danger);
+}
+
+.cockpit-action.tone-warning {
+  border-left-color: var(--jht-warning);
+}
+
+.cockpit-action.tone-info {
+  border-left-color: var(--jht-primary);
+}
+
+.cockpit-action-eyebrow {
+  color: var(--jht-text-tertiary);
+  font-size: 11px;
+  margin: 0 0 2px;
+}
+
+.cockpit-action.tone-danger .cockpit-action-eyebrow {
+  color: var(--jht-danger);
+}
+
+.cockpit-action-label {
+  color: var(--jht-text-primary);
+  font-size: 14px;
+  margin: 0;
+}
+
+.cockpit-clear {
+  margin: 0;
+}
+
+.cockpit-money {
+  border-top: 1px solid var(--jht-line);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  margin: 0;
+  padding-top: 14px;
+}
+
+.cockpit-money dt {
+  color: var(--jht-text-disabled);
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+
+.cockpit-money dd {
+  color: var(--jht-text-primary);
+  font-size: 15px;
+  margin: 0;
+}
+
+.cockpit-money .cockpit-margin {
+  color: var(--jht-success);
+}
+
+@media (max-width: 760px) {
+  .cockpit-stages {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* ─── 오늘 할 일 큐 (대시보드 최상단) ─────────────────────────────────────
+ * 집계 숫자보다 먼저 "지금 처리할 대상"을 급한 순서로 보여줍니다.
+ */
+.work-queue {
+  background: var(--jht-surface);
+  border: 1px solid var(--jht-line);
+  border-radius: var(--jht-radius-lg);
+  box-shadow: var(--jht-shadow-card);
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 18px 20px;
+}
+
+.work-queue-clear {
+  margin: 0;
+}
+
+.work-queue-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.work-queue-item {
+  align-items: center;
+  background: var(--jht-surface-subtle);
+  border: 1px solid var(--jht-line);
+  border-left: 3px solid var(--jht-line-strong);
+  border-radius: 0 var(--jht-radius-md) var(--jht-radius-md) 0;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 10px 14px;
+}
+
+.work-queue-item.tone-danger {
+  border-left-color: var(--jht-danger);
+}
+
+.work-queue-item.tone-warning {
+  border-left-color: var(--jht-warning);
+}
+
+.work-queue-item.tone-info {
+  border-left-color: var(--jht-primary);
+}
+
+.work-queue-count {
+  color: var(--jht-text-primary);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.25px;
+  min-width: 28px;
+  text-align: center;
+}
+
+.work-queue-item.tone-danger .work-queue-count {
+  color: var(--jht-danger);
+}
+
+.work-queue-item.tone-warning .work-queue-count {
+  color: var(--jht-warning);
+}
+
+.work-queue-body {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.work-queue-body small {
+  color: var(--jht-text-disabled);
+  font-size: 11px;
+}
+
+.work-queue-body span {
+  color: var(--jht-text-primary);
+  font-size: 14px;
 }
