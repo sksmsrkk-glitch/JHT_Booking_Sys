@@ -14,8 +14,10 @@ import {
   type AdminDashboardAnalytics,
   type AdminDashboardRow as DashboardRow
 } from "@/features/admin-dashboard/queries";
+import { GroupStatusBoard } from "@/components/admin/GroupStatusBoard";
 import { WorkQueue } from "@/components/admin/WorkQueue";
 import { listAdminWorkQueue, type WorkQueueItem } from "@/features/admin-dashboard/work-queue";
+import { getGroupStatusBoard, type GroupStatusBoard as GroupStatusBoardData } from "@/features/reservation/group-status-board";
 import { adminRoutes } from "@/features/v1/site-map";
 import {
   classifyPageDataError,
@@ -51,14 +53,16 @@ type DashboardLoadState =
       status: "ready";
       analytics: AdminDashboardAnalytics;
       workQueue: WorkQueueItem[];
+      board: GroupStatusBoardData | null;
     }
   | {
       status: "auth-required";
       message: string;
       analytics: AdminDashboardAnalytics;
       workQueue: WorkQueueItem[];
+      board: GroupStatusBoardData | null;
     }
-  | { status: "error"; message: string; analytics: AdminDashboardAnalytics; workQueue: WorkQueueItem[] };
+  | { status: "error"; message: string; analytics: AdminDashboardAnalytics; workQueue: WorkQueueItem[]; board: GroupStatusBoardData | null };
 
 const dashboardViews: Array<{ value: DashboardView; label: string }> = [
   { value: "overview", label: "Overview" },
@@ -149,6 +153,9 @@ function AdminDashboard({
     <section className="admin-dashboard-shell" aria-label="Internal admin dashboard">
       {/* 숫자 성적표보다 먼저 "지금 처리할 것"을 보여줍니다. 필터와 무관하게 항상 전체 기준입니다. */}
       {loadState.status === "ready" ? <WorkQueue items={loadState.workQueue} locale={locale} /> : null}
+
+      {/* 전 팀이 공유하는 핵심 화면입니다. 엑셀 단체현황표와 같은 달력형 배치로 둡니다. */}
+      {loadState.board ? <GroupStatusBoard board={loadState.board} locale={locale} /> : null}
 
       <div className="section-heading dashboard-title-row">
         <div>
@@ -444,18 +451,36 @@ async function loadDashboardData(filters: DashboardFilters): Promise<DashboardLo
     // KPI와 모든 분해 행은 PostgreSQL에서 전체 필터 범위를 집계합니다.
     // 운영 목록의 첫 페이지가 대시보드 수치에 섞이지 않도록 경계를 분리합니다.
     // 할 일 큐는 필터와 무관하게 "지금 처리해야 하는 것"을 그대로 보여줍니다.
-    const [analytics, workQueue] = await Promise.all([
+    // 단체 현황표는 필터의 기간을 따르되, 지정이 없으면 이번 달을 보여줍니다.
+    const boardRange = resolveBoardRange(filters);
+    const [analytics, workQueue, board] = await Promise.all([
       getAdminDashboardAnalytics(supabase, filters),
-      listAdminWorkQueue(supabase)
+      listAdminWorkQueue(supabase),
+      getGroupStatusBoard(supabase, boardRange).catch(() => null)
     ]);
-    return { status: "ready", analytics, workQueue };
+    return { status: "ready", analytics, workQueue, board };
   } catch (error) {
     return {
       ...classifyPageDataError(error),
       analytics: emptyAdminDashboardAnalytics(),
-      workQueue: []
+      workQueue: [],
+      board: null
     };
   }
+}
+
+/* 필터에 기간이 없으면 이번 달 1일~말일을 기본 조회 구간으로 씁니다. */
+function resolveBoardRange(filters: DashboardFilters): { start: string; end: string } {
+  if (filters.from && filters.to) return { start: filters.from, end: filters.to };
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const start = new Date(Date.UTC(year, month, 1));
+  const end = new Date(Date.UTC(year, month + 1, 0));
+  return {
+    start: filters.from ?? start.toISOString().slice(0, 10),
+    end: filters.to ?? end.toISOString().slice(0, 10)
+  };
 }
 
 function normalizeDashboardFilters(params: Awaited<SearchParams>): DashboardFilters {
