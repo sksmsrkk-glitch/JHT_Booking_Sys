@@ -6644,3 +6644,92 @@ html.dark .jht-calendar-month-grid button {
   color: var(--jht-text-primary);
   font-size: 14px;
 }
+
+/* ─── 견적 작성 3단계 스테퍼 ──────────────────────────────────────────────
+ * 폼은 하나로 유지하고 패널만 전환하므로, 단계를 오가도 입력값이 보존됩니다.
+ */
+.quote-stepper {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+}
+
+.quote-step button {
+  align-items: center;
+  background: var(--jht-surface);
+  border: 1px solid var(--jht-line);
+  border-radius: var(--jht-radius-md);
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.quote-step-index {
+  align-items: center;
+  background: var(--jht-surface-subtle);
+  border-radius: var(--jht-radius-pill);
+  color: var(--jht-text-tertiary);
+  display: inline-flex;
+  flex: 0 0 24px;
+  font-size: 12px;
+  font-weight: 600;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
+}
+
+.quote-step-body {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.quote-step-body strong {
+  color: var(--jht-text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.quote-step-body small {
+  color: var(--jht-text-disabled);
+  font-size: 12px;
+}
+
+.quote-step.active button {
+  background: var(--jht-primary-weak);
+  border-color: var(--jht-primary);
+}
+
+.quote-step.active .quote-step-index {
+  background: var(--jht-primary);
+  color: #ffffff;
+}
+
+.quote-step.active .quote-step-body strong {
+  color: var(--jht-primary);
+  font-weight: 600;
+}
+
+.quote-step.done .quote-step-index {
+  background: var(--jht-success);
+  color: #ffffff;
+}
+
+.quote-step-actions {
+  align-items: center;
+  border-top: 1px solid var(--jht-line);
+  gap: 10px;
+  padding-top: 14px;
+}
+
+@media (max-width: 760px) {
+  .quote-stepper {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -9,7 +9,7 @@ import { safeFetch } from "@/lib/client/safe-fetch";
 
 import { requestRouteRefresh } from "@/lib/client/route-refresh";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { AgencyListItem } from "@/features/agency/types";
 import type { CompanyListItem } from "@/features/company/types";
 import { buildCurrencyOptions, DEFAULT_COUNTRY_REFERENCES, mergeCountryReferences } from "@/features/countries/defaults";
@@ -467,6 +467,13 @@ export function QuoteCaseCreateForm({
   const [message, setMessage] = useState("");
   const [sampleNotice, setSampleNotice] = useState("");
   const [isBusy, setIsBusy] = useState(false);
+  /*
+   * 예전에는 기본정보·환율·원가항목·일정이 한 화면에 모두 펼쳐져 처음 쓰는 담당자가 어디부터
+   * 채워야 할지 알기 어려웠습니다. 3단계로 나누되 폼은 하나로 유지해(패널만 숨김) 입력값이
+   * 단계를 오가도 사라지지 않고 그대로 제출됩니다.
+   */
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const formRef = useRef<HTMLFormElement | null>(null);
   const [caseFields, setCaseFields] = useState<QuoteCaseFields>(DEFAULT_CASE_FIELDS);
   const [itemRows, setItemRows] = useState<QuoteItemRow[]>([DEFAULT_ITEM_ROW]);
   const [itineraryRows, setItineraryRows] = useState<ItineraryRow[]>([DEFAULT_ITINERARY_ROW]);
@@ -614,8 +621,50 @@ export function QuoteCaseCreateForm({
     requestRouteRefresh();
   }
 
+  /*
+   * 다음 단계로 갈 때 현재 단계의 필수 입력만 먼저 검사합니다.
+   * 이렇게 해야 마지막 제출 시점에 "숨겨진 단계의 빈 필수 항목"이 브라우저 검증에 걸려
+   * 포커스를 못 잡고 조용히 실패하는 문제가 생기지 않습니다.
+   */
+  function goToStep(next: 1 | 2 | 3) {
+    if (next > step) {
+      const panel = formRef.current?.querySelector(`[data-quote-step="${step}"]`);
+      const controls = panel
+        ? Array.from(panel.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input, select, textarea"))
+        : [];
+      const invalid = controls.find((control) => !control.disabled && !control.checkValidity());
+      if (invalid) {
+        invalid.reportValidity();
+        return;
+      }
+    }
+    setMessage("");
+    setStep(next);
+  }
+
+  const steps: Array<{ value: 1 | 2 | 3; label: string; helper: string }> = [
+    { value: 1, label: "Basics", helper: "Partner, dates, pax" },
+    { value: 2, label: "Costing", helper: "FX and quote items" },
+    { value: 3, label: "Itinerary", helper: "Days and public summary" }
+  ];
+
   return (
-    <form action={createQuoteCase} className="stacked-form">
+    <form action={createQuoteCase} className="stacked-form" ref={formRef}>
+      <ol className="quote-stepper" aria-label="Quote creation steps">
+        {steps.map((entry) => (
+          <li className={`quote-step ${entry.value === step ? "active" : entry.value < step ? "done" : ""}`} key={entry.value}>
+            <button onClick={() => goToStep(entry.value)} type="button">
+              <span className="quote-step-index">{entry.value}</span>
+              <span className="quote-step-body">
+                <strong>{entry.label}</strong>
+                <small>{entry.helper}</small>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ol>
+
+      <div data-quote-step="1" hidden={step !== 1}>
       <div className="form-grid three-column">
         <label>
           Company
@@ -737,7 +786,9 @@ export function QuoteCaseCreateForm({
           onChange={(event) => updateCaseField("termsAndConditions", event.target.value)}
         />
       </label>
+      </div>
 
+      <div data-quote-step="2" hidden={step !== 2}>
       <section className="full-width-field">
         <div className="section-heading">
           <div>
@@ -1228,6 +1279,9 @@ export function QuoteCaseCreateForm({
         </div>
       </section>
 
+      </div>
+
+      <div data-quote-step="3" hidden={step !== 3}>
       <section className="full-width-field">
         <div className="section-heading">
           <div>
@@ -1373,10 +1427,24 @@ export function QuoteCaseCreateForm({
         </div>
       </section>
 
-      <div className="inline-actions">
-        <button className="button-primary" disabled={isBusy} type="submit">
-          Create Quote Case
-        </button>
+      </div>
+
+      <div className="inline-actions quote-step-actions">
+        {step > 1 ? (
+          <button className="button-secondary" onClick={() => goToStep((step - 1) as 1 | 2)} type="button">
+            Back
+          </button>
+        ) : null}
+        {step < 3 ? (
+          <button className="button-primary" onClick={() => goToStep((step + 1) as 2 | 3)} type="button">
+            Next
+          </button>
+        ) : (
+          <button className="button-primary" disabled={isBusy} type="submit">
+            Create Quote Case
+          </button>
+        )}
+        <span className="subtext">Step {step} of 3</span>
         {message ? <span className="danger-text">{message}</span> : null}
       </div>
     </form>
