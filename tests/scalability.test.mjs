@@ -10,6 +10,30 @@ import test from "node:test";
 
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
 
+test("route segments do not introduce loading.tsx suspense boundaries", async () => {
+  const { readdir } = await import("node:fs/promises");
+
+  /*
+   * 라우트 단위 loading.tsx는 페이지 전체를 Suspense 경계로 감싸고, 데이터 조회로 서스펜드된
+   * 페이지 본문이 스트리밍으로 전달됩니다. 이 프로젝트에서는 그렇게 스트리밍된 본문이
+   * 하이드레이션되지 않아, 어드민의 모든 폼 버튼이 눌러도 반응하지 않는 상태가 되었습니다.
+   * (Next 15.5.18과 15.5.22 모두에서 재현, 레이아웃을 비워도 동일)
+   * 로딩 스켈레톤보다 화면 조작 가능 여부가 우선이므로 라우트 loading.tsx는 두지 않습니다.
+   */
+  const found = [];
+  async function scan(relative) {
+    const entries = await readdir(path.join(repositoryRoot, relative), { withFileTypes: true });
+    for (const entry of entries) {
+      const next = path.posix.join(relative.replaceAll("\\", "/"), entry.name);
+      if (entry.isDirectory()) await scan(next);
+      else if (entry.name === "loading.tsx") found.push(next);
+    }
+  }
+  await scan("src/app");
+
+  assert.deepEqual(found, [], `route-level loading.tsx breaks hydration of streamed page content: ${found.join(", ")}`);
+});
+
 test("shared pagination enforces bounded database reads", async () => {
   const source = await readSource("src/lib/api/pagination.ts");
   assert.match(source, /DEFAULT_PAGE_SIZE = 20/);
