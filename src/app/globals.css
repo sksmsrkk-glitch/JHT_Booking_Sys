@@ -6268,12 +6268,13 @@ html.dark .jht-calendar-month-grid button {
   background: none;
   border: 0;
   border-radius: var(--jht-radius-sm);
-  color: var(--jht-text-tertiary);
+  /* 상위 그룹 라벨은 하위 항목과 구분되도록 굵게 두고 색도 한 단계 진하게 씁니다. */
+  color: var(--jht-text-secondary);
   cursor: pointer;
   display: flex;
   font-family: inherit;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   gap: 8px;
   justify-content: space-between;
   letter-spacing: 0.125px;
@@ -6284,7 +6285,7 @@ html.dark .jht-calendar-month-grid button {
 
 .admin-workspace-nav-toggle:hover {
   background: var(--jht-surface-subtle);
-  color: var(--jht-text-secondary);
+  color: var(--jht-text-primary);
 }
 
 .admin-workspace-nav-toggle > span:first-child {
