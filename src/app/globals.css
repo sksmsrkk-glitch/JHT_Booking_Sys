@@ -243,7 +243,7 @@ a {
   color: var(--text);
   cursor: pointer;
   font: inherit;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
   padding: 10px 12px;
   white-space: nowrap;
@@ -360,7 +360,7 @@ a {
   border-radius: 999px;
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1;
   min-height: 34px;
   padding: 10px 13px;
@@ -389,7 +389,7 @@ a {
   color: var(--text-muted);
   cursor: pointer;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   min-height: 34px;
   min-width: 54px;
   padding: 0 12px;
@@ -413,7 +413,7 @@ a {
   color: var(--text-muted);
   cursor: pointer;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   min-height: 30px;
   min-width: 38px;
   padding: 0 10px;
@@ -455,7 +455,7 @@ a {
 .eyebrow {
   color: var(--text-soft);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0;
   margin-bottom: 8px;
   text-transform: uppercase;
@@ -638,7 +638,7 @@ a {
 .partner-onboarding-steps span {
   color: #5f7896;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -680,7 +680,7 @@ a {
 .partner-status-item small {
   color: #829ab1;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .partner-status-item strong {
@@ -790,7 +790,7 @@ a {
   border-radius: 6px;
   display: inline-flex;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 500;
   justify-content: center;
   min-height: 40px;
   padding: 0 14px;
@@ -832,7 +832,7 @@ a {
   color: #334e68;
   display: grid;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   gap: 6px;
 }
 
@@ -882,7 +882,7 @@ select:disabled {
   color: #334e68;
   display: grid;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   gap: 6px;
 }
 
@@ -914,7 +914,7 @@ select:disabled {
   color: #334e68;
   display: grid;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   gap: 6px;
 }
 
@@ -987,7 +987,7 @@ select:disabled {
 
 .auth-recovery-links a {
   color: var(--jht-primary, #0f5b99);
-  font-weight: 700;
+  font-weight: 500;
   text-decoration: none;
 }
 
@@ -1064,15 +1064,17 @@ select:disabled {
 }
 
 .dashboard-kpi-card span {
-  color: #334e68;
+  color: var(--jht-text-tertiary);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
 .dashboard-kpi-card strong {
-  color: #102a43;
+  color: var(--jht-text-primary);
   font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
   line-height: 1;
 }
 
@@ -1103,7 +1105,7 @@ select:disabled {
   border-radius: 999px;
   color: #334e68;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   padding: 8px 12px;
 }
 
@@ -1201,7 +1203,7 @@ select:disabled {
   color: #334e68;
   display: grid;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   gap: 6px;
 }
 
@@ -1209,7 +1211,7 @@ select:disabled {
   color: #334e68;
   display: grid;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   gap: 6px;
   margin: 12px 0;
 }
@@ -1331,7 +1333,7 @@ select:disabled {
 
 .success-text {
   color: #137333;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .inline-actions {
@@ -1372,7 +1374,7 @@ select:disabled {
   color: #243b53;
   cursor: pointer;
   display: inline-flex;
-  font-weight: 800;
+  font-weight: 600;
   justify-content: center;
   min-height: 38px;
   padding: 0 12px;
@@ -1427,7 +1429,7 @@ select:disabled {
 .checkbox-cluster legend {
   color: #334e68;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   padding: 0 6px;
 }
 
@@ -1436,7 +1438,7 @@ select:disabled {
   color: #334e68;
   display: inline-flex;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   gap: 6px;
 }
 
@@ -1449,7 +1451,7 @@ select:disabled {
   color: #334e68;
   display: grid;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   gap: 8px;
 }
 
@@ -1471,7 +1473,7 @@ select:disabled {
 .mini-checkbox-cluster legend {
   color: #52606d;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   padding: 0 6px;
 }
 
@@ -1596,7 +1598,7 @@ select:disabled {
   border-radius: 999px;
   color: #ffffff;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1;
   max-width: 250px;
   overflow: hidden;
@@ -1647,7 +1649,7 @@ select:disabled {
   border-radius: 999px;
   color: #315173;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   padding: 4px 7px;
   white-space: nowrap;
 }
@@ -1724,7 +1726,7 @@ select:disabled {
   color: #334e68;
   display: grid;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   gap: 4px;
 }
 
@@ -1737,7 +1739,7 @@ select:disabled {
 .calendar-current-month {
   color: #486581;
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 600;
   line-height: 34px;
   min-width: 68px;
   text-align: right;
@@ -1755,7 +1757,7 @@ select:disabled {
   color: #334e68;
   display: grid;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   gap: 4px;
 }
 
@@ -1775,7 +1777,7 @@ select:disabled {
   color: #334e68;
   display: grid;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 600;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   text-transform: uppercase;
 }
@@ -1818,7 +1820,7 @@ select:disabled {
 .calendar-day span {
   color: #334e68;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .calendar-day.muted {
@@ -1845,7 +1847,7 @@ select:disabled {
   color: #ffffff;
   display: block;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 600;
   line-height: 1.15;
   margin: 0 3px;
   min-height: 24px;
@@ -1928,7 +1930,7 @@ select:disabled {
 .operation-check-card > span {
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 600;
   justify-self: start;
   padding: 6px 8px;
   text-transform: uppercase;
@@ -1972,7 +1974,7 @@ select:disabled {
   color: #ffffff;
   display: inline-flex;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 600;
   height: 28px;
   justify-content: center;
   width: 28px;
@@ -1995,7 +1997,7 @@ select:disabled {
   border-radius: 999px;
   color: #284b63;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   padding: 7px 10px;
 }
 
@@ -2022,7 +2024,7 @@ select:disabled {
   border-radius: 6px;
   display: inline-block;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   margin: 0 6px 6px 0;
   padding: 6px 8px;
 }
@@ -2090,7 +2092,7 @@ select:disabled {
   border-left: 1px solid #c4d8eb;
   border-right: 1px solid #c4d8eb;
   color: #284b63;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .calendar-cell-arrival {
@@ -2114,7 +2116,7 @@ select:disabled {
   border-radius: 999px;
   color: #334e68;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1;
   padding: 6px 8px;
   white-space: nowrap;
@@ -2233,7 +2235,7 @@ table {
   color: #334e68;
   display: grid;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   gap: 6px;
 }
 
@@ -2368,7 +2370,7 @@ html.dark .quote-sample-load-status {
 
 .quote-item-table tfoot td {
   background: #f8fafc;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .money-cell,
@@ -2486,7 +2488,7 @@ html.dark .quote-sample-load-status {
   border-radius: 6px;
   color: #334e68;
   display: inline-flex;
-  font-weight: 700;
+  font-weight: 600;
   justify-content: center;
   min-height: 40px;
   width: 100%;
@@ -2505,7 +2507,7 @@ th {
   background: #f8fafc;
   color: #334e68;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
@@ -2516,7 +2518,7 @@ tbody tr:last-child td {
 .strong-link {
   color: #0f5b99;
   display: block;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .subtext {
@@ -2533,7 +2535,7 @@ tbody tr:last-child td {
   color: #334e68;
   display: inline-flex;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 4px 8px;
 }
 
@@ -2634,7 +2636,7 @@ tbody tr:last-child td {
 .definition-list dt {
   color: #627d98;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   margin-bottom: 3px;
   text-transform: uppercase;
 }
@@ -2684,7 +2686,7 @@ tbody tr:last-child td {
   color: #334e68;
   display: grid;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   gap: 6px;
 }
 
@@ -2697,7 +2699,7 @@ tbody tr:last-child td {
 .row-details summary {
   color: #0f5b99;
   cursor: pointer;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .row-details[open] summary {
@@ -2753,7 +2755,7 @@ tbody tr:last-child td {
 .metric-card span {
   color: #627d98;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .metric-card strong {
@@ -2919,14 +2921,14 @@ tbody tr:last-child td {
 .workflow-context-panel dt {
   color: #627d98;
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
 .workflow-context-panel dd {
   color: #1f2933;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   margin: 0;
 }
 
@@ -2940,7 +2942,7 @@ tbody tr:last-child td {
   border-radius: 7px;
   color: var(--primary);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   padding: 8px 10px;
   text-align: center;
   text-decoration: none;
@@ -2986,7 +2988,7 @@ tbody tr:last-child td {
 .workflow-message footer {
   color: #627d98;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .workflow-message p {
@@ -3008,7 +3010,7 @@ tbody tr:last-child td {
   color: #334e68;
   display: grid;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   gap: 5px;
 }
 
@@ -3030,7 +3032,7 @@ tbody tr:last-child td {
 .workflow-action-card span:first-child {
   color: #627d98;
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
@@ -3112,7 +3114,7 @@ tbody tr:last-child td {
   color: #334e68;
   display: grid;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   gap: 5px;
 }
 
@@ -3155,7 +3157,7 @@ tbody tr:last-child td {
   border-bottom: 1px solid #e2e8f0;
   color: #334e68;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: 0.02em;
   padding: 9px 14px;
   text-transform: uppercase;
@@ -3193,7 +3195,7 @@ tbody tr:last-child td {
   color: #627d98;
   display: none;
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
@@ -3216,7 +3218,7 @@ tbody tr:last-child td {
   border-radius: 6px;
   color: var(--primary);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   justify-content: center;
   padding: 7px 9px;
   text-align: center;
@@ -3234,7 +3236,7 @@ tbody tr:last-child td {
   border-radius: 999px;
   color: #9a3412;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1;
   padding: 6px 8px;
   white-space: nowrap;
@@ -3301,14 +3303,14 @@ tbody tr:last-child td {
 .confirmation-reservation-tile dt {
   color: #60758c;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
 .confirmation-row-meta dt {
   color: #60758c;
   font-size: 9px;
-  font-weight: 800;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
@@ -3346,7 +3348,7 @@ tbody tr:last-child td {
 
 .confirmation-status-tile p {
   font-size: 19px;
-  font-weight: 800;
+  font-weight: 600;
   margin: 0;
 }
 
@@ -3400,7 +3402,7 @@ tbody tr:last-child td {
   border-radius: 999px;
   color: #334e68;
   font-size: 9px;
-  font-weight: 800;
+  font-weight: 600;
   padding: 2px 7px;
 }
 
@@ -3420,7 +3422,7 @@ tbody tr:last-child td {
 .confirmation-row-meta dd {
   color: #202b38;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   margin: 0;
 }
 
@@ -3516,7 +3518,7 @@ tbody tr:last-child td {
 .quote-total-box span {
   color: #627d98;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
 }
 
@@ -3543,7 +3545,7 @@ tbody tr:last-child td {
 .meal-summary dt {
   color: #627d98;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   margin-bottom: 4px;
   text-transform: uppercase;
 }
@@ -3579,12 +3581,12 @@ tbody tr:last-child td {
 
 .danger-text {
   color: #a61b1b;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .warning-text {
   color: #92400e;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .danger-button {
@@ -3615,7 +3617,7 @@ tbody tr:last-child td {
 .checkbox-group legend {
   color: #334e68;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 0 6px;
 }
 
@@ -3645,7 +3647,7 @@ tbody tr:last-child td {
   color: #137333;
   display: inline-block;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 4px 8px;
 }
 
@@ -3931,7 +3933,7 @@ html.dark img {
   border-radius: 999px;
   color: #183b56;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   padding: 4px 8px;
 }
 
@@ -3963,13 +3965,13 @@ html.dark img {
 .invoice-totals dt {
   color: #627d98;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
 }
 
 .invoice-totals dd {
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 500;
   margin: 0;
 }
 
@@ -4271,7 +4273,7 @@ summary:focus-visible {
   border-radius: var(--jht-radius-pill);
   color: var(--jht-text-secondary);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 500;
   height: 40px;
   min-height: 40px;
   padding: 0 14px;
@@ -4384,7 +4386,7 @@ summary:focus-visible {
 .eyebrow {
   color: var(--jht-text-tertiary);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .route-card,
@@ -4461,7 +4463,7 @@ summary:focus-visible {
 .compact-button {
   border-radius: var(--jht-radius-md);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 600;
   min-height: 44px;
   padding: 0 16px;
 }
@@ -4476,7 +4478,7 @@ summary:focus-visible {
   display: inline-flex;
   font: inherit;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 600;
   justify-content: center;
   min-height: 44px;
   padding: 0 16px;
@@ -4499,7 +4501,7 @@ summary:focus-visible {
   cursor: pointer;
   display: inline-flex;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 600;
   justify-content: center;
   min-height: 44px;
   padding: 0 16px;
@@ -4643,7 +4645,7 @@ textarea:disabled {
 .list-control-form label {
   color: var(--jht-text-secondary);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 table {
@@ -4656,7 +4658,7 @@ table th {
   background: var(--jht-surface-subtle);
   color: var(--jht-text-secondary);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 table td,
@@ -4684,7 +4686,7 @@ tbody tr:hover td {
 .missing-action-list span {
   border-radius: var(--jht-radius-pill);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   padding: 5px 10px;
 }
 
@@ -4863,7 +4865,7 @@ tbody tr:hover td {
   border-radius: var(--jht-radius-md);
   color: var(--jht-primary);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   padding: 9px 10px;
 }
 
@@ -5210,7 +5212,7 @@ html.dark .nav-more-menu a:hover {
 .support-tools-disclosure > summary span {
   color: var(--jht-text-tertiary);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .support-tools-disclosure[open] > summary {
@@ -5258,7 +5260,7 @@ html.dark .nav-more-menu a:hover {
 .quote-create-disclosure .disclosure-action {
   color: var(--jht-primary);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .quote-create-disclosure[open] > summary {
@@ -5349,7 +5351,7 @@ html.dark .nav-more-menu a:hover {
 .partner-workspace-link span {
   color: inherit;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.25;
 }
 
@@ -5430,7 +5432,7 @@ html.dark .nav-more-menu a:hover {
   border-radius: 999px;
   color: var(--jht-text-secondary);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1;
   padding: 8px 10px;
   white-space: nowrap;
@@ -5463,7 +5465,7 @@ html.dark .nav-more-menu a:hover {
 .partner-database-metrics span {
   color: var(--jht-text-tertiary);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .partner-database-metrics strong {
@@ -5489,7 +5491,7 @@ html.dark .nav-more-menu a:hover {
   border-bottom: 1px solid var(--jht-line-soft);
   color: var(--jht-text-secondary);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: 0;
   min-height: 38px;
   padding: 0 16px;
@@ -5670,7 +5672,7 @@ html input.jht-english-calendar-input {
   display: inline-flex;
   font: inherit;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   justify-content: center;
   min-height: 32px;
   padding: 0;
@@ -5692,7 +5694,7 @@ html input.jht-english-calendar-input {
 .jht-calendar-weekdays span {
   color: var(--jht-text-tertiary);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 600;
   text-align: center;
 }
 
@@ -5889,7 +5891,7 @@ html.dark .jht-calendar-month-grid button {
   box-sizing: border-box;
   display: inline-flex;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   height: var(--jht-control-height);
   justify-content: center;
   line-height: 1;
@@ -6222,8 +6224,9 @@ html.dark .jht-calendar-month-grid button {
 }
 
 /* ─── 어드민 워크스페이스 사이드바 (2026-07 네비게이션 평탄화) ─────────────────
- * 예전 상단바는 목적지 13개 중 9개를 "더보기" 드롭다운에 숨겼습니다.
- * Notion의 앱 셸 패턴대로 좌측에 전부 펼치고, 현재 위치는 파란 인디케이터로 표시합니다.
+ * 상위 그룹은 접었다 펼 수 있는 드롭다운이며, 현재 화면이 속한 그룹은 자동으로 펼쳐집니다.
+ * 라벨은 본문과 같은 타이포 스케일을 쓰고, 좁은 폭에서도 글자가 상자 밖으로 나가지 않게
+ * 한 줄 말줄임(ellipsis)으로 자릅니다. 전체 이름은 title 속성으로 확인할 수 있습니다.
  */
 .admin-workspace {
   display: grid;
@@ -6243,27 +6246,73 @@ html.dark .jht-calendar-month-grid button {
 
 .admin-workspace-sidebar {
   align-self: start;
+  min-width: 0;
   position: sticky;
   top: 24px;
 }
 
 .admin-workspace-nav {
   display: grid;
-  gap: 20px;
+  gap: 4px;
+  min-width: 0;
 }
 
 .admin-workspace-nav-section {
   display: grid;
   gap: 2px;
+  min-width: 0;
 }
 
-.admin-workspace-nav-section h2 {
-  color: var(--jht-text-disabled);
+.admin-workspace-nav-toggle {
+  align-items: center;
+  background: none;
+  border: 0;
+  border-radius: var(--jht-radius-sm);
+  color: var(--jht-text-tertiary);
+  cursor: pointer;
+  display: flex;
+  font-family: inherit;
   font-size: 12px;
   font-weight: 600;
+  gap: 8px;
+  justify-content: space-between;
   letter-spacing: 0.125px;
-  margin: 0 0 6px;
-  padding: 0 10px;
+  padding: 7px 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.admin-workspace-nav-toggle:hover {
+  background: var(--jht-surface-subtle);
+  color: var(--jht-text-secondary);
+}
+
+.admin-workspace-nav-toggle > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-workspace-caret {
+  border-bottom: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  flex: 0 0 auto;
+  height: 6px;
+  transform: rotate(-45deg);
+  transition: transform 140ms ease;
+  width: 6px;
+}
+
+.admin-workspace-caret.open {
+  transform: rotate(45deg);
+}
+
+.admin-workspace-nav-items {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding-bottom: 6px;
 }
 
 .admin-workspace-link {
@@ -6271,19 +6320,31 @@ html.dark .jht-calendar-month-grid button {
   border-radius: var(--jht-radius-sm);
   display: grid;
   gap: 1px;
-  padding: 7px 10px;
+  min-width: 0;
+  padding: 6px 10px;
   transition: background 120ms ease;
+}
+
+.admin-workspace-link span,
+.admin-workspace-link small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-workspace-link span {
   color: var(--jht-text-secondary);
   font-size: 14px;
   font-weight: 500;
+  letter-spacing: 0;
 }
 
 .admin-workspace-link small {
   color: var(--jht-text-disabled);
   font-size: 12px;
+  font-weight: 400;
 }
 
 .admin-workspace-link:hover {
@@ -6312,8 +6373,8 @@ html.dark .jht-calendar-month-grid button {
   }
 
   .admin-workspace-nav {
-    gap: 12px;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   }
 }
 
@@ -6533,7 +6594,7 @@ html.dark .jht-calendar-month-grid button {
 .work-queue-count {
   color: var(--jht-text-primary);
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.25px;
   min-width: 28px;
   text-align: center;
@@ -6650,4 +6711,37 @@ html.dark .jht-calendar-month-grid button {
   .quote-stepper {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* ─── 카드 텍스트 넘침 방지 (2026-07 UI 정리) ─────────────────────────────
+ * 좁은 화면이나 긴 숫자·라벨에서 글자가 카드 밖으로 밀려나오지 않게 합니다.
+ * 숫자는 잘라내지 않고 크기를 줄여 맞추고, 설명 문구는 줄바꿈으로 흘립니다.
+ */
+.dashboard-kpi-card,
+.metric-card,
+.work-queue-item,
+.cockpit-action {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-kpi-card strong,
+.metric-card strong {
+  font-size: clamp(20px, 2vw, 26px);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-kpi-card span,
+.dashboard-kpi-card small,
+.metric-card span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.work-queue-body span,
+.work-queue-body small,
+.cockpit-action-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }

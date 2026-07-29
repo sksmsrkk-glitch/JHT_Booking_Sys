@@ -4,6 +4,7 @@
  */
 "use client";
 
+import { useState } from "react";
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -184,28 +185,55 @@ export function AdminWorkspaceSidebar({ locale }: { locale: Locale }) {
   const pathname = usePathname();
   const isKo = locale === "ko";
 
+  /*
+   * 상위 그룹을 접었다 펼 수 있게 합니다. 현재 보고 있는 화면이 속한 그룹은 자동으로 펼쳐지고,
+   * 사용자가 직접 접거나 편 그룹은 그 선택을 유지합니다(경로가 바뀌어도 유지).
+   */
+  const [manualOpen, setManualOpen] = useState<Record<string, boolean>>({});
+
   return (
     <aside className="admin-workspace-sidebar" aria-label={isKo ? "관리자 네비게이션" : "Admin navigation"}>
       <nav className="admin-workspace-nav">
-        {adminNavSections.map((section) => (
-          <section className="admin-workspace-nav-section" key={section.titleEn}>
-            <h2>{isKo ? section.titleKo : section.titleEn}</h2>
-            {section.items.map((item) => {
-              const isActive = isItemActive(pathname, item.href);
-              return (
-                <Link
-                  aria-current={isActive ? "page" : undefined}
-                  className={isActive ? "admin-workspace-link active" : "admin-workspace-link"}
-                  href={item.href}
-                  key={item.href}
-                >
-                  <span>{isKo ? item.labelKo : item.labelEn}</span>
-                  <small>{isKo ? item.helperKo : item.helperEn}</small>
-                </Link>
-              );
-            })}
-          </section>
-        ))}
+        {adminNavSections.map((section) => {
+          const hasActiveItem = section.items.some((item) => isItemActive(pathname, item.href));
+          const isOpen = manualOpen[section.titleEn] ?? hasActiveItem;
+          const panelId = `admin-nav-${section.titleEn.toLowerCase().replace(/\s+/g, "-")}`;
+
+          return (
+            <section className="admin-workspace-nav-section" key={section.titleEn}>
+              <button
+                aria-controls={panelId}
+                aria-expanded={isOpen}
+                className="admin-workspace-nav-toggle"
+                onClick={() => setManualOpen((current) => ({ ...current, [section.titleEn]: !isOpen }))}
+                type="button"
+              >
+                <span>{isKo ? section.titleKo : section.titleEn}</span>
+                <span aria-hidden="true" className={isOpen ? "admin-workspace-caret open" : "admin-workspace-caret"} />
+              </button>
+
+              <div className="admin-workspace-nav-items" hidden={!isOpen} id={panelId}>
+                {section.items.map((item) => {
+                  const isActive = isItemActive(pathname, item.href);
+                  const label = isKo ? item.labelKo : item.labelEn;
+                  const helper = isKo ? item.helperKo : item.helperEn;
+                  return (
+                    <Link
+                      aria-current={isActive ? "page" : undefined}
+                      className={isActive ? "admin-workspace-link active" : "admin-workspace-link"}
+                      href={item.href}
+                      key={item.href}
+                      title={`${label} · ${helper}`}
+                    >
+                      <span>{label}</span>
+                      <small>{helper}</small>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
       </nav>
     </aside>
   );
