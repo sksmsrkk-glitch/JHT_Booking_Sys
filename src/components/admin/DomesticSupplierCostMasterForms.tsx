@@ -200,11 +200,11 @@ export function CostMasterQuickCreateForm({
         </label>
         <label>
           Valid From
-          <LocaleDateInput disabled={isBusy} name="validFrom" />
+          <LocaleDateInput disabled={isBusy} name="validFrom" rangeGroup="cost-valid" rangeRole="start" />
         </label>
         <label>
           Valid To
-          <LocaleDateInput disabled={isBusy} name="validTo" />
+          <LocaleDateInput disabled={isBusy} name="validTo" rangeGroup="cost-valid" rangeRole="end" />
         </label>
         <label>
           Pax Range

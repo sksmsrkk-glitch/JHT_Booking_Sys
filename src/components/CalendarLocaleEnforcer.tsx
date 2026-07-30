@@ -64,12 +64,15 @@ export function CalendarLocaleEnforcer() {
         return;
       }
 
-      renderDatePicker(popover, viewDate, input.value, (nextMonth) => {
+      // 종료일 캘린더는 짝지어진 시작일 이전 날짜를 아예 누를 수 없게 막습니다.
+      const minIso = input.dataset.jhtRangeRole === "end" ? partnerIsoValue(input) : null;
+      renderDatePicker(popover, viewDate, input.value, minIso, (nextMonth) => {
         viewDate = new Date(viewDate.getFullYear(), nextMonth, 1);
         renderPicker();
         positionPicker();
       }, (selectedDate) => {
         setInputValue(input, formatIsoDate(selectedDate));
+        syncRangePartner(input);
         closePicker();
       });
     };
@@ -180,12 +183,61 @@ function enhancePickerInput(
 
   input.addEventListener("focus", () => openPicker(input, mode));
   input.addEventListener("click", () => openPicker(input, mode));
+  if (mode === "date" && input.dataset.jhtRangeGroup) {
+    // 키보드로 직접 입력한 값도 blur 시점(change)에 범위를 교정합니다.
+    input.addEventListener("change", () => syncRangePartner(input));
+  }
+}
+
+/** 같은 form(없으면 문서) 안에서 같은 그룹의 반대 역할 입력을 찾습니다. */
+function findRangePartner(input: HTMLInputElement): HTMLInputElement | null {
+  const group = input.dataset.jhtRangeGroup;
+  const role = input.dataset.jhtRangeRole;
+  if (!group || (role !== "start" && role !== "end")) return null;
+  const oppositeRole = role === "start" ? "end" : "start";
+  const scope: ParentNode = input.form ?? document;
+  return scope.querySelector<HTMLInputElement>(
+    `input[data-jht-range-group="${group}"][data-jht-range-role="${oppositeRole}"]`
+  );
+}
+
+function partnerIsoValue(input: HTMLInputElement): string | null {
+  const partner = findRangePartner(input);
+  const value = partner?.value ?? "";
+  return isIsoDateValue(value) ? value : null;
+}
+
+/*
+ * 시작일이 종료일보다 늦어지지 않게 하는 최종 안전망입니다.
+ * 방금 편집한 필드의 값을 존중하고 반대쪽 필드를 따라오게 조정합니다:
+ * 시작일을 종료일 뒤로 옮기면 종료일을 시작일로 끌어올리고,
+ * 종료일을 시작일 앞으로 당기면 시작일을 종료일로 내립니다.
+ * 교정 후 두 값이 같아지므로 상대 입력의 change 리스너가 다시 돌아도 무한 루프가 없습니다.
+ */
+function syncRangePartner(changed: HTMLInputElement) {
+  const partner = findRangePartner(changed);
+  if (!partner || partner.disabled || partner.readOnly) return;
+  const changedValue = changed.value;
+  const partnerValue = partner.value;
+  if (!isIsoDateValue(changedValue) || !isIsoDateValue(partnerValue)) return;
+
+  const role = changed.dataset.jhtRangeRole;
+  if (role === "start" && changedValue > partnerValue) {
+    setInputValue(partner, changedValue);
+  } else if (role === "end" && changedValue < partnerValue) {
+    setInputValue(partner, changedValue);
+  }
+}
+
+function isIsoDateValue(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
 function renderDatePicker(
   popover: HTMLDivElement,
   viewDate: Date,
   selectedValue: string,
+  minIso: string | null,
   onMonthChange: (nextMonth: number) => void,
   onSelect: (selectedDate: Date) => void
 ) {
@@ -222,12 +274,19 @@ function renderDatePicker(
 
   for (let day = 1; day <= daysInMonth; day += 1) {
     const date = new Date(year, month, day);
+    const iso = formatIsoDate(date);
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = String(day);
     button.setAttribute("aria-label", formatPickerAriaDate(date));
-    if (formatIsoDate(date) === selectedIso) button.className = "selected";
-    button.addEventListener("click", () => onSelect(date));
+    if (iso === selectedIso) button.className = "selected";
+    if (minIso && iso < minIso) {
+      // 종료일 캘린더에서 시작일 이전 날짜는 선택 자체가 불가능합니다.
+      button.disabled = true;
+      button.classList.add("out-of-range");
+    } else {
+      button.addEventListener("click", () => onSelect(date));
+    }
     grid.appendChild(button);
   }
 

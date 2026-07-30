@@ -738,6 +738,8 @@ export function QuoteCaseCreateForm({
           Start Date
           <LocaleDateInput
             name="startDate"
+            rangeGroup="quote-tour"
+            rangeRole="start"
             value={caseFields.startDate}
             onChange={(event) => updateCaseField("startDate", event.target.value)}
           />
@@ -746,6 +748,8 @@ export function QuoteCaseCreateForm({
           End Date
           <LocaleDateInput
             name="endDate"
+            rangeGroup="quote-tour"
+            rangeRole="end"
             value={caseFields.endDate}
             onChange={(event) => updateCaseField("endDate", event.target.value)}
           />

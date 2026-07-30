@@ -11,6 +11,14 @@ import type { InputHTMLAttributes } from "react";
 type LocaleDateInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
   /** 날짜(YYYY-MM-DD) 또는 월(YYYY-MM) 입력 모드. 기본값 date. */
   mode?: "date" | "month";
+  /**
+   * 시작일·종료일 쌍을 이루는 두 입력에 같은 그룹명을 지정합니다.
+   * CalendarLocaleEnforcer가 같은 form(없으면 문서) 안에서 그룹으로 짝을 찾아
+   * 종료일 캘린더에서 시작일 이전 날짜를 막고, 역전된 입력을 자동 교정합니다.
+   */
+  rangeGroup?: string;
+  /** 그룹 안에서 이 입력이 시작일인지 종료일인지 표시합니다. */
+  rangeRole?: "start" | "end";
 };
 
 /*
@@ -20,7 +28,7 @@ type LocaleDateInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> 
  * form 제출 값 형식(YYYY-MM-DD / YYYY-MM)은 그대로 유지합니다.
  */
 export const LocaleDateInput = forwardRef<HTMLInputElement, LocaleDateInputProps>(
-  function LocaleDateInput({ mode = "date", className, placeholder, inputMode, ...rest }, ref) {
+  function LocaleDateInput({ mode = "date", className, placeholder, inputMode, rangeGroup, rangeRole, ...rest }, ref) {
     const isMonth = mode === "month";
     const classes = ["jht-english-calendar-input", className].filter(Boolean).join(" ");
     return (
@@ -29,6 +37,8 @@ export const LocaleDateInput = forwardRef<HTMLInputElement, LocaleDateInputProps
         ref={ref}
         type="text"
         data-jht-calendar={mode}
+        data-jht-range-group={rangeGroup}
+        data-jht-range-role={rangeGroup ? rangeRole : undefined}
         lang="en-US"
         autoComplete="off"
         inputMode={inputMode ?? "numeric"}

@@ -96,11 +96,11 @@ function WorkflowFilterBar({
       <form action="/admin/workflows" className="workflow-filter-bar">
         <label>
           {locale === "ko" ? "시작일" : "From"}
-          <LocaleDateInput name="from" defaultValue={filters.from ?? ""} />
+          <LocaleDateInput name="from" rangeGroup="workflow-period" rangeRole="start" defaultValue={filters.from ?? ""} />
         </label>
         <label>
           {locale === "ko" ? "종료일" : "To"}
-          <LocaleDateInput name="to" defaultValue={filters.to ?? ""} />
+          <LocaleDateInput name="to" rangeGroup="workflow-period" rangeRole="end" defaultValue={filters.to ?? ""} />
         </label>
         <label>
           {locale === "ko" ? "파트너사명" : "Partner"}

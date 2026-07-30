@@ -9,6 +9,7 @@ import { demoReservations } from "@/features/reservation/demo-data";
 import type { ReservationListItem } from "@/features/reservation/types";
 import { getPageAuthorization } from "@/lib/api/page-session";
 import { isDemoModeEnabled } from "@/lib/api/guards";
+import { normalizeDateRange } from "@/lib/domain/date-range.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -117,11 +118,11 @@ function ConfirmationFilterPanel({
         </label>
         <label>
           From
-          <LocaleDateInput name="from" defaultValue={filters.from} />
+          <LocaleDateInput name="from" rangeGroup="confirmation-period" rangeRole="start" defaultValue={filters.from} />
         </label>
         <label>
           To
-          <LocaleDateInput name="to" defaultValue={filters.to} />
+          <LocaleDateInput name="to" rangeGroup="confirmation-period" rangeRole="end" defaultValue={filters.to} />
         </label>
         <label>
           Country
@@ -274,10 +275,12 @@ function normalizeFilters(searchParams: Awaited<SearchParams>): ConfirmationFilt
   const parsedLimit = Number(searchParams.limit);
   const limit = [20, 50, 100].includes(parsedLimit) ? parsedLimit : 20;
 
+  // 시작일이 종료일보다 늦게 들어오면 두 값을 맞바꿔 조회가 빈 화면으로 죽지 않게 합니다.
+  const { from, to } = normalizeDateRange(normalizeDate(searchParams.from), normalizeDate(searchParams.to));
   return {
     limit,
-    from: normalizeDate(searchParams.from),
-    to: normalizeDate(searchParams.to),
+    from,
+    to,
     country: (searchParams.country ?? "").trim(),
     agency: (searchParams.agency ?? "").trim()
   };

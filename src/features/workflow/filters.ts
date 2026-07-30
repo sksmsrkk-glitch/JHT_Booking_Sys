@@ -2,6 +2,7 @@
  * @file 한글 책임: `workflow` 업무 기능의 입력 정규화, 상태 변환 또는 화면용 데이터를 구성합니다.
  * 여러 화면과 API가 같은 규칙을 재사용하도록 도메인 결정을 모으고, 공급사 원가와 파트너 공개 데이터의 경계를 유지합니다.
  */
+import { normalizeDateRange } from "@/lib/domain/date-range.mjs";
 import type { WorkflowThreadSummary } from "./types";
 
 export type WorkflowFilters = {
@@ -23,9 +24,12 @@ export type WorkflowFilterInput = {
 const workflowFilterKeys = ["from", "to", "partner", "tourCode", "group"] as const;
 
 export function normalizeWorkflowFilters(input: WorkflowFilterInput): WorkflowFilters {
+  // URL을 직접 고치는 등으로 시작일이 종료일보다 늦게 들어오면 두 값을 맞바꿔
+  // 목록이 "결과 없음"으로 조용히 비어 보이는 상태를 막습니다.
+  const { from, to } = normalizeDateRange(normalizeDate(input.from), normalizeDate(input.to));
   return {
-    from: normalizeDate(input.from),
-    to: normalizeDate(input.to),
+    from,
+    to,
     partner: normalizeOptional(input.partner),
     tourCode: normalizeOptional(input.tourCode),
     group: normalizeOptional(input.group)

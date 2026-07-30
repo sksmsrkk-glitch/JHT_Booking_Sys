@@ -24,6 +24,7 @@ import {
   getInternalPageContext,
   requirePageFinanceRole
 } from "@/lib/api/server-page-context";
+import { normalizeDateRange } from "@/lib/domain/date-range.mjs";
 import { normalizeLocale } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 import { translateAdminUi } from "@/lib/admin-ui-text";
@@ -304,11 +305,11 @@ function DashboardFilterBar({
       </label>
       <label>
         {tr("From")}
-        <LocaleDateInput name="from" defaultValue={filters.from ?? ""} />
+        <LocaleDateInput name="from" rangeGroup="dashboard-period" rangeRole="start" defaultValue={filters.from ?? ""} />
       </label>
       <label>
         {tr("To")}
-        <LocaleDateInput name="to" defaultValue={filters.to ?? ""} />
+        <LocaleDateInput name="to" rangeGroup="dashboard-period" rangeRole="end" defaultValue={filters.to ?? ""} />
       </label>
       <button className="button-primary" type="submit">
         {tr("Filter")}
@@ -485,11 +486,13 @@ function resolveBoardRange(filters: DashboardFilters): { start: string; end: str
 
 function normalizeDashboardFilters(params: Awaited<SearchParams>): DashboardFilters {
   const view = dashboardViews.some((item) => item.value === params.view) ? (params.view as DashboardView) : "overview";
+  // 시작일이 종료일보다 늦게 들어오면 두 값을 맞바꿔 조회가 빈 화면으로 죽지 않게 합니다.
+  const { from, to } = normalizeDateRange(normalizeDate(params.from), normalizeDate(params.to));
   return {
     country: normalizeOptional(params.country)?.toUpperCase(),
     agencyAccountId: normalizeOptional(params.agencyAccountId),
-    from: normalizeDate(params.from),
-    to: normalizeDate(params.to),
+    from,
+    to,
     view
   };
 }

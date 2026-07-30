@@ -193,11 +193,11 @@ export function InquiryCreateForm() {
         </label>
         <label>
           Arrival Date
-          <LocaleDateInput name="arrivalDate" />
+          <LocaleDateInput name="arrivalDate" rangeGroup="inquiry-tour" rangeRole="start" />
         </label>
         <label>
           Departure Date
-          <LocaleDateInput name="departureDate" />
+          <LocaleDateInput name="departureDate" rangeGroup="inquiry-tour" rangeRole="end" />
         </label>
         <label>
           Preferred Language

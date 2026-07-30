@@ -221,11 +221,11 @@ export function GuideExpenseReportForm({
         </label>
         <label>
           Start
-          <LocaleDateInput value={report.tourStartDate} onChange={(event) => updateReport("tourStartDate", event.target.value)} />
+          <LocaleDateInput rangeGroup="guide-tour" rangeRole="start" value={report.tourStartDate} onChange={(event) => updateReport("tourStartDate", event.target.value)} />
         </label>
         <label>
           End
-          <LocaleDateInput value={report.tourEndDate} onChange={(event) => updateReport("tourEndDate", event.target.value)} />
+          <LocaleDateInput rangeGroup="guide-tour" rangeRole="end" value={report.tourEndDate} onChange={(event) => updateReport("tourEndDate", event.target.value)} />
         </label>
         <label>
           Currency

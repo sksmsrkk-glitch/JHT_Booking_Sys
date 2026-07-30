@@ -79,11 +79,11 @@ export function RoomAssignmentCreateForm({
         </label>
         <label>
           Check In
-          <LocaleDateInput disabled={isBusy || Boolean(disabledReason)} name="checkIn" />
+          <LocaleDateInput disabled={isBusy || Boolean(disabledReason)} name="checkIn" rangeGroup="room-stay" rangeRole="start" />
         </label>
         <label>
           Check Out
-          <LocaleDateInput disabled={isBusy || Boolean(disabledReason)} name="checkOut" />
+          <LocaleDateInput disabled={isBusy || Boolean(disabledReason)} name="checkOut" rangeGroup="room-stay" rangeRole="end" />
         </label>
       </div>
 

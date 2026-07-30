@@ -12,6 +12,9 @@ import { CalendarLocaleEnforcer } from "@/components/CalendarLocaleEnforcer";
 import { RouteRefreshBridge } from "@/components/RouteRefreshBridge";
 import { normalizeSessionSurface, sessionCookieNames } from "@/lib/domain/auth-session.mjs";
 import { normalizeLocale } from "@/lib/i18n";
+// 한글 서체는 사용자 PC 설치 여부에 의존하지 않도록 Pretendard Variable을 self-host합니다.
+// dynamic subset이라 실제 화면에 쓰인 글리프 조각만 내려받고, 외부 CDN 요청은 없습니다.
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
 
 /*

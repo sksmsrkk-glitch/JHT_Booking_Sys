@@ -132,8 +132,19 @@ export async function listWorkflowThreadPage(
   if (agencyIds) query = query.in("agency_account_id", agencyIds);
   if (filters.tourCode) query = query.ilike("workflow_code", `%${escapeLikePattern(filters.tourCode)}%`);
   if (filters.group) query = query.ilike("title", `%${escapeLikePattern(filters.group)}%`);
-  if (filters.from) query = query.gte("last_message_at", `${filters.from}T00:00:00.000Z`);
-  if (filters.to) query = query.lte("last_message_at", `${filters.to}T23:59:59.999Z`);
+  /*
+   * 화면의 날짜 열은 마지막 메시지 시각(없으면 생성 시각)을 보여주므로 필터도 같은 기준을 씁니다.
+   * last_message_at만 비교하면 아직 메시지가 없는(NULL) 워크플로우가 무조건 탈락해,
+   * 화면에 보이는 날짜로 검색해도 결과가 비는 문제가 생깁니다.
+   */
+  if (filters.from) {
+    const fromTs = `${filters.from}T00:00:00.000Z`;
+    query = query.or(`last_message_at.gte.${fromTs},and(last_message_at.is.null,created_at.gte.${fromTs})`);
+  }
+  if (filters.to) {
+    const toTs = `${filters.to}T23:59:59.999Z`;
+    query = query.or(`last_message_at.lte.${toTs},and(last_message_at.is.null,created_at.lte.${toTs})`);
+  }
 
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);

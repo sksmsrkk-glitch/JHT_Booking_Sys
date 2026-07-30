@@ -132,11 +132,13 @@ html.dark {
  * 폰트 스택 2종 (2026-07 Notion 디자인 이관)
  *
  * - 어드민(한/영 혼용): Inter를 먼저 두어 영문·숫자는 Notion 서체로 렌더하고,
- *   한글 글리프는 폰트 폴백으로 Pretendard(없으면 OS 기본 한글 서체)가 이어받습니다.
+ *   한글 글리프는 self-host된 "Pretendard Variable"(layout.tsx에서 로드)이 이어받습니다.
+ *   사용자 PC 설치 여부와 무관하게 어디서나 같은 한글 서체가 보장되며, 맑은 고딕 폴백은
+ *   Pretendard 로드 실패 시의 최후 수단으로만 남습니다.
  * - 파트너 포털(영어 전용): Inter 순정. 한글 서체를 스택에 두지 않아 Notion 규격 그대로입니다.
  */
 :root {
-  --jht-font-admin: var(--jht-font-inter), Inter, Pretendard, "Pretendard Variable", -apple-system,
+  --jht-font-admin: var(--jht-font-inter), Inter, "Pretendard Variable", Pretendard, -apple-system,
     "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --jht-font-partner: var(--jht-font-inter), Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
@@ -146,6 +148,11 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--jht-font-admin);
+  /* 한글 가독성: 안티앨리어싱을 켜고, 단어 중간이 아닌 어절 단위로 줄바꿈합니다. */
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  word-break: keep-all;
+  line-height: 1.55;
 }
 
 .partner-workspace,
@@ -165,18 +172,20 @@ h1,
 h2,
 h3 {
   font-weight: 700;
+  line-height: 1.3;
 }
 
+/* 픽셀 고정 자간은 한글 제목에서 과하게 좁아 보여, 크기에 비례하는 em 단위로 완화합니다. */
 h1 {
-  letter-spacing: -1px;
+  letter-spacing: -0.02em;
 }
 
 h2 {
-  letter-spacing: -0.625px;
+  letter-spacing: -0.015em;
 }
 
 h3 {
-  letter-spacing: -0.25px;
+  letter-spacing: -0.01em;
 }
 
 a {
@@ -5710,6 +5719,15 @@ html input.jht-english-calendar-input {
   color: #ffffff;
 }
 
+/* 종료일 캘린더에서 시작일 이전 날짜: 선택 불가를 시각적으로도 분명히 합니다. */
+.jht-calendar-grid button.out-of-range,
+.jht-calendar-grid button.out-of-range:hover {
+  background: transparent;
+  color: var(--jht-text-tertiary);
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .jht-calendar-spacer {
   min-height: 32px;
 }
@@ -5907,6 +5925,49 @@ html.dark .jht-calendar-month-grid button {
   height: 32px;
   min-height: 32px;
   padding: 0;
+}
+
+/*
+ * 필터 행 안정화 (2026-07-30)
+ * 필터 바 안의 모든 입력·셀렉트·버튼을 같은 높이로 강제하고 셀을 아래 변에 정렬합니다.
+ * 라벨 문구가 길어 줄바꿈되더라도 박스 밑변이 항상 한 줄로 맞아, 특정 박스만
+ * 아래로 내려와 보이는 문제가 구조적으로 발생하지 않습니다.
+ */
+.toolbar,
+.confirmation-filter-bar,
+.workflow-filter-bar {
+  align-items: end;
+}
+
+.toolbar input,
+.toolbar select,
+.toolbar .button-primary,
+.toolbar .button-secondary,
+.confirmation-filter-bar input,
+.confirmation-filter-bar select,
+.confirmation-filter-bar .button-primary,
+.confirmation-filter-bar .button-secondary {
+  box-sizing: border-box;
+  height: var(--jht-control-height);
+  min-height: var(--jht-control-height);
+}
+
+/* 캡션 타이포를 세 필터 바에서 동일하게 맞춰 행 높이 편차를 없앱니다. */
+.toolbar label,
+.confirmation-filter-bar label,
+.workflow-filter-bar label {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* 좁은 화면에서는 고정 열이 넘치지 않도록 자동 줄바꿈 그리드로 전환합니다. */
+@media (max-width: 1180px) {
+  .toolbar,
+  .confirmation-filter-bar,
+  .workflow-filter-bar {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
 }
 
 .main input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
