@@ -3,7 +3,11 @@
  * 서버 전용 비밀키와 브라우저 공개키가 섞이지 않도록 클라이언트 경계를 분리하고 요청 단위 인증 정보를 보존합니다.
  */
 import { createClient } from "@supabase/supabase-js";
-import { ACCESS_TOKEN_COOKIE, extractBearerToken } from "@/lib/domain/auth-session.mjs";
+import {
+  extractBearerToken,
+  resolveSessionSurface,
+  sessionCookieNames
+} from "@/lib/domain/auth-session.mjs";
 
 // 요청 단위 JWT는 Supabase 클라이언트 객체와 WeakMap으로 연결해 로그나 직렬화 결과에 노출하지 않습니다.
 const requestAccessTokens = new WeakMap<object, string>();
@@ -42,13 +46,31 @@ export function getRequestAccessToken(client: object) {
 
 function cookieAuthorization(request: Request) {
   const cookie = request.headers.get("cookie") ?? "";
-  const accessToken = cookie
-    .split(";")
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(`${ACCESS_TOKEN_COOKIE}=`))
-    ?.slice(`${ACCESS_TOKEN_COOKIE}=`.length);
+  const parts = cookie.split(";").map((part) => part.trim());
 
-  return accessToken ? `Bearer ${decodeURIComponent(accessToken)}` : "";
+  /*
+   * 요청 경로의 포털(surface)에 맞는 세션 쿠키를 우선 사용합니다.
+   * 워크플로우처럼 내부·파트너가 함께 쓰는 API는 주 쿠키가 없을 때만 다른 포털 쿠키로
+   * 폴백해, 파트너 화면의 클라이언트 호출이 끊기지 않으면서도 두 세션이 공존할 때는
+   * 경로에 맞는 세션이 항상 이기도록 합니다.
+   */
+  const surface = resolveSurfaceFromRequest(request);
+  const primary = sessionCookieNames(surface).access;
+  const fallback = sessionCookieNames(surface === "agency" ? "internal" : "agency").access;
+
+  for (const cookieName of [primary, fallback]) {
+    const accessToken = parts.find((part) => part.startsWith(`${cookieName}=`))?.slice(`${cookieName}=`.length);
+    if (accessToken) return `Bearer ${decodeURIComponent(accessToken)}`;
+  }
+  return "";
+}
+
+function resolveSurfaceFromRequest(request: Request) {
+  try {
+    return resolveSessionSurface(new URL(request.url).pathname);
+  } catch {
+    return "internal" as const;
+  }
 }
 
 export function createServiceSupabaseClient() {

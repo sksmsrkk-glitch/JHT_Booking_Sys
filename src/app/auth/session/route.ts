@@ -4,12 +4,14 @@
  */
 import { NextResponse } from "next/server";
 import {
-  ACCESS_TOKEN_COOKIE,
   getVerifiedAccessTokenClaims,
   isAccessTokenForProject,
   isAccessTokenStale,
-  REFRESH_TOKEN_COOKIE
+  normalizeSessionSurface,
+  sessionCookieNames
 } from "@/lib/domain/auth-session.mjs";
+import { requireAgencyUser, requireInternalUser } from "@/lib/api/auth";
+import { HttpError } from "@/lib/api/http";
 import { createRequestSupabaseClient } from "@/lib/supabase/server";
 
 const fallbackMaxAgeSeconds = 60 * 60;
@@ -23,7 +25,7 @@ export async function POST(request: Request) {
     return jsonResponse({ error: "Invalid session origin" }, { status: 403 });
   }
 
-  let payload: { accessToken?: unknown; expiresIn?: unknown; refreshToken?: unknown };
+  let payload: { accessToken?: unknown; accountType?: unknown; expiresIn?: unknown; refreshToken?: unknown };
   try {
     payload = await request.json();
   } catch {
@@ -36,14 +38,18 @@ export async function POST(request: Request) {
   if (payload.refreshToken !== undefined && (typeof payload.refreshToken !== "string" || payload.refreshToken.trim().length === 0)) {
     return jsonResponse({ error: "refreshToken must be a non-empty string" }, { status: 400 });
   }
-  if (!(await isVerifiedAccessToken(payload.accessToken, requestUrl))) {
-    return jsonResponse({ error: "Invalid or expired access token" }, { status: 401 });
+
+  const surface = normalizeSessionSurface(payload.accountType);
+  const verification = await verifyAccessTokenForSurface(payload.accessToken, surface, requestUrl);
+  if (!verification.ok) {
+    return jsonResponse({ error: verification.message }, { status: verification.status });
   }
 
+  const cookieNamesForSurface = sessionCookieNames(surface);
   const maxAge = resolveMaxAgeSeconds(payload.expiresIn);
   const response = jsonResponse({ ok: true });
   const secure = isHttpsRequest(request, requestUrl);
-  response.cookies.set(ACCESS_TOKEN_COOKIE, payload.accessToken, {
+  response.cookies.set(cookieNamesForSurface.access, payload.accessToken, {
     httpOnly: true,
     maxAge,
     path: "/",
@@ -51,7 +57,7 @@ export async function POST(request: Request) {
     secure
   });
   if (typeof payload.refreshToken === "string") {
-    response.cookies.set(REFRESH_TOKEN_COOKIE, payload.refreshToken, {
+    response.cookies.set(cookieNamesForSurface.refresh, payload.refreshToken, {
       httpOnly: true,
       maxAge: refreshTokenMaxAgeSeconds,
       path: "/",
@@ -62,11 +68,23 @@ export async function POST(request: Request) {
   return response;
 }
 
-/** 브라우저가 전달한 토큰을 현재 Supabase 프로젝트의 서명된 사용자 JWT로 확인한 뒤에만 쿠키를 발급합니다. */
-async function isVerifiedAccessToken(accessToken: string, requestUrl: URL) {
+/**
+ * 브라우저가 전달한 토큰을 현재 Supabase 프로젝트의 서명된 사용자 JWT로 확인하고,
+ * 요청한 포털에 실제 소속(내부 역할 또는 활성 파트너 계정)이 있는 계정만 쿠키를 발급합니다.
+ * 소속 검증을 로그인 시점에 하면, 엉뚱한 포털에 세션이 생겨 화면마다 역할 오류가 뜨는 상태를 원천 차단합니다.
+ */
+async function verifyAccessTokenForSurface(
+  accessToken: string,
+  surface: "internal" | "agency",
+  requestUrl: URL
+): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  if (isAccessTokenStale(accessToken, Math.floor(Date.now() / 1000), 0)) return false;
-  if (!isAccessTokenForProject(accessToken, supabaseUrl)) return false;
+  if (isAccessTokenStale(accessToken, Math.floor(Date.now() / 1000), 0)) {
+    return { ok: false, status: 401, message: "Invalid or expired access token" };
+  }
+  if (!isAccessTokenForProject(accessToken, supabaseUrl)) {
+    return { ok: false, status: 401, message: "Invalid or expired access token" };
+  }
 
   try {
     const verificationRequest = new Request(requestUrl, {
@@ -74,9 +92,28 @@ async function isVerifiedAccessToken(accessToken: string, requestUrl: URL) {
     });
     const supabase = createRequestSupabaseClient(verificationRequest);
     const claims = await getVerifiedAccessTokenClaims(supabase.auth, accessToken);
-    return typeof claims?.sub === "string" && claims.sub.length > 0;
-  } catch {
-    return false;
+    if (typeof claims?.sub !== "string" || claims.sub.length === 0) {
+      return { ok: false, status: 401, message: "Invalid or expired access token" };
+    }
+
+    if (surface === "agency") {
+      await requireAgencyUser(supabase);
+    } else {
+      await requireInternalUser(supabase);
+    }
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof HttpError && (error.status === 401 || error.status === 403)) {
+      return {
+        ok: false,
+        status: 403,
+        message:
+          surface === "agency"
+            ? "This account does not have partner portal access."
+            : "This account does not have internal portal access."
+      };
+    }
+    return { ok: false, status: 500, message: "Session verification failed" };
   }
 }
 

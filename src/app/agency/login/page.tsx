@@ -9,11 +9,12 @@ import { resolvePostLoginPath } from "@/lib/domain/auth-session.mjs";
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = Promise<{ next?: string; reset?: string }>;
+type SearchParams = Promise<{ next?: string; reason?: string; reset?: string }>;
 
 export default async function AgencyLoginPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const resetComplete = params.reset === "complete";
+  const agencyAccountMissing = params.reason === "agency-account";
   const redirectTo = resolvePostLoginPath("agency", params.next);
   return (
     <>
@@ -45,6 +46,13 @@ export default async function AgencyLoginPage({ searchParams }: { searchParams: 
         </div>
         <div className="partner-auth-form-stack">
           {resetComplete ? <section className="notice compact"><p>Password updated. Log in with your new password.</p></section> : null}
+          {agencyAccountMissing ? (
+            <section className="notice compact">
+              <p>
+                The signed-in account is not an active partner account. Log in with the agency account approved by JHT.
+              </p>
+            </section>
+          ) : null}
           <SupabaseLoginForm accountType="agency" buttonLabel="Log In" pendingLabel="Logging in..." redirectTo={redirectTo} />
         </div>
       </section>

@@ -49,6 +49,7 @@ export function SupabaseLoginForm({ accountType, buttonLabel, pendingLabel, redi
     const sessionResponse = await safeFetch("/auth/session", {
       body: JSON.stringify({
         accessToken: data.session.access_token,
+        accountType,
         expiresIn: data.session.expires_in,
         refreshToken: data.session.refresh_token
       }),

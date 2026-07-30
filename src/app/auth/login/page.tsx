@@ -5,11 +5,12 @@
 import { SupabaseLoginForm } from "@/components/auth/SupabaseLoginForm";
 import { resolvePostLoginPath } from "@/lib/domain/auth-session.mjs";
 
-type SearchParams = Promise<{ next?: string; reset?: string }>;
+type SearchParams = Promise<{ next?: string; reason?: string; reset?: string }>;
 
 export default async function LoginPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const resetComplete = params.reset === "complete";
+  const internalRoleMissing = params.reason === "internal-role";
   const redirectTo = resolvePostLoginPath("internal", params.next);
   return (
     <>
@@ -21,6 +22,14 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
         </div>
       </div>
       {resetComplete ? <section className="notice compact"><p>Password updated. Log in with your new password.</p></section> : null}
+      {internalRoleMissing ? (
+        <section className="notice compact">
+          <p>
+            The signed-in account does not have internal portal access. Log in with a JHT staff account, or use the
+            partner portal if you are an agency user.
+          </p>
+        </section>
+      ) : null}
       <SupabaseLoginForm accountType="internal" buttonLabel="Log In" pendingLabel="Logging in..." redirectTo={redirectTo} />
     </>
   );

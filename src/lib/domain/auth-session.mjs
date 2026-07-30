@@ -2,13 +2,44 @@
  * @file 한글 책임: `auth session` 도메인의 프레임워크 독립적인 계산·검증·상태 전이 규칙을 구현합니다.
  * API와 UI가 같은 업무 결정을 사용하도록 순수 함수 중심으로 유지하며, 금액·권한·멱등성 관련 예외를 호출자에게 명확히 전달합니다.
  */
+/*
+ * 세션 쿠키는 포털(surface)별로 완전히 분리합니다.
+ * 하나의 쿠키를 두 포털이 공유하면 파트너 포털 로그인이 직원의 어드민 세션을 덮어써서,
+ * 어드민 화면은 껍데기만 렌더된 채 패널마다 "Internal role is required"를 뿜는 상태가 됩니다.
+ * 이름을 분리해 두면 같은 브라우저에서 직원 세션과 파트너 세션이 서로를 침범하지 않습니다.
+ */
 export const ACCESS_TOKEN_COOKIE = "jht_access_token";
 export const REFRESH_TOKEN_COOKIE = "jht_refresh_token";
+export const AGENCY_ACCESS_TOKEN_COOKIE = "jht_agency_access_token";
+export const AGENCY_REFRESH_TOKEN_COOKIE = "jht_agency_refresh_token";
 
 const allowedRoutePrefixes = {
   agency: "/agency",
   internal: "/admin"
 };
+
+/** 명시된 두 포털 값만 허용하고, 알 수 없는 값은 내부 포털로 처리합니다. */
+export function normalizeSessionSurface(value) {
+  return value === "agency" ? "agency" : "internal";
+}
+
+/**
+ * 요청 경로가 어느 포털의 세션 쿠키를 사용해야 하는지 결정합니다.
+ * 파트너 화면(/agency)과 파트너 API(/api/agency)만 agency 세션을 쓰고 나머지는 내부 세션입니다.
+ */
+export function resolveSessionSurface(pathname) {
+  if (typeof pathname !== "string") return "internal";
+  if (pathname === "/agency" || pathname.startsWith("/agency/")) return "agency";
+  if (pathname === "/api/agency" || pathname.startsWith("/api/agency/")) return "agency";
+  return "internal";
+}
+
+/** 해당 포털의 access/refresh 쿠키 이름 쌍을 돌려줍니다. */
+export function sessionCookieNames(surface) {
+  return normalizeSessionSurface(surface) === "agency"
+    ? { access: AGENCY_ACCESS_TOKEN_COOKIE, refresh: AGENCY_REFRESH_TOKEN_COOKIE }
+    : { access: ACCESS_TOKEN_COOKIE, refresh: REFRESH_TOKEN_COOKIE };
+}
 
 /**
  * 로그인 페이지의 next 값은 같은 포털 안의 절대 경로만 허용합니다.

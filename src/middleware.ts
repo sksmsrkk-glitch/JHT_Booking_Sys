@@ -4,10 +4,10 @@
  */
 import { NextResponse, type NextRequest } from "next/server";
 import {
-  ACCESS_TOKEN_COOKIE,
   isAccessTokenForProject,
   isAccessTokenStale,
-  REFRESH_TOKEN_COOKIE
+  resolveSessionSurface,
+  sessionCookieNames
 } from "@/lib/domain/auth-session.mjs";
 
 const PUBLIC_AGENCY_PATHS = new Set([
@@ -27,10 +27,14 @@ type RefreshedSession = {
   refreshToken: string;
 };
 
+type SurfaceCookieNames = { access: string; refresh: string };
+
 /**
  * 관리자와 파트너 업무 화면의 인증 경계를 관리합니다.
- * access token이 만료되기 직전이면 HttpOnly refresh token으로 세션을 갱신해 사용자가 작업 중
- * 반복해서 로그인 화면으로 돌아가지 않도록 합니다.
+ * 포털(surface)별로 분리된 세션 쿠키만 읽고 갱신하므로, 파트너 포털 로그인이
+ * 같은 브라우저의 직원 어드민 세션을 덮어쓰는 교차 오염이 발생하지 않습니다.
+ * access token이 만료되기 직전이면 HttpOnly refresh token으로 세션을 갱신해
+ * 사용자가 작업 중 반복해서 로그인 화면으로 돌아가지 않도록 합니다.
  */
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
@@ -42,8 +46,9 @@ export async function middleware(request: NextRequest) {
   const protectedAdminPath = path.startsWith("/admin") && !PUBLIC_ADMIN_PATHS.has(path);
   if (!protectedAgencyPath && !protectedAdminPath) return continueRequest(request);
 
-  const accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value ?? "";
-  const refreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value ?? "";
+  const cookieNames = sessionCookieNames(resolveSessionSurface(path));
+  const accessToken = request.cookies.get(cookieNames.access)?.value ?? "";
+  const refreshToken = request.cookies.get(cookieNames.refresh)?.value ?? "";
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   if (
     accessToken &&
@@ -55,10 +60,10 @@ export async function middleware(request: NextRequest) {
 
   if (refreshToken) {
     const refreshed = await refreshSupabaseSession(refreshToken);
-    if (refreshed) return continueWithRefreshedSession(request, refreshed);
+    if (refreshed) return continueWithRefreshedSession(request, refreshed, cookieNames);
   }
 
-  return redirectToLogin(request, protectedAgencyPath);
+  return redirectToLogin(request, protectedAgencyPath, cookieNames);
 }
 
 function continueRequest(request: NextRequest) {
@@ -101,20 +106,24 @@ async function refreshSupabaseSession(refreshToken: string): Promise<RefreshedSe
   }
 }
 
-function continueWithRefreshedSession(request: NextRequest, session: RefreshedSession) {
+function continueWithRefreshedSession(
+  request: NextRequest,
+  session: RefreshedSession,
+  cookieNames: SurfaceCookieNames
+) {
   const requestHeaders = buildSurfaceRequestHeaders(request);
-  requestHeaders.set("cookie", buildForwardedCookieHeader(request, session));
+  requestHeaders.set("cookie", buildForwardedCookieHeader(request, session, cookieNames));
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   const secure = isHttpsRequest(request);
 
-  response.cookies.set(ACCESS_TOKEN_COOKIE, session.accessToken, {
+  response.cookies.set(cookieNames.access, session.accessToken, {
     httpOnly: true,
     maxAge: normalizeExpiresIn(session.expiresIn),
     path: "/",
     sameSite: "lax",
     secure
   });
-  response.cookies.set(REFRESH_TOKEN_COOKIE, session.refreshToken, {
+  response.cookies.set(cookieNames.refresh, session.refreshToken, {
     httpOnly: true,
     maxAge: refreshTokenMaxAgeSeconds,
     path: "/",
@@ -126,31 +135,42 @@ function continueWithRefreshedSession(request: NextRequest, session: RefreshedSe
 
 function buildSurfaceRequestHeaders(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
-  if (request.nextUrl.pathname === "/agency" || request.nextUrl.pathname.startsWith("/agency/")) {
+  const path = request.nextUrl.pathname;
+  const surface = resolveSessionSurface(path);
+
+  // surface/path 헤더는 서버 컴포넌트의 세션·가드 판단 근거이므로 클라이언트가 보낸 값을 항상 덮어씁니다.
+  requestHeaders.set("x-jht-surface", surface);
+  requestHeaders.set("x-jht-path", path);
+  if (surface === "agency") {
     // 파트너 포털은 해외 사용자 전용이므로 관리자 언어 쿠키와 무관하게 영어로 렌더링합니다.
     requestHeaders.set("x-jht-locale", "en");
-    requestHeaders.set("x-jht-surface", "agency");
+  } else {
+    requestHeaders.delete("x-jht-locale");
   }
   return requestHeaders;
 }
 
-function buildForwardedCookieHeader(request: NextRequest, session: RefreshedSession) {
+function buildForwardedCookieHeader(
+  request: NextRequest,
+  session: RefreshedSession,
+  cookieNames: SurfaceCookieNames
+) {
   const cookies = request.cookies
     .getAll()
-    .filter(({ name }) => name !== ACCESS_TOKEN_COOKIE && name !== REFRESH_TOKEN_COOKIE)
+    .filter(({ name }) => name !== cookieNames.access && name !== cookieNames.refresh)
     .map(({ name, value }) => `${name}=${encodeURIComponent(value)}`);
-  cookies.push(`${ACCESS_TOKEN_COOKIE}=${encodeURIComponent(session.accessToken)}`);
-  cookies.push(`${REFRESH_TOKEN_COOKIE}=${encodeURIComponent(session.refreshToken)}`);
+  cookies.push(`${cookieNames.access}=${encodeURIComponent(session.accessToken)}`);
+  cookies.push(`${cookieNames.refresh}=${encodeURIComponent(session.refreshToken)}`);
   return cookies.join("; ");
 }
 
-function redirectToLogin(request: NextRequest, isAgencyPath: boolean) {
+function redirectToLogin(request: NextRequest, isAgencyPath: boolean, cookieNames: SurfaceCookieNames) {
   const loginUrl = new URL(isAgencyPath ? "/agency/login" : "/auth/login", request.url);
   loginUrl.searchParams.set("next", `${request.nextUrl.pathname}${request.nextUrl.search}`);
   const response = NextResponse.redirect(loginUrl);
   const secure = isHttpsRequest(request);
 
-  for (const cookieName of [ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE]) {
+  for (const cookieName of [cookieNames.access, cookieNames.refresh]) {
     response.cookies.set(cookieName, "", {
       httpOnly: true,
       maxAge: 0,

@@ -10,7 +10,7 @@ import { AdminShellFrame } from "@/components/AdminShellFrame";
 import { AppTopbar } from "@/components/AppTopbar";
 import { CalendarLocaleEnforcer } from "@/components/CalendarLocaleEnforcer";
 import { RouteRefreshBridge } from "@/components/RouteRefreshBridge";
-import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "@/lib/domain/auth-session.mjs";
+import { normalizeSessionSurface, sessionCookieNames } from "@/lib/domain/auth-session.mjs";
 import { normalizeLocale } from "@/lib/i18n";
 import "./globals.css";
 
@@ -36,8 +36,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const headerStore = await headers();
   const cookieStore = await cookies();
   const locale = normalizeLocale(headerStore.get("x-jht-locale") ?? cookieStore.get("jht_locale")?.value);
+  // 현재 화면이 속한 포털의 세션 쿠키만 확인해, 다른 포털 로그인 상태가 이 화면의 로그인 표시를 바꾸지 않게 합니다.
+  const surfaceCookies = sessionCookieNames(normalizeSessionSurface(headerStore.get("x-jht-surface")));
   const isSignedIn = Boolean(
-    cookieStore.get(ACCESS_TOKEN_COOKIE)?.value || cookieStore.get(REFRESH_TOKEN_COOKIE)?.value
+    cookieStore.get(surfaceCookies.access)?.value || cookieStore.get(surfaceCookies.refresh)?.value
   );
 
   return (

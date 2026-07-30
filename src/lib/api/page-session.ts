@@ -3,6 +3,7 @@
  * 민감 정보가 응답과 로그에 노출되지 않도록 내부 오류와 외부 메시지를 분리하고 모든 라우트가 같은 보안 경계를 사용하게 합니다.
  */
 import { cookies, headers } from "next/headers";
+import { normalizeSessionSurface, sessionCookieNames } from "@/lib/domain/auth-session.mjs";
 
 export async function getPageAuthorization() {
   const headerStore = await headers();
@@ -11,8 +12,11 @@ export async function getPageAuthorization() {
     return { authorization: directAuthorization, headerStore };
   }
 
+  // x-jht-surface는 미들웨어가 클라이언트 값을 덮어써서 설정하므로 위조될 수 없습니다.
+  // 포털별 쿠키만 읽어 파트너 세션이 어드민 화면 인증에 쓰이는 교차 사용을 차단합니다.
+  const surface = normalizeSessionSurface(headerStore.get("x-jht-surface"));
   const cookieStore = await cookies();
-  const accessToken = cookieStore.get("jht_access_token")?.value;
+  const accessToken = cookieStore.get(sessionCookieNames(surface).access)?.value;
   return {
     authorization: accessToken ? `Bearer ${accessToken}` : "",
     headerStore
